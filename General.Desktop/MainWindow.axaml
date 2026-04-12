@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:webview="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
+        mc:Ignorable="d"
+        d:DesignWidth="1440"
+        d:DesignHeight="900"
+        Width="1440"
+        Height="900"
+        MinWidth="1200"
+        MinHeight="760"
+        Background="#F5F7FA"
+        x:Class="General.Desktop.MainWindow"
+        Title="General.Desktop">
+    <Grid RowDefinitions="0,*"> <!-- 0 表示没有标题栏 -->
+    <!-- <Grid RowDefinitions="72,*"> -->
+        <!-- <Border Grid.Row="0"
+                Padding="24,0"
+                Background="#0F172A">
+            <Grid ColumnDefinitions="*,Auto"
+                  VerticalAlignment="Center">
+                <StackPanel Spacing="2"
+                            VerticalAlignment="Center">
+                    <TextBlock FontSize="24"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Text="General.Desktop" />
+                    <TextBlock Foreground="#94A3B8"
+                               Text="Avalonia 桌面壳，负责承载 WebView 与本地系统能力。" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="12"
+                            VerticalAlignment="Center">
+                    <Border Padding="12,6"
+                            Background="#1E293B"
+                            CornerRadius="999">
+                        <TextBlock Foreground="#E2E8F0"
+                                   Text="统一入口" />
+                    </Border>
+                    <Border Padding="12,6"
+                            Background="#1E293B"
+                            CornerRadius="999">
+                        <TextBlock Foreground="#E2E8F0"
+                                   Text="系统通知" />
+                    </Border>
+                    <Border Padding="12,6"
+                            Background="#1E293B"
+                            CornerRadius="999">
+                        <TextBlock Foreground="#E2E8F0"
+                                   Text="文件桥接" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border> -->
+
+        <Border Grid.Row="1"
+                Margin="0"
+                Background="White"
+                CornerRadius="0">
+            <webview:NativeWebView x:Name="WebViewHost" />
+        </Border>
+    </Grid>
+</Window>

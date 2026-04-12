@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/General.Admin.Application.Contracts/General.Admin.Application.Contracts.csproj" />
+    <Project Path="src/General.Admin.Application/General.Admin.Application.csproj" />
+    <Project Path="src/General.Admin.DbMigrator/General.Admin.DbMigrator.csproj" />
+    <Project Path="src/General.Admin.Domain.Shared/General.Admin.Domain.Shared.csproj" />
+    <Project Path="src/General.Admin.Domain/General.Admin.Domain.csproj" />
+    <Project Path="src/General.Admin.EntityFrameworkCore/General.Admin.EntityFrameworkCore.csproj" />
+    <Project Path="src/General.Admin.HttpApi.Client/General.Admin.HttpApi.Client.csproj" />
+    <Project Path="src/General.Admin.HttpApi.Host/General.Admin.HttpApi.Host.csproj" />
+    <Project Path="src/General.Admin.HttpApi/General.Admin.HttpApi.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/General.Admin.Application.Tests/General.Admin.Application.Tests.csproj" />
+    <Project Path="test/General.Admin.Domain.Tests/General.Admin.Domain.Tests.csproj" />
+    <Project Path="test/General.Admin.EntityFrameworkCore.Tests/General.Admin.EntityFrameworkCore.Tests.csproj" />
+    <Project Path="test/General.Admin.HttpApi.Client.ConsoleTestApp/General.Admin.HttpApi.Client.ConsoleTestApp.csproj" />
+    <Project Path="test/General.Admin.TestBase/General.Admin.TestBase.csproj" />
+  </Folder>
+</Solution>
