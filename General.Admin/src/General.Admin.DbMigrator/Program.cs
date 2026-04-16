@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using General.Admin.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +35,18 @@ class Program
     public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
             .AddAppSettingsSecretsJson()
+            .AddJsoncAppSettingsDirectory()
+            .ConfigureAppConfiguration((_, configurationBuilder) =>
+            {
+                var configuration = configurationBuilder.Build();
+                var normalizedConnectionString = SqliteConnectionStringHelper.Normalize(
+                    configuration.GetConnectionString("Default"));
+
+                configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:Default"] = normalizedConnectionString
+                });
+            })
             .ConfigureLogging((context, logging) => logging.ClearProviders())
             .ConfigureServices((hostContext, services) =>
             {

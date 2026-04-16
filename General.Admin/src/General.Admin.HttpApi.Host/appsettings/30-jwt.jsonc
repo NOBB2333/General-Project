@@ -1,0 +1,9 @@
+{
+  // 一期先走轻量 JWT 适配前端请求模型。
+  "Jwt": {
+    "Issuer": "General.Admin",
+    "Audience": "General.Web",
+    "ExpireMinutes": 480,
+    "SecurityKey": "General.Admin.Local.Development.Secret.Key.2026"
+  }
+}

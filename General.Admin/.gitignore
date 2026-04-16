@@ -263,3 +263,7 @@ src/General.Admin.Blazor.Server.Tiered/Logs/*
 
 # Use abp install-libs to restore.
 **/wwwroot/libs/*
+
+
+# 忽略上传的附件
+src/General.Admin.HttpApi.Host/App_Data/phase-one-files

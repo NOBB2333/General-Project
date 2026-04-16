@@ -10,6 +10,7 @@ using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.OpenIddict;
+using Volo.Abp.PermissionManagement;
 using Volo.Abp.PermissionManagement.Identity;
 using Volo.Abp.PermissionManagement.OpenIddict;
 using Volo.Abp.SettingManagement;
@@ -59,6 +60,24 @@ public class AdminDomainModule : AbpModule
         Configure<AbpMultiTenancyOptions>(options =>
         {
             options.IsEnabled = MultiTenancyConsts.IsEnabled;
+        });
+
+        Configure<FeatureManagementOptions>(options =>
+        {
+            options.SaveStaticFeaturesToDatabase = false;
+            options.IsDynamicFeatureStoreEnabled = false;
+        });
+
+        Configure<PermissionManagementOptions>(options =>
+        {
+            options.SaveStaticPermissionsToDatabase = false;
+            options.IsDynamicPermissionStoreEnabled = false;
+        });
+
+        Configure<SettingManagementOptions>(options =>
+        {
+            options.SaveStaticSettingsToDatabase = false;
+            options.IsDynamicSettingStoreEnabled = false;
         });
 
 #if DEBUG

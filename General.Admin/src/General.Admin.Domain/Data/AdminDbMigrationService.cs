@@ -7,11 +7,12 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using General.Admin.PhaseOne;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
-using Volo.Abp.Identity;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.TenantManagement;
+using Volo.Abp.Uow;
 
 namespace General.Admin.Data;
 
@@ -19,21 +20,24 @@ public class AdminDbMigrationService : ITransientDependency
 {
     public ILogger<AdminDbMigrationService> Logger { get; set; }
 
-    private readonly IDataSeeder _dataSeeder;
+    private readonly PhaseOneDataSeedContributor _phaseOneDataSeedContributor;
     private readonly IEnumerable<IAdminDbSchemaMigrator> _dbSchemaMigrators;
     private readonly ITenantRepository _tenantRepository;
     private readonly ICurrentTenant _currentTenant;
+    private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public AdminDbMigrationService(
-        IDataSeeder dataSeeder,
+        PhaseOneDataSeedContributor phaseOneDataSeedContributor,
         IEnumerable<IAdminDbSchemaMigrator> dbSchemaMigrators,
         ITenantRepository tenantRepository,
-        ICurrentTenant currentTenant)
+        ICurrentTenant currentTenant,
+        IUnitOfWorkManager unitOfWorkManager)
     {
-        _dataSeeder = dataSeeder;
+        _phaseOneDataSeedContributor = phaseOneDataSeedContributor;
         _dbSchemaMigrators = dbSchemaMigrators;
         _tenantRepository = tenantRepository;
         _currentTenant = currentTenant;
+        _unitOfWorkManager = unitOfWorkManager;
 
         Logger = NullLogger<AdminDbMigrationService>.Instance;
     }
@@ -100,10 +104,9 @@ public class AdminDbMigrationService : ITransientDependency
     {
         Logger.LogInformation($"Executing {(tenant == null ? "host" : tenant.Name + " tenant")} database seed...");
 
-        await _dataSeeder.SeedAsync(new DataSeedContext(tenant?.Id)
-            .WithProperty(IdentityDataSeedContributor.AdminEmailPropertyName, IdentityDataSeedContributor.AdminEmailDefaultValue)
-            .WithProperty(IdentityDataSeedContributor.AdminPasswordPropertyName, IdentityDataSeedContributor.AdminPasswordDefaultValue)
-        );
+        using var unitOfWork = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+        await _phaseOneDataSeedContributor.SeedAsync(new DataSeedContext(tenant?.Id));
+        await unitOfWork.CompleteAsync();
     }
 
     private bool AddInitialMigrationIfNotExist()

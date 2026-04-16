@@ -10,6 +10,30 @@ import { useAuthStore } from '#/store';
 
 import { generateAccess } from './access';
 
+const FALLBACK_NOT_FOUND_ROUTE_NAME = 'FallbackNotFound';
+
+function buildLoginRedirect(fullPath: string) {
+  return {
+    path: LOGIN_PATH,
+    query:
+      fullPath === preferences.app.defaultHomePath
+        ? {}
+        : { redirect: encodeURIComponent(fullPath) },
+    replace: true,
+  };
+}
+
+function resetAccessState() {
+  const accessStore = useAccessStore();
+  accessStore.setAccessCodes([]);
+  accessStore.setAccessMenus([]);
+  accessStore.setAccessRoutes([]);
+  accessStore.setAccessToken(null);
+  accessStore.setRefreshToken(null);
+  accessStore.setIsAccessChecked(false);
+  accessStore.setLoginExpired(false);
+}
+
 /**
  * 通用守卫配置
  * @param router
@@ -52,7 +76,12 @@ function setupAccessGuard(router: Router) {
 
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string)) {
-      if (to.path === LOGIN_PATH && accessStore.accessToken) {
+      if (
+        to.path === LOGIN_PATH &&
+        accessStore.accessToken &&
+        accessStore.isAccessChecked &&
+        userStore.userInfo?.homePath
+      ) {
         return decodeURIComponent(
           (to.query?.redirect as string) ||
             userStore.userInfo?.homePath ||
@@ -71,51 +100,47 @@ function setupAccessGuard(router: Router) {
 
       // 没有访问权限，跳转登录页面
       if (to.fullPath !== LOGIN_PATH) {
-        return {
-          path: LOGIN_PATH,
-          // 如不需要，直接删除 query
-          query:
-            to.fullPath === preferences.app.defaultHomePath
-              ? {}
-              : { redirect: encodeURIComponent(to.fullPath) },
-          // 携带当前跳转的页面，登录后重新跳转该页面
-          replace: true,
-        };
+        return buildLoginRedirect(to.fullPath);
       }
       return to;
     }
 
-    // 是否已经生成过动态路由
-    if (accessStore.isAccessChecked) {
+    const shouldRegenerateAccess =
+      !accessStore.isAccessChecked ||
+      to.name === FALLBACK_NOT_FOUND_ROUTE_NAME;
+
+    if (!shouldRegenerateAccess) {
       return true;
     }
 
-    // 生成路由表
-    // 当前登录用户拥有的角色标识列表
-    const userInfo = userStore.userInfo || (await authStore.fetchUserInfo());
-    const userRoles = userInfo.roles ?? [];
+    try {
+      // 生成路由表
+      const userInfo = userStore.userInfo || (await authStore.fetchUserInfo());
+      const userRoles = userInfo.roles ?? [];
 
-    // 生成菜单和路由
-    const { accessibleMenus, accessibleRoutes } = await generateAccess({
-      roles: userRoles,
-      router,
-      // 则会在菜单中显示，但是访问会被重定向到403
-      routes: accessRoutes,
-    });
+      const { accessibleMenus, accessibleRoutes } = await generateAccess({
+        roles: userRoles,
+        router,
+        routes: accessRoutes,
+      });
 
-    // 保存菜单信息和路由信息
-    accessStore.setAccessMenus(accessibleMenus);
-    accessStore.setAccessRoutes(accessibleRoutes);
-    accessStore.setIsAccessChecked(true);
-    const redirectPath = (from.query.redirect ??
-      (to.path === preferences.app.defaultHomePath
-        ? userInfo.homePath || preferences.app.defaultHomePath
-        : to.fullPath)) as string;
+      accessStore.setAccessMenus(accessibleMenus);
+      accessStore.setAccessRoutes(accessibleRoutes);
+      accessStore.setIsAccessChecked(true);
+      const redirectPath = (from.query.redirect ??
+        (to.path === preferences.app.defaultHomePath
+          ? userInfo.homePath || preferences.app.defaultHomePath
+          : to.fullPath)) as string;
 
-    return {
-      ...router.resolve(decodeURIComponent(redirectPath)),
-      replace: true,
-    };
+      return {
+        ...router.resolve(decodeURIComponent(redirectPath)),
+        replace: true,
+      };
+    } catch (error) {
+      console.error('Failed to build dynamic routes.', error);
+      resetAccessState();
+      return buildLoginRedirect(to.fullPath);
+    }
   });
 }
 

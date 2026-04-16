@@ -49,8 +49,8 @@ const timelineItems = [
   { color: 'orange', content: '下一步建议先做登录后首页与项目列表页' },
 ];
 
-function gotoAnalytics() {
-  router.push('/analytics');
+function gotoBusinessOverview() {
+  router.push('/business/overview');
 }
 </script>
 
@@ -74,7 +74,7 @@ function gotoAnalytics() {
               v-for="card in moduleCards"
               :key="card.title"
               :bordered="false"
-              class="bg-[#f8fafc]"
+              class="workspace-card"
             >
               <template #title>{{ card.title }}</template>
               <p class="mb-4 text-text-secondary">{{ card.description }}</p>
@@ -112,7 +112,7 @@ function gotoAnalytics() {
           </div>
 
           <div class="mt-4 flex gap-3">
-            <Button type="primary" @click="gotoAnalytics">查看分析占位页</Button>
+            <Button type="primary" @click="gotoBusinessOverview">进入经营总览</Button>
             <Button @click="router.push('/demos/ant-design')">保留模板演示页</Button>
           </div>
         </Card>
@@ -120,3 +120,13 @@ function gotoAnalytics() {
     </Row>
   </Page>
 </template>
+
+<style scoped>
+.workspace-card {
+  background: var(--ant-color-fill-quaternary);
+  transition:
+    background-color 0.24s ease,
+    color 0.24s ease,
+    box-shadow 0.24s ease;
+}
+</style>

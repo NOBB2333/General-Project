@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using General.Admin.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
 
@@ -30,6 +33,18 @@ public class Program
             Log.Information("Starting General.Admin.HttpApi.Host.");
             var builder = WebApplication.CreateBuilder(args);
             builder.Host.AddAppSettingsSecretsJson()
+                .AddJsoncAppSettingsDirectory()
+                .ConfigureAppConfiguration((_, configurationBuilder) =>
+                {
+                    var configuration = configurationBuilder.Build();
+                    var normalizedConnectionString = SqliteConnectionStringHelper.Normalize(
+                        configuration.GetConnectionString("Default"));
+
+                    configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["ConnectionStrings:Default"] = normalizedConnectionString
+                    });
+                })
                 .UseAutofac()
                 .UseSerilog();
             await builder.AddApplicationAsync<AdminHttpApiHostModule>();

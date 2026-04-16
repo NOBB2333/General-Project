@@ -15,9 +15,11 @@ public class AdminDbContextFactory : IDesignTimeDbContextFactory<AdminDbContext>
         AdminEfCoreEntityExtensionMappings.Configure();
 
         var configuration = BuildConfiguration();
+        var connectionString = SqliteConnectionStringHelper.Normalize(
+            configuration.GetConnectionString("Default"));
 
         var builder = new DbContextOptionsBuilder<AdminDbContext>()
-            .UseSqlServer(configuration.GetConnectionString("Default"));
+            .UseSqlite(connectionString);
 
         return new AdminDbContext(builder.Options);
     }

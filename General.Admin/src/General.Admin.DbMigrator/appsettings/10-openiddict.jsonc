@@ -1,0 +1,10 @@
+{
+  "OpenIddict": {
+    "Applications": {
+      "Admin_Swagger": {
+        "ClientId": "Admin_Swagger",
+        "RootUrl": "https://localhost:44392"
+      }
+    }
+  }
+}

@@ -2,23 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using General.Admin.EntityFrameworkCore;
+using General.Admin.Infrastructure;
 using General.Admin.MultiTenancy;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite.Bundling;
 using Microsoft.OpenApi;
-using OpenIddict.Validation.AspNetCore;
 using Volo.Abp;
 using Volo.Abp.Account;
 using Volo.Abp.Account.Web;
+using Volo.Abp.AspNetCore.Auditing;
 using Volo.Abp.AspNetCore.MultiTenancy;
 using Volo.Abp.AspNetCore.Mvc;
+using Volo.Abp.AspNetCore.Mvc.Libs;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared;
 using Volo.Abp.AspNetCore.Serilog;
@@ -45,25 +50,14 @@ namespace General.Admin;
 )]
 public class AdminHttpApiHostModule : AbpModule
 {
-    public override void PreConfigureServices(ServiceConfigurationContext context)
-    {
-        PreConfigure<OpenIddictBuilder>(builder =>
-        {
-            builder.AddValidation(options =>
-            {
-                options.AddAudiences("Admin");
-                options.UseLocalServer();
-                options.UseAspNetCore();
-            });
-        });
-    }
-
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
         var hostingEnvironment = context.Services.GetHostingEnvironment();
 
+        ConfigureAuditing();
         ConfigureAuthentication(context);
+        ConfigureMvcLibs();
         ConfigureBundles();
         ConfigureUrls(configuration);
         ConfigureConventionalControllers();
@@ -72,9 +66,52 @@ public class AdminHttpApiHostModule : AbpModule
         ConfigureSwaggerServices(context, configuration);
     }
 
+    private void ConfigureAuditing()
+    {
+        Configure<AbpAspNetCoreAuditingOptions>(options =>
+        {
+            options.IgnoredUrls.Add("/api/app");
+        });
+    }
+
+    private void ConfigureMvcLibs()
+    {
+        Configure<AbpMvcLibsOptions>(options =>
+        {
+            options.CheckLibs = false;
+        });
+    }
+
     private void ConfigureAuthentication(ServiceConfigurationContext context)
     {
-        context.Services.ForwardIdentityAuthenticationForBearer(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
+        var configuration = context.Services.GetConfiguration();
+        Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+
+        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey));
+
+        context.Services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.MapInboundClaims = false;
+                options.RequireHttpsMetadata = false;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateAudience = true,
+                    ValidateIssuer = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ValidAudience = jwtOptions.Audience,
+                    ValidIssuer = jwtOptions.Issuer,
+                    NameClaimType = AbpClaimTypes.UserName,
+                    RoleClaimType = AbpClaimTypes.Role,
+                    IssuerSigningKey = signingKey,
+                    ClockSkew = TimeSpan.FromMinutes(1)
+                };
+            });
+
         context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
             options.IsDynamicClaimsEnabled = true;
@@ -197,7 +234,6 @@ public class AdminHttpApiHostModule : AbpModule
         app.UseRouting();
         app.UseCors();
         app.UseAuthentication();
-        app.UseAbpOpenIddictValidation();
 
         if (MultiTenancyConsts.IsEnabled)
         {

@@ -1,0 +1,17 @@
+{
+  "title": "示例页",
+  "antd": "Ant Design Vue",
+  "general": "General 示例",
+  "generalPageTitle": "General 示例页面",
+  "generalDescription": "当前先保留这页作为通用组件与交互能力的占位示例。",
+  "vben": {
+    "title": "项目",
+    "about": "关于",
+    "document": "文档",
+    "antdv": "Ant Design Vue 版本",
+    "antdv-next": "Antdv Next 版本",
+    "naive-ui": "Naive UI 版本",
+    "element-plus": "Element Plus 版本",
+    "tdesign": "TDesign Vue 版本"
+  }
+}
