@@ -8,6 +8,10 @@ public class CurrentUserInfoDto
 
     public string HomePath { get; set; } = "/platform/workspace";
 
+    public DateTime? LastLoginTime { get; set; }
+
+    public List<string> OrganizationUnitNames { get; set; } = [];
+
     public string RealName { get; set; } = string.Empty;
 
     public List<string> Roles { get; set; } = [];

@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize]
 [Route("api/app/business")]
 public class BusinessController : ControllerBase

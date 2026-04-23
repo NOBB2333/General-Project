@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize]
 [Route("api/app/organization-unit")]
 public class OrganizationUnitController : ControllerBase
@@ -26,6 +25,7 @@ public class OrganizationUnitController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] OrganizationUnitSaveInput input)
     {
@@ -34,6 +34,7 @@ public class OrganizationUnitController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] OrganizationUnitSaveInput input)
     {
@@ -42,6 +43,7 @@ public class OrganizationUnitController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPut("{id:guid}/move")]
     public async Task<ActionResult<ApiResponse<bool>>> MoveAsync(Guid id, [FromBody] OrganizationUnitMoveInput input)
     {
@@ -50,6 +52,7 @@ public class OrganizationUnitController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {

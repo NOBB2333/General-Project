@@ -8,7 +8,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize]
 [Route("api/app/user")]
 public class UserController : ControllerBase
@@ -32,7 +31,6 @@ public class UserController : ControllerBase
         return ApiResponse<CurrentUserInfoDto>.Ok(await _userService.GetCurrentUserInfoAsync(token));
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
     [HttpGet("list")]
     public async Task<ActionResult<ApiResponse<List<PhaseOneUserListItemDto>>>> GetListAsync([FromQuery] PhaseOneUserListInput input)
     {
@@ -40,6 +38,7 @@ public class UserController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.User.Manage")]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneUserSaveInput input)
     {
@@ -48,6 +47,7 @@ public class UserController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.User.Manage")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PhaseOneUserSaveInput input)
     {
@@ -56,10 +56,18 @@ public class UserController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.User.Manage")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {
         await _userService.DeleteAsync(id);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [HttpPut("password")]
+    public async Task<ActionResult<ApiResponse<bool>>> ChangePasswordAsync([FromBody] PhaseOnePasswordChangeInput input)
+    {
+        await _userService.ChangePasswordAsync(input);
         return ApiResponse<bool>.Ok(true);
     }
 }

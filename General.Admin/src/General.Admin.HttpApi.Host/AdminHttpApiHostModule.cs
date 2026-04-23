@@ -11,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.Mvc;
 using General.Admin.EntityFrameworkCore;
 using General.Admin.Infrastructure;
 using General.Admin.MultiTenancy;
@@ -34,6 +35,7 @@ using Volo.Abp.Security.Claims;
 using Volo.Abp.Swashbuckle;
 using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.VirtualFileSystem;
+using Volo.Abp.Auditing;
 
 namespace General.Admin;
 
@@ -55,6 +57,7 @@ public class AdminHttpApiHostModule : AbpModule
         var configuration = context.Services.GetConfiguration();
         var hostingEnvironment = context.Services.GetHostingEnvironment();
 
+        context.Services.AddHttpContextAccessor();
         ConfigureAuditing();
         ConfigureAuthentication(context);
         ConfigureMvcLibs();
@@ -70,7 +73,14 @@ public class AdminHttpApiHostModule : AbpModule
     {
         Configure<AbpAspNetCoreAuditingOptions>(options =>
         {
+            options.IgnoredUrls.Add("/api/health");
             options.IgnoredUrls.Add("/api/app");
+        });
+
+        Configure<AbpAuditingOptions>(options =>
+        {
+            options.IsEnabledForGetRequests = false;
+            options.HideErrors = true;
         });
     }
 
@@ -79,6 +89,11 @@ public class AdminHttpApiHostModule : AbpModule
         Configure<AbpMvcLibsOptions>(options =>
         {
             options.CheckLibs = false;
+        });
+
+        Configure<MvcOptions>(options =>
+        {
+            options.Filters.AddService<PlatformEndpointBlacklistFilter>();
         });
     }
 
@@ -178,6 +193,9 @@ public class AdminHttpApiHostModule : AbpModule
 
     private static void ConfigureSwaggerServices(ServiceConfigurationContext context, IConfiguration configuration)
     {
+        context.Services.AddScoped<PlatformEndpointBlacklistFilter>();
+        context.Services.AddTransient<PhaseOneRequestAuditMiddleware>();
+        context.Services.AddTransient<PhaseOneUserActivityMiddleware>();
         context.Services.AddAbpSwaggerGenWithOAuth(
             configuration["AuthServer:Authority"]!,
             new Dictionary<string, string>
@@ -242,6 +260,8 @@ public class AdminHttpApiHostModule : AbpModule
         app.UseUnitOfWork();
         app.UseDynamicClaims();
         app.UseAuthorization();
+        app.UseMiddleware<PhaseOneRequestAuditMiddleware>();
+        app.UseMiddleware<PhaseOneUserActivityMiddleware>();
 
         app.UseSwagger();
         app.UseAbpSwaggerUI(c =>
@@ -253,7 +273,6 @@ public class AdminHttpApiHostModule : AbpModule
             c.OAuthScopes("Admin");
         });
 
-        app.UseAuditing();
         app.UseAbpSerilogEnrichers();
         app.UseConfiguredEndpoints();
     }

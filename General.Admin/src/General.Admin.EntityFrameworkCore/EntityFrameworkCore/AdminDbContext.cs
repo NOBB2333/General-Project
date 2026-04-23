@@ -60,6 +60,12 @@ public class AdminDbContext :
     public DbSet<TenantConnectionString> TenantConnectionStrings { get; set; }
     public DbSet<AppMenu> AppMenus { get; set; }
     public DbSet<AppRoleMenu> AppRoleMenus { get; set; }
+    public DbSet<AppRoleAuthorization> AppRoleAuthorizations { get; set; }
+    public DbSet<AppTenantAuthorization> AppTenantAuthorizations { get; set; }
+    public DbSet<AppUserProfile> AppUserProfiles { get; set; }
+    public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
+    public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
+    public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
     public DbSet<PhaseOneProject> PhaseOneProjects { get; set; }
     public DbSet<PhaseOneProjectCycle> PhaseOneProjectCycles { get; set; }
     public DbSet<PhaseOneProjectDocument> PhaseOneProjectDocuments { get; set; }
@@ -125,6 +131,80 @@ public class AdminDbContext :
             b.ToTable($"{AdminConsts.DbTablePrefix}RoleMenus", AdminConsts.DbSchema);
             b.ConfigureByConvention();
             b.HasIndex(x => new { x.RoleId, x.MenuId }).IsUnique();
+        });
+
+        builder.Entity<AppRoleAuthorization>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}RoleAuthorizations", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.DataScopeMode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.AccountScopeMode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.CustomOrganizationUnitIds).IsRequired().HasColumnType("TEXT");
+            b.Property(x => x.AllowedUserIds).IsRequired().HasColumnType("TEXT");
+            b.Property(x => x.ApiBlacklist).IsRequired().HasColumnType("TEXT");
+            b.HasIndex(x => x.RoleId).IsUnique();
+        });
+
+        builder.Entity<AppTenantAuthorization>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}TenantAuthorizations", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.Property(x => x.MenuIds).IsRequired().HasColumnType("TEXT");
+            b.Property(x => x.ApiBlacklist).IsRequired().HasColumnType("TEXT");
+            b.HasIndex(x => x.TenantId).IsUnique();
+        });
+
+        builder.Entity<AppUserProfile>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}UserProfiles", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.EmployeeNo).HasMaxLength(64);
+            b.Property(x => x.PhoneNumber).HasMaxLength(32);
+            b.Property(x => x.ExternalSource).HasMaxLength(64);
+            b.Property(x => x.ExternalUserId).HasMaxLength(128);
+            b.Property(x => x.ForceLogoutAfter);
+            b.Property(x => x.LastSeenIpAddress).HasMaxLength(64);
+            b.Property(x => x.LastSeenDevice).HasMaxLength(128);
+            b.Property(x => x.LastSeenBrowser).HasMaxLength(512);
+            b.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        builder.Entity<AppExternalAccountMapping>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ExternalAccountMappings", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ExternalSource).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ExternalUserId).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.HasIndex(x => new { x.UserId, x.ExternalSource, x.ExternalUserId }).IsUnique();
+        });
+
+        builder.Entity<AppPlatformFile>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}PlatformFiles", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.FileKey).IsRequired().HasMaxLength(256);
+            b.Property(x => x.FileName).IsRequired().HasMaxLength(256);
+            b.Property(x => x.ContentType).IsRequired().HasMaxLength(256);
+            b.Property(x => x.Category).IsRequired().HasMaxLength(64);
+            b.Property(x => x.ParentPath).HasMaxLength(256);
+            b.Property(x => x.StorageLocation).IsRequired().HasMaxLength(512);
+            b.HasIndex(x => x.FileKey).IsUnique();
+            b.HasIndex(x => new { x.Category, x.ParentPath });
+        });
+
+        builder.Entity<AppUpdateLog>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}UpdateLogs", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Version).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Title).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Summary).IsRequired().HasMaxLength(2048);
+            b.Property(x => x.ImpactScope).HasMaxLength(256);
+            b.HasIndex(x => x.Version).IsUnique();
+            b.HasIndex(x => x.PublishedAt);
         });
 
         builder.Entity<PhaseOneProject>(b =>

@@ -22,7 +22,7 @@ const columns = [
   { dataIndex: 'title', key: 'title', title: '任务名称', width: 180 },
   { dataIndex: 'jobKey', key: 'jobKey', title: '任务键', width: 180 },
   { dataIndex: 'cronExpression', key: 'cronExpression', title: 'Cron', width: 180 },
-  { dataIndex: 'description', key: 'description', title: '说明' },
+  { dataIndex: 'description', key: 'description', title: '说明', ellipsis: true, width: 320 },
   { dataIndex: 'nextRunTime', key: 'nextRunTime', title: '下次执行', width: 160 },
   { dataIndex: 'lastRunTime', key: 'lastRunTime', title: '最近执行', width: 160 },
   { dataIndex: 'isEnabled', key: 'isEnabled', title: '状态', width: 100 },
@@ -80,8 +80,12 @@ onMounted(loadData);
         :loading="loading"
         :pagination="false"
         row-key="jobKey"
+        :scroll="{ x: 1320 }"
       >
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'description'">
+            <div class="scheduler__desc">{{ (record as SchedulerApi.JobItem).description || '-' }}</div>
+          </template>
           <template v-if="column.key === 'nextRunTime'">
             {{ formatDate((record as SchedulerApi.JobItem).nextRunTime) }}
           </template>
@@ -132,5 +136,13 @@ onMounted(loadData);
 
 .scheduler__cell small {
   color: var(--ant-color-text-secondary);
+}
+
+.scheduler__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.6;
 }
 </style>

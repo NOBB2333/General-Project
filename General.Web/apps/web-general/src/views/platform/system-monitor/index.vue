@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Col, Descriptions, Empty, Row, Statistic, Table } from 'ant-design-vue';
+import { Alert, Button, Card, Col, Descriptions, Empty, Row, Statistic, Table } from 'ant-design-vue';
 
 import { getSystemMonitorApi, type SystemMonitorApi } from '#/api/core';
 
@@ -30,6 +30,9 @@ async function loadMonitor() {
 }
 
 function formatBytes(value: number) {
+  if (value <= 0) {
+    return '0 B';
+  }
   if (value < 1024) {
     return `${value} B`;
   }
@@ -42,31 +45,64 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
+function formatMemoryUsage(usedBytes?: number, totalBytes?: number) {
+  return `${formatBytes(usedBytes || 0)}/${formatBytes(totalBytes || 0)}`;
+}
+
+function resolveSystemUsedMemoryBytes() {
+  if (!monitor.value) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    (monitor.value.totalMemoryBytes || 0) - Math.max(0, monitor.value.availableMemoryBytes || 0),
+  );
+}
+
 onMounted(loadMonitor);
 </script>
 
 <template>
   <Page description="系统监控提供当前服务器环境、进程资源占用和磁盘情况。" title="系统监控">
     <section class="platform-monitor">
+      <Alert
+        v-if="monitor?.memoryUsageNote"
+        :message="monitor.memoryUsageNote"
+        show-icon
+        type="info"
+      />
+
       <Row :gutter="[16, 16]">
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
+            <Statistic
+              title="CPU 使用率"
+              :precision="2"
+              suffix="%"
+              :value="monitor?.cpuUsagePercent || 0"
+            />
+          </Card>
+        </Col>
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
+            <Statistic
+              title="系统内存使用"
+              :value="formatMemoryUsage(resolveSystemUsedMemoryBytes(), monitor?.totalMemoryBytes)"
+            />
+          </Card>
+        </Col>
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
+            <Statistic
+              title="进程内存使用"
+              :value="formatMemoryUsage(monitor?.workingSetBytes, monitor?.processMemoryDisplayDenominatorBytes)"
+            />
+          </Card>
+        </Col>
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
             <Statistic title="CPU 核心数" :value="monitor?.processorCount || 0" />
-          </Card>
-        </Col>
-        <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
-            <Statistic title="进程线程数" :value="monitor?.threadCount || 0" />
-          </Card>
-        </Col>
-        <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
-            <Statistic title="工作集" :value="formatBytes(monitor?.workingSetBytes || 0)" />
-          </Card>
-        </Col>
-        <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
-            <Statistic title="托管堆" :value="formatBytes(monitor?.managedMemoryBytes || 0)" />
           </Card>
         </Col>
       </Row>
@@ -97,7 +133,23 @@ onMounted(loadMonitor);
               <Descriptions.Item label="CPU 总耗时">
                 {{ monitor ? `${monitor.cpuTimeSeconds.toFixed(1)} 秒` : '-' }}
               </Descriptions.Item>
+              <Descriptions.Item label="进程线程数">{{ monitor?.threadCount ?? '-' }}</Descriptions.Item>
               <Descriptions.Item label="句柄数">{{ monitor?.handleCount ?? '-' }}</Descriptions.Item>
+              <Descriptions.Item label="总物理内存">
+                {{ formatBytes(monitor?.totalMemoryBytes || 0) }}
+              </Descriptions.Item>
+              <Descriptions.Item label="工作集">
+                {{ formatBytes(monitor?.workingSetBytes || 0) }}
+              </Descriptions.Item>
+              <Descriptions.Item label="系统内存占比">
+                {{ monitor?.systemMemoryUsagePercent?.toFixed(2) || '0.00' }}%
+              </Descriptions.Item>
+              <Descriptions.Item label="进程内存占比">
+                {{ monitor?.processMemoryUsagePercent?.toFixed(2) || '0.00' }}%
+              </Descriptions.Item>
+              <Descriptions.Item label="托管堆">
+                {{ formatBytes(monitor?.managedMemoryBytes || 0) }}
+              </Descriptions.Item>
               <Descriptions.Item label="可用内存上限">
                 {{ formatBytes(monitor?.availableMemoryBytes || 0) }}
               </Descriptions.Item>

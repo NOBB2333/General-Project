@@ -18,13 +18,38 @@ export namespace AuditLogApi {
   }
 
   export interface AuditLogQuery {
+    category?: string;
+    endTime?: string;
     keyword?: string;
     maxResultCount?: number;
+    startTime?: string;
+  }
+
+  export interface LogStatItem {
+    count: number;
+    key: string;
+    label: string;
+  }
+
+  export interface LogDashboard {
+    accessLogs: AuditLogItem[];
+    auditLogs: AuditLogItem[];
+    exceptionLogs: AuditLogItem[];
+    operationLogs: AuditLogItem[];
+    topApis: LogStatItem[];
+    topMenus: LogStatItem[];
+    topUsers: LogStatItem[];
   }
 }
 
 export async function getAuditLogListApi(params?: AuditLogApi.AuditLogQuery) {
   return requestClient.get<AuditLogApi.AuditLogItem[]>('/app/audit-log/list', {
+    params,
+  });
+}
+
+export async function getAuditLogDashboardApi(params?: AuditLogApi.AuditLogQuery) {
+  return requestClient.get<AuditLogApi.LogDashboard>('/app/audit-log/dashboard', {
     params,
   });
 }

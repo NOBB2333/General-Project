@@ -1,5 +1,6 @@
 using Volo.Abp.Authorization;
 using Volo.Abp.DependencyInjection;
+using Volo.Abp.Domain.Entities;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
 using Volo.Abp.Users;
@@ -102,49 +103,38 @@ public class PhaseOneProjectService : ITransientDependency
 
     public async Task<PhaseOneProjectDetailDto> GetDetailAsync(Guid projectId)
     {
-        var context = await BuildContextAsync();
-        var project = context.Projects.FirstOrDefault(x => x.Id == projectId);
-        if (project == null)
-        {
-            throw new AbpAuthorizationException("项目不存在或当前用户无权查看。");
-        }
+        // 使用精准上下文：仅查询该项目的子实体
+        var context = await BuildDetailContextAsync(projectId);
+        var project = context.Projects[0];
 
-        var projectTasks = context.Tasks
-            .Where(item => item.ProjectId == projectId)
+        var projectTasks = (context.TasksByProject.GetValueOrDefault(projectId) ?? [])
             .OrderBy(item => item.PlannedEndTime ?? DateTime.MaxValue)
             .ThenBy(item => item.TaskCode)
             .ToList();
-        var projectMilestones = context.Milestones
-            .Where(item => item.ProjectId == projectId)
+        var projectMilestones = (context.MilestonesByProject.GetValueOrDefault(projectId) ?? [])
             .OrderBy(item => item.PlannedCompletionDate)
             .ToList();
-        var projectCycles = context.Cycles
-            .Where(item => item.ProjectId == projectId)
+        var projectCycles = (context.CyclesByProject.GetValueOrDefault(projectId) ?? [])
             .OrderBy(item => item.StartDate ?? DateTime.MaxValue)
             .ThenBy(item => item.EndDate ?? DateTime.MaxValue)
             .ToList();
-        var projectRaidItems = context.RaidItems
-            .Where(item => item.ProjectId == projectId)
+        var projectRaidItems = (context.RaidItemsByProject.GetValueOrDefault(projectId) ?? [])
             .OrderByDescending(item => item.Level)
             .ThenBy(item => item.PlannedResolveDate ?? DateTime.MaxValue)
             .ToList();
-        var projectIssues = context.Issues
-            .Where(item => item.ProjectId == projectId)
+        var projectIssues = (context.IssuesByProject.GetValueOrDefault(projectId) ?? [])
             .OrderBy(item => item.DueDate ?? DateTime.MaxValue)
             .ThenBy(item => item.Title)
             .ToList();
-        var projectDocuments = context.Documents
-            .Where(item => item.ProjectId == projectId)
+        var projectDocuments = (context.DocumentsByProject.GetValueOrDefault(projectId) ?? [])
             .OrderBy(item => item.Category)
             .ThenBy(item => item.Title)
             .ToList();
-        var projectMembers = context.Members
-            .Where(item => item.ProjectId == projectId)
+        var projectMembers = (context.MembersByProject.GetValueOrDefault(projectId) ?? [])
             .OrderByDescending(item => item.IsActive())
             .ThenBy(item => context.UserNameMap.GetValueOrDefault(item.UserId) ?? string.Empty)
             .ToList();
-        var projectWorklogs = context.Worklogs
-            .Where(item => item.ProjectId == projectId)
+        var projectWorklogs = (context.WorklogsByProject.GetValueOrDefault(projectId) ?? [])
             .OrderByDescending(item => item.WorkDate)
             .ThenByDescending(item => item.CreationTime)
             .ToList();
@@ -162,7 +152,7 @@ public class PhaseOneProjectService : ITransientDependency
             Cycles = projectCycles.Select(item => MapCycle(item, context)).ToList(),
             Description = project.Description ?? string.Empty,
             Documents = projectDocuments.Select(item => MapDocument(item, context)).ToList(),
-            HighRiskCount = projectRaidItems.Count(item => item.Type == "风险" && item.Level == "高" && !IsClosed(item.Status)),
+            HighRiskCount = projectRaidItems.Count(item => item.Type == PhaseOneRaidTypes.Risk && item.Level == PhaseOnePriorities.High && !IsClosed(item.Status)),
             Id = project.Id,
             IsKeyProject = project.IsKeyProject,
             Issues = projectIssues.Select(item => MapIssue(item, context)).ToList(),
@@ -226,13 +216,15 @@ public class PhaseOneProjectService : ITransientDependency
             .ThenBy(project => project.PlannedEndDate ?? DateTime.MaxValue)
             .Select(project =>
             {
-                var tasks = context.Tasks.Where(item => item.ProjectId == project.Id && item.OwnerUserId == currentUserId && !IsClosed(item.Status)).ToList();
-                var issues = context.Issues.Where(item => item.ProjectId == project.Id && item.OwnerUserId == currentUserId && !IsClosed(item.Status)).ToList();
-                var weekHours = context.Worklogs
-                    .Where(item => item.ProjectId == project.Id && item.UserId == currentUserId && item.WeekStartDate.Date == weekStartDate.Date)
+                var tasks = (context.TasksByProject.GetValueOrDefault(project.Id) ?? [])
+                    .Where(item => item.OwnerUserId == currentUserId && !IsClosed(item.Status)).ToList();
+                var issues = (context.IssuesByProject.GetValueOrDefault(project.Id) ?? [])
+                    .Where(item => item.OwnerUserId == currentUserId && !IsClosed(item.Status)).ToList();
+                var weekHours = (context.WorklogsByProject.GetValueOrDefault(project.Id) ?? [])
+                    .Where(item => item.UserId == currentUserId && item.WeekStartDate.Date == weekStartDate.Date)
                     .Sum(item => item.Hours);
-                var nextCycle = context.Cycles
-                    .Where(item => item.ProjectId == project.Id && !IsClosed(item.Status))
+                var nextCycle = (context.CyclesByProject.GetValueOrDefault(project.Id) ?? [])
+                    .Where(item => !IsClosed(item.Status))
                     .OrderBy(item => item.StartDate ?? DateTime.MaxValue)
                     .FirstOrDefault();
 
@@ -409,6 +401,70 @@ public class PhaseOneProjectService : ITransientDependency
             _currentUser.IsInRole(PhaseOneRoleNames.Admin));
     }
 
+    /// <summary>
+    /// 针对单项目详情视图的精准上下文：只加载目标项目的子实体，避免全量扫描。
+    /// </summary>
+    private async Task<ProjectContext> BuildDetailContextAsync(Guid projectId)
+    {
+        var accessibleOrganizationUnitIds = await _dataScopeService.GetAccessibleOrganizationUnitIdsAsync();
+        var organizationUnits = (await _organizationUnitRepository.GetListAsync())
+            .ToDictionary(item => item.Id, item => item.DisplayName);
+        var users = (await _userRepository.GetListAsync())
+            .ToDictionary(item => item.Id, ResolveDisplayName);
+
+        var project = await _projectRepository.GetAsync(projectId);
+        var allMembers = (await _projectMemberRepository.GetListAsync()).ToList();
+
+        // 权限检查：当前用户必须能看到该项目
+        var canAccess = _currentUser.IsInRole(PhaseOneRoleNames.Admin)
+            || accessibleOrganizationUnitIds.Contains(project.OrganizationUnitId)
+            || (_currentUser.Id.HasValue && allMembers.Any(m =>
+                m.ProjectId == projectId
+                && m.UserId == _currentUser.Id.Value
+                && (m.IsActive() || m.AllowHistoricalRead)));
+
+        if (!canAccess)
+        {
+            throw new EntityNotFoundException(typeof(PhaseOneProject), projectId);
+        }
+
+        var projects = new List<PhaseOneProject> { project };
+        var members = allMembers.Where(m => m.ProjectId == projectId).ToList();
+
+        // 仅查询该项目的子实体（精准查询，不做全表扫描）
+        var milestones = await _projectMilestoneRepository.GetListAsync(x => x.ProjectId == projectId);
+        var cycles     = await _projectCycleRepository.GetListAsync(x => x.ProjectId == projectId);
+        var tasks      = await _projectTaskRepository.GetListAsync(x => x.ProjectId == projectId);
+        var raidItems  = await _projectRaidItemRepository.GetListAsync(x => x.ProjectId == projectId);
+        var issues     = await _projectIssueRepository.GetListAsync(x => x.ProjectId == projectId);
+        var documents  = await _projectDocumentRepository.GetListAsync(x => x.ProjectId == projectId);
+        var worklogs   = await _projectWorklogRepository.GetListAsync(x => x.ProjectId == projectId);
+
+        var myMemberMap = _currentUser.Id.HasValue
+            ? members
+                .Where(item => item.UserId == _currentUser.Id.Value)
+                .GroupBy(item => item.ProjectId)
+                .ToDictionary(item => item.Key, item => item.OrderByDescending(x => x.JoinDate).First())
+            : new Dictionary<Guid, PhaseOneProjectMember>();
+
+        return new ProjectContext(
+            organizationUnits,
+            projects,
+            projects.ToDictionary(item => item.Id, item => item.Name),
+            milestones,
+            cycles,
+            raidItems,
+            tasks,
+            issues,
+            documents,
+            members,
+            worklogs,
+            users,
+            myMemberMap,
+            _currentUser.Id,
+            _currentUser.IsInRole(PhaseOneRoleNames.Admin));
+    }
+
     private static List<PhaseOneProjectCalendarItemDto> BuildCalendarItems(
         IReadOnlyCollection<PhaseOneProjectTask> tasks,
         IReadOnlyCollection<PhaseOneProjectCycle> cycles,
@@ -513,32 +569,32 @@ public class PhaseOneProjectService : ITransientDependency
 
     private static PhaseOneProjectListItemDto MapProject(PhaseOneProject project, ProjectContext context)
     {
-        var projectTasks = context.Tasks.Where(item => item.ProjectId == project.Id).ToList();
-        var projectMilestones = context.Milestones.Where(item => item.ProjectId == project.Id).ToList();
-        var raidItems = context.RaidItems.Where(item => item.ProjectId == project.Id).ToList();
-        var members = context.Members.Where(item => item.ProjectId == project.Id).ToList();
+        var projectTasks      = context.TasksByProject.GetValueOrDefault(project.Id)      ?? [];
+        var projectMilestones = context.MilestonesByProject.GetValueOrDefault(project.Id) ?? [];
+        var raidItems         = context.RaidItemsByProject.GetValueOrDefault(project.Id)  ?? [];
+        var members           = context.MembersByProject.GetValueOrDefault(project.Id)    ?? [];
 
         return new PhaseOneProjectListItemDto
         {
-            BlockedTaskCount = projectTasks.Count(item => item.IsBlocked && !IsClosed(item.Status)),
-            CompletedTaskCount = projectTasks.Count(item => item.Status == "已完成" || item.Status == "已关闭"),
-            HighRiskCount = raidItems.Count(item => item.Type == "风险" && item.Level == "高" && !IsClosed(item.Status)),
-            Id = project.Id,
-            IsKeyProject = project.IsKeyProject,
-            ManagerName = context.UserNameMap.GetValueOrDefault(project.ManagerUserId) ?? "-",
-            MemberCount = members.Count(item => item.IsActive()),
-            MilestoneTotalCount = projectMilestones.Count,
-            MyRelation = ResolveMyRelation(project, context),
-            Name = project.Name,
+            BlockedTaskCount     = projectTasks.Count(item => item.IsBlocked && !IsClosed(item.Status)),
+            CompletedTaskCount   = projectTasks.Count(item => item.Status == PhaseOneProjectStatuses.Completed || item.Status == PhaseOneProjectStatuses.Closed),
+            HighRiskCount        = raidItems.Count(item => item.Type == PhaseOneRaidTypes.Risk && item.Level == PhaseOnePriorities.High && !IsClosed(item.Status)),
+            Id                   = project.Id,
+            IsKeyProject         = project.IsKeyProject,
+            ManagerName          = context.UserNameMap.GetValueOrDefault(project.ManagerUserId) ?? "-",
+            MemberCount          = members.Count(item => item.IsActive()),
+            MilestoneTotalCount  = projectMilestones.Count,
+            MyRelation           = ResolveMyRelation(project, context),
+            Name                 = project.Name,
             OrganizationUnitName = context.OrganizationUnitNameMap.GetValueOrDefault(project.OrganizationUnitId) ?? "-",
             OverdueMilestoneCount = projectMilestones.Count(item => item.PlannedCompletionDate.Date < DateTime.Today && !IsClosed(item.Status)),
-            OverdueTaskCount = projectTasks.Count(item => IsOverdue(item.PlannedEndTime, item.Status)),
-            PlannedEndDate = project.PlannedEndDate,
-            PlannedStartDate = project.PlannedStartDate,
-            Priority = project.Priority,
-            ProjectCode = project.ProjectCode,
-            Status = project.Status,
-            TaskTotalCount = projectTasks.Count
+            OverdueTaskCount     = projectTasks.Count(item => IsOverdue(item.PlannedEndTime, item.Status)),
+            PlannedEndDate       = project.PlannedEndDate,
+            PlannedStartDate     = project.PlannedStartDate,
+            Priority             = project.Priority,
+            ProjectCode          = project.ProjectCode,
+            Status               = project.Status,
+            TaskTotalCount       = projectTasks.Count
         };
     }
 
@@ -618,10 +674,7 @@ public class PhaseOneProjectService : ITransientDependency
         };
     }
 
-    private static bool IsClosed(string status)
-    {
-        return status == "已完成" || status == "已关闭" || status == "已解除";
-    }
+    private static bool IsClosed(string status) => PhaseOneProjectStatuses.IsClosed(status);
 
     private static bool IsDueSoon(DateTime? plannedEndTime)
     {
@@ -645,9 +698,9 @@ public class PhaseOneProjectService : ITransientDependency
         return project.ManagerUserId == currentUserId
             || project.SponsorUserId == currentUserId
             || context.MyMemberMap.ContainsKey(project.Id)
-            || context.Tasks.Any(item => item.ProjectId == project.Id && item.OwnerUserId == currentUserId)
-            || context.Issues.Any(item => item.ProjectId == project.Id && item.OwnerUserId == currentUserId)
-            || context.Worklogs.Any(item => item.ProjectId == project.Id && item.UserId == currentUserId);
+            || context.MyTaskProjectIds.Contains(project.Id)
+            || context.MyIssueProjectIds.Contains(project.Id)
+            || context.MyWorklogProjectIds.Contains(project.Id);
     }
 
     private static bool IsOverdue(DateTime? plannedEndTime, string status)
@@ -668,7 +721,7 @@ public class PhaseOneProjectService : ITransientDependency
             return "var(--ant-color-success)";
         }
 
-        return priority == "高"
+        return priority == PhaseOnePriorities.High
             ? "var(--ant-color-error)"
             : "var(--ant-color-primary)";
     }
@@ -734,6 +787,23 @@ public class PhaseOneProjectService : ITransientDependency
         Guid? CurrentUserId,
         bool CurrentUserIsAdmin)
     {
-        public Dictionary<Guid, string> TaskTitleMap { get; } = Tasks.ToDictionary(item => item.Id, item => item.Title);
+        // 单条查找
+        public Dictionary<Guid, string> TaskTitleMap { get; } =
+            Tasks.ToDictionary(item => item.Id, item => item.Title);
+
+        // 预分组字典：O(1) 按项目取子集，避免 MapProject/GetDetail 里的 O(N×M) 扫描
+        public Dictionary<Guid, List<PhaseOneProjectTask>>      TasksByProject      { get; } = Tasks.GroupBy(t => t.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectMilestone>> MilestonesByProject { get; } = Milestones.GroupBy(m => m.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectRaidItem>>  RaidItemsByProject  { get; } = RaidItems.GroupBy(r => r.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectMember>>    MembersByProject    { get; } = Members.GroupBy(m => m.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectIssue>>     IssuesByProject     { get; } = Issues.GroupBy(i => i.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectWorklog>>   WorklogsByProject   { get; } = Worklogs.GroupBy(w => w.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectCycle>>     CyclesByProject     { get; } = Cycles.GroupBy(c => c.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneProjectDocument>>  DocumentsByProject  { get; } = Documents.GroupBy(d => d.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+
+        // 预计算当前用户在各项目中的存在性：O(1) 支持 IsMyRelatedProject 判断
+        public HashSet<Guid> MyTaskProjectIds    { get; } = CurrentUserId.HasValue ? Tasks.Where(t => t.OwnerUserId == CurrentUserId.Value).Select(t => t.ProjectId).ToHashSet() : [];
+        public HashSet<Guid> MyIssueProjectIds   { get; } = CurrentUserId.HasValue ? Issues.Where(i => i.OwnerUserId == CurrentUserId.Value).Select(i => i.ProjectId).ToHashSet() : [];
+        public HashSet<Guid> MyWorklogProjectIds { get; } = CurrentUserId.HasValue ? Worklogs.Where(w => w.UserId == CurrentUserId.Value).Select(w => w.ProjectId).ToHashSet() : [];
     }
 }

@@ -1,10 +1,23 @@
 import { requestClient } from '#/api/request';
 
 export namespace TenantApi {
+  export interface TenantAuthorization {
+    apiBlacklist: string[];
+    isActive: boolean;
+    menuIds: string[];
+  }
+
   export interface TenantItem {
+    adminEmail?: null | string;
+    adminUserId?: null | string;
+    adminUserName?: null | string;
+    apiBlacklist: string[];
+    creationTime: string;
     defaultConnectionString?: null | string;
     id: string;
+    isActive: boolean;
     name: string;
+    remark?: null | string;
   }
 
   export interface TenantSaveInput {
@@ -23,4 +36,15 @@ export async function createTenantApi(data: TenantApi.TenantSaveInput) {
 
 export async function deleteTenantApi(id: string) {
   return requestClient.delete<boolean>(`/app/tenant/${id}`);
+}
+
+export async function getTenantAuthorizationApi(id: string) {
+  return requestClient.get<TenantApi.TenantAuthorization>(`/app/tenant/${id}/authorization`);
+}
+
+export async function saveTenantAuthorizationApi(
+  id: string,
+  data: TenantApi.TenantAuthorization,
+) {
+  return requestClient.put<boolean>(`/app/tenant/${id}/authorization`, data);
 }

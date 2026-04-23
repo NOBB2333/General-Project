@@ -15,13 +15,16 @@ namespace General.Admin.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly JwtTokenService _jwtTokenService;
+    private readonly PhaseOneUserActivityService _userActivityService;
     private readonly IdentityUserManager _userManager;
 
     public AuthController(
         JwtTokenService jwtTokenService,
+        PhaseOneUserActivityService userActivityService,
         IdentityUserManager userManager)
     {
         _jwtTokenService = jwtTokenService;
+        _userActivityService = userActivityService;
         _userManager = userManager;
     }
 
@@ -43,6 +46,7 @@ public class AuthController : ControllerBase
         }
 
         var roles = (await _userManager.GetRolesAsync(user)).ToList();
+        await _userActivityService.MarkLoginAsync(user.Id);
         var token = _jwtTokenService.CreateAccessToken(user, roles);
 
         return ApiResponse<LoginResultDto>.Ok(new LoginResultDto

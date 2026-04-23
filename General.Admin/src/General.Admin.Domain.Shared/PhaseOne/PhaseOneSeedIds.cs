@@ -21,6 +21,9 @@ public static class PhaseOneSeedIds
     public static readonly Guid PlatformFiles = Guid.Parse("20000000-0000-0000-0000-000000000009");
     public static readonly Guid PlatformAuditLogs = Guid.Parse("20000000-0000-0000-0000-000000000010");
     public static readonly Guid PlatformProfile = Guid.Parse("20000000-0000-0000-0000-000000000011");
+    public static readonly Guid PlatformStats = Guid.Parse("20000000-0000-0000-0000-000000000022");
+    public static readonly Guid PlatformOnlineUsers = Guid.Parse("20000000-0000-0000-0000-000000000020");
+    public static readonly Guid PlatformUpdateLogs = Guid.Parse("20000000-0000-0000-0000-000000000021");
     public static readonly Guid PlatformScheduler = Guid.Parse("20000000-0000-0000-0000-000000000019");
     public static readonly Guid PlatformSystemMonitor = Guid.Parse("20000000-0000-0000-0000-000000000018");
     public static readonly Guid PlatformOrganizationManage = Guid.Parse("20000000-0000-0000-0000-000000000012");

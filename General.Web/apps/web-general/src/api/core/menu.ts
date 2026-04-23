@@ -41,9 +41,6 @@ export namespace MenuApi {
   }
 }
 
-/**
- * 获取用户所有菜单
- */
 export async function getAllMenusApi(appCodesOverride?: null | string) {
   return requestClient.get<RouteRecordStringComponent[]>('/app/menu/all', {
     params: createAppCodeParams(appCodesOverride),
@@ -70,6 +67,12 @@ export async function createMenuApi(data: MenuApi.MenuSaveInput) {
 
 export async function updateMenuApi(id: string, data: MenuApi.MenuSaveInput) {
   return requestClient.put<boolean>(`/app/menu/${id}`, data);
+}
+
+export async function setMenuEnabledApi(id: string, isEnabled: boolean) {
+  return requestClient.put<boolean>(`/app/menu/${id}/enabled`, undefined, {
+    params: { isEnabled },
+  });
 }
 
 export async function deleteMenuApi(id: string) {

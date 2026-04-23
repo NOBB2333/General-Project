@@ -94,15 +94,20 @@ public class PhaseOneOrganizationUnitService : ITransientDependency
         return organizationUnits
             .Where(x => x.ParentId == parentId)
             .OrderBy(x => x.Code)
-            .Select(x => new OrganizationUnitTreeDto
+            .Select(x =>
             {
-                Id = x.Id,
-                ParentId = x.ParentId,
-                Code = x.Code,
-                Disabled = !accessibleIds.Contains(x.Id),
-                DisplayName = x.DisplayName,
-                MemberCount = memberCountMap.TryGetValue(x.Id, out var count) ? count : 0,
-                Children = BuildTree(organizationUnits, memberCountMap, accessibleIds, x.Id)
+                var children = BuildTree(organizationUnits, memberCountMap, accessibleIds, x.Id);
+                var currentCount = memberCountMap.TryGetValue(x.Id, out var count) ? count : 0;
+                return new OrganizationUnitTreeDto
+                {
+                    Id = x.Id,
+                    ParentId = x.ParentId,
+                    Code = x.Code,
+                    Disabled = !accessibleIds.Contains(x.Id),
+                    DisplayName = x.DisplayName,
+                    MemberCount = currentCount + children.Sum(child => child.MemberCount),
+                    Children = children
+                };
             })
             .ToList();
     }

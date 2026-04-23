@@ -67,12 +67,14 @@ public class PhaseOneMenuService : ITransientDependency
 
     public async Task CreateAsync(PhaseOneMenuSaveInput input)
     {
+        await ValidateMenuParentAsync(null, input);
         var menu = CreateMenu(Guid.NewGuid(), input);
         await _menuRepository.InsertAsync(menu, autoSave: true);
     }
 
     public async Task UpdateAsync(Guid id, PhaseOneMenuSaveInput input)
     {
+        await ValidateMenuParentAsync(id, input);
         var menu = await _menuRepository.GetAsync(id);
         menu.Update(
             input.AppCode,
@@ -94,6 +96,32 @@ public class PhaseOneMenuService : ITransientDependency
             false,
             input.Order,
             input.IsEnabled);
+        await _menuRepository.UpdateAsync(menu, autoSave: true);
+    }
+
+    public async Task SetEnabledAsync(Guid id, bool isEnabled)
+    {
+        var menu = await _menuRepository.GetAsync(id);
+        menu.Update(
+            menu.AppCode,
+            menu.ParentId,
+            menu.Name,
+            menu.Path,
+            menu.Component,
+            menu.Redirect,
+            menu.Type,
+            menu.Title,
+            menu.Icon,
+            menu.PermissionCode,
+            menu.Link,
+            menu.AffixTab,
+            menu.KeepAlive,
+            menu.HideInBreadcrumb,
+            menu.HideInMenu,
+            menu.HideInTab,
+            menu.MenuVisibleWithForbidden,
+            menu.Order,
+            isEnabled);
         await _menuRepository.UpdateAsync(menu, autoSave: true);
     }
 
@@ -241,6 +269,45 @@ public class PhaseOneMenuService : ITransientDependency
             .Where(x => menuIds.Contains(x.Id) && x.IsEnabled)
             .OrderBy(x => x.Order)
             .ToList();
+    }
+
+    private async Task ValidateMenuParentAsync(Guid? currentMenuId, PhaseOneMenuSaveInput input)
+    {
+        if (!input.ParentId.HasValue)
+        {
+            return;
+        }
+
+        if (currentMenuId.HasValue && currentMenuId.Value == input.ParentId.Value)
+        {
+            throw new InvalidOperationException("菜单不能把自己作为父节点。");
+        }
+
+        var menus = await _menuRepository.GetListAsync();
+        var parentMenu = menus.FirstOrDefault(x => x.Id == input.ParentId.Value);
+        if (parentMenu == null)
+        {
+            throw new InvalidOperationException("父级菜单不存在，请刷新后重试。");
+        }
+
+        if (!string.Equals(parentMenu.AppCode, input.AppCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("父级菜单与当前菜单必须属于同一应用。");
+        }
+
+        if (parentMenu.Type == PhaseOneMenuType.Button)
+        {
+            throw new InvalidOperationException("按钮类型不能作为父级菜单。");
+        }
+
+        if (currentMenuId.HasValue)
+        {
+            var descendants = GetDescendantIds(menus, currentMenuId.Value);
+            if (descendants.Contains(input.ParentId.Value))
+            {
+                throw new InvalidOperationException("不能把菜单移动到自己的子节点下面。");
+            }
+        }
     }
 
     private static HashSet<Guid> NormalizeMenuIds(IEnumerable<Guid> menuIds, IReadOnlyCollection<AppMenu> allMenus)

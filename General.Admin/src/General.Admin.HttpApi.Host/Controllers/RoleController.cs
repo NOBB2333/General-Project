@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize(Roles = PhaseOneRoleNames.Admin)]
 [Route("api/app/role")]
 public class RoleController : ControllerBase
@@ -25,7 +24,22 @@ public class RoleController : ControllerBase
         return ApiResponse<List<PhaseOneRoleDto>>.Ok(await _roleService.GetListAsync());
     }
 
+    [HttpGet("{id:guid}/authorization")]
+    public async Task<ActionResult<ApiResponse<PhaseOneRoleAuthorizationDto>>> GetAuthorizationAsync(Guid id)
+    {
+        return ApiResponse<PhaseOneRoleAuthorizationDto>.Ok(await _roleService.GetAuthorizationAsync(id));
+    }
+
+    [HttpPut("{id:guid}/authorization")]
+    [PlatformEndpoint("Platform.Role.Manage")]
+    public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(Guid id, [FromBody] PhaseOneRoleAuthorizationSaveInput input)
+    {
+        await _roleService.SaveAuthorizationAsync(id, input);
+        return ApiResponse<bool>.Ok(true);
+    }
+
     [HttpPost]
+    [PlatformEndpoint("Platform.Role.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneRoleSaveInput input)
     {
         await _roleService.CreateAsync(input);
@@ -33,6 +47,7 @@ public class RoleController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [PlatformEndpoint("Platform.Role.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {
         await _roleService.DeleteAsync(id);

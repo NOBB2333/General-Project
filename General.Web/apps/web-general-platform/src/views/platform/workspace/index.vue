@@ -9,8 +9,10 @@ import { Button, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tag, Timelin
 import {
   getFileListApi,
   getOrganizationTreeApi,
+  getOnlineUserListApi,
   getRoleListApi,
   getTenantListApi,
+  getUpdateLogListApi,
   getUserInfoApi,
   getUserListApi,
 } from '#/api/core';
@@ -22,9 +24,11 @@ const router = useRouter();
 const loading = ref(true);
 const summary = ref({
   files: 0,
+  onlineUsers: 0,
   organizations: 0,
   roles: 0,
   tenants: 0,
+  updateLogs: 0,
   users: 0,
 });
 const userInfo = ref<null | {
@@ -40,7 +44,9 @@ const quickEntries = [
   { path: '/platform/tenants', tag: '租户', title: '维护租户空间' },
   { path: '/platform/menus', tag: '菜单', title: '配置平台导航与按钮码' },
   { path: '/platform/files', tag: '文件', title: '统一管理制度与模板文件' },
+  { path: '/platform/online-users', tag: '在线', title: '查看当前在线会话' },
   { path: '/platform/audit-logs', tag: '审计', title: '查看最新访问留痕' },
+  { path: '/platform/update-logs', tag: '版本', title: '维护平台更新记录' },
   { path: '/platform/system-monitor', tag: '监控', title: '查看服务器资源状态' },
 ];
 
@@ -58,20 +64,24 @@ function flattenOrganizationCount(items: Array<{ children: any[] }>): number {
 async function loadWorkspace() {
   loading.value = true;
   try {
-    const [organizations, users, roles, tenants, files, currentUser] = await Promise.all([
+    const [organizations, users, roles, tenants, files, onlineUsers, updateLogs, currentUser] = await Promise.all([
       getOrganizationTreeApi(),
       getUserListApi(),
       getRoleListApi(),
       getTenantListApi(),
       getFileListApi(),
+      getOnlineUserListApi(),
+      getUpdateLogListApi(),
       getUserInfoApi(),
     ]);
 
     summary.value = {
       files: files.length,
+      onlineUsers: onlineUsers.length,
       organizations: flattenOrganizationCount(organizations),
       roles: roles.length,
       tenants: tenants.length,
+      updateLogs: updateLogs.length,
       users: users.length,
     };
     userInfo.value = currentUser as any;
@@ -117,6 +127,8 @@ onMounted(loadWorkspace);
             ['角色数量', summary.roles],
             ['租户数量', summary.tenants],
             ['文件数量', summary.files],
+            ['在线会话', summary.onlineUsers],
+            ['更新记录', summary.updateLogs],
           ]" :key="item[0]" :lg="4" :md="8" :span="24">
             <Card :bordered="false" class="platform-workspace__metric">
               <Statistic :title="item[0]" :value="item[1]" />

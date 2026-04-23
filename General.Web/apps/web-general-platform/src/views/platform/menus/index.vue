@@ -8,12 +8,10 @@ import { Page } from '@vben/common-ui';
 import {
   Button,
   Card,
-  Descriptions,
   Empty,
   Form,
   Input,
   InputNumber,
-  Modal,
   Select,
   Space,
   Switch,
@@ -21,7 +19,7 @@ import {
   message,
 } from 'ant-design-vue';
 
-import { createMenuApi, deleteMenuApi, getMenuPermissionTreeApi, updateMenuApi } from '#/api/core';
+import { createMenuApi, deleteMenuApi, getMenuPermissionTreeApi, setMenuEnabledApi, updateMenuApi } from '#/api/core';
 
 defineOptions({ name: 'PlatformMenuPage' });
 
@@ -41,12 +39,12 @@ const loading = ref(false);
 const saving = ref(false);
 const items = ref<MenuApi.PermissionTreeItem[]>([]);
 const selectedId = ref('');
-const modalVisible = ref(false);
-const editingId = ref<null | string>(null);
+const creating = ref(false);
+
 const formState = reactive<any>({
   appCode: 'platform',
-  component: '/platform/workspace/index',
-  icon: 'lucide:layout-dashboard',
+  component: '',
+  icon: '',
   isEnabled: true,
   name: '',
   order: 10,
@@ -64,7 +62,7 @@ function normalizeTree(source: MenuApi.PermissionTreeItem[]): any[] {
   return source.map((item) => ({
     children: normalizeTree(item.children || []),
     key: item.id,
-    title: `[${item.appCode}] ${item.title}`,
+    title: `[${item.appCode}] ${item.title}${item.isEnabled ? '' : ' · 已停用'}`,
   }));
 }
 
@@ -81,6 +79,35 @@ function findMenuById(source: MenuApi.PermissionTreeItem[], id: string): MenuApi
   return null;
 }
 
+function patchFormBySelection(menu?: MenuApi.PermissionTreeItem | null) {
+  if (!menu) {
+    formState.appCode = 'platform';
+    formState.component = '';
+    formState.icon = '';
+    formState.isEnabled = true;
+    formState.name = '';
+    formState.order = 10;
+    formState.parentId = undefined;
+    formState.path = '';
+    formState.permissionCode = '';
+    formState.title = '';
+    formState.type = 2;
+    return;
+  }
+
+  formState.appCode = menu.appCode;
+  formState.component = menu.component || '';
+  formState.icon = menu.icon || '';
+  formState.isEnabled = menu.isEnabled;
+  formState.name = menu.name;
+  formState.order = menu.order;
+  formState.parentId = menu.parentId || undefined;
+  formState.path = menu.path;
+  formState.permissionCode = menu.permissionCode || '';
+  formState.title = menu.title;
+  formState.type = menu.type;
+}
+
 async function loadMenus() {
   loading.value = true;
   try {
@@ -88,13 +115,14 @@ async function loadMenus() {
     if (!selectedId.value && items.value[0]) {
       selectedId.value = items.value[0].id;
     }
+    patchFormBySelection(findMenuById(items.value, selectedId.value));
   } finally {
     loading.value = false;
   }
 }
 
 function openCreate(parentId?: null | string) {
-  editingId.value = null;
+  creating.value = true;
   formState.appCode = selectedMenu.value?.appCode || 'platform';
   formState.component = '';
   formState.icon = '';
@@ -106,27 +134,12 @@ function openCreate(parentId?: null | string) {
   formState.permissionCode = '';
   formState.title = '';
   formState.type = 2;
-  modalVisible.value = true;
 }
 
-function openEdit() {
-  if (!selectedMenu.value) {
-    return;
-  }
-
-  editingId.value = selectedMenu.value.id;
-  formState.appCode = selectedMenu.value.appCode;
-  formState.component = selectedMenu.value.component || '';
-  formState.icon = selectedMenu.value.icon || '';
-  formState.isEnabled = selectedMenu.value.isEnabled;
-  formState.name = selectedMenu.value.name;
-  formState.order = selectedMenu.value.order;
-  formState.parentId = selectedMenu.value.parentId || undefined;
-  formState.path = selectedMenu.value.path;
-  formState.permissionCode = selectedMenu.value.permissionCode || '';
-  formState.title = selectedMenu.value.title;
-  formState.type = selectedMenu.value.type;
-  modalVisible.value = true;
+function selectMenu(menuId: string) {
+  selectedId.value = menuId;
+  creating.value = false;
+  patchFormBySelection(findMenuById(items.value, menuId));
 }
 
 async function handleSubmit() {
@@ -144,15 +157,15 @@ async function handleSubmit() {
       permissionCode: formState.permissionCode || null,
     };
 
-    if (editingId.value) {
-      await updateMenuApi(editingId.value, payload);
-      message.success('菜单已更新');
-    } else {
+    if (creating.value || !selectedMenu.value) {
       await createMenuApi(payload);
       message.success('菜单已创建');
+      creating.value = false;
+    } else {
+      await updateMenuApi(selectedMenu.value.id, payload);
+      message.success('菜单已更新');
     }
 
-    modalVisible.value = false;
     await loadMenus();
   } finally {
     saving.value = false;
@@ -167,6 +180,18 @@ async function handleDelete() {
   await deleteMenuApi(selectedMenu.value.id);
   message.success('菜单已删除');
   selectedId.value = '';
+  creating.value = false;
+  await loadMenus();
+}
+
+async function handleToggleEnabled(checked: unknown) {
+  if (!selectedMenu.value) {
+    return;
+  }
+
+  const nextEnabled = checked === true;
+  await setMenuEnabledApi(selectedMenu.value.id, nextEnabled);
+  message.success(`菜单已${nextEnabled ? '启用' : '停用'}`);
   await loadMenus();
 }
 
@@ -174,7 +199,7 @@ loadMenus();
 </script>
 
 <template>
-  <Page description="菜单管理用于维护平台、项目、经营三个 APP 的导航和按钮权限。" title="菜单管理">
+  <Page description="菜单管理重构为左侧树、右侧详情编辑，启停直接在详情头部完成。" title="菜单管理">
     <div class="platform-menu">
       <Card :bordered="false" class="platform-menu__tree" title="菜单树">
         <template #extra>
@@ -193,89 +218,73 @@ loadMenus();
           :loading="loading"
           :selected-keys="selectedId ? [selectedId] : []"
           :tree-data="treeData"
-          @select="(keys) => { selectedId = `${keys[0] ?? ''}`; }"
+          @select="(keys) => { if (keys[0]) selectMenu(`${keys[0]}`); }"
         />
         <Empty v-else description="暂无菜单" />
       </Card>
 
-      <Card :bordered="false" title="菜单详情">
+      <Card :bordered="false" title="详情编辑">
         <template #extra>
-          <Space v-if="selectedMenu">
-            <Button @click="openEdit">编辑</Button>
-            <Button danger @click="handleDelete">删除</Button>
+          <Space>
+            <Switch
+              v-if="selectedMenu && !creating"
+              :checked="selectedMenu.isEnabled"
+              checked-children="启用"
+              un-checked-children="停用"
+              @change="(checked) => void handleToggleEnabled(checked)"
+            />
+            <Button v-if="selectedMenu && !creating" danger @click="handleDelete">删除</Button>
+            <Button :loading="saving" type="primary" @click="handleSubmit">
+              {{ creating ? '创建菜单' : '保存修改' }}
+            </Button>
           </Space>
         </template>
 
-        <Descriptions v-if="selectedMenu" :column="1" bordered size="small">
-          <Descriptions.Item label="应用编码">{{ selectedMenu.appCode }}</Descriptions.Item>
-          <Descriptions.Item label="菜单标题">{{ selectedMenu.title }}</Descriptions.Item>
-          <Descriptions.Item label="名称">{{ selectedMenu.name }}</Descriptions.Item>
-          <Descriptions.Item label="路径">{{ selectedMenu.path }}</Descriptions.Item>
-          <Descriptions.Item label="组件">{{ selectedMenu.component || '-' }}</Descriptions.Item>
-          <Descriptions.Item label="图标">{{ selectedMenu.icon || '-' }}</Descriptions.Item>
-          <Descriptions.Item label="按钮码">{{ selectedMenu.permissionCode || '-' }}</Descriptions.Item>
-          <Descriptions.Item label="类型">
-            {{ selectedMenu.type === 1 ? '目录' : selectedMenu.type === 2 ? '页面' : '按钮' }}
-          </Descriptions.Item>
-          <Descriptions.Item label="排序">{{ selectedMenu.order }}</Descriptions.Item>
-          <Descriptions.Item label="状态">
-            {{ selectedMenu.isEnabled ? '启用' : '停用' }}
-          </Descriptions.Item>
-        </Descriptions>
-        <Empty v-else description="请选择左侧菜单节点" />
+        <div v-if="!selectedMenu && !creating" class="platform-menu__empty">
+          <Empty description="请选择左侧菜单节点，或直接新增菜单" />
+        </div>
+
+        <Form v-else layout="vertical">
+          <div class="platform-menu__form-grid">
+            <Form.Item label="应用编码" required>
+              <Select v-model:value="formState.appCode" :options="APP_OPTIONS" />
+            </Form.Item>
+            <Form.Item label="菜单类型" required>
+              <Select v-model:value="formState.type" :options="TYPE_OPTIONS" />
+            </Form.Item>
+            <Form.Item label="菜单标题" required>
+              <Input v-model:value="formState.title" :maxlength="128" />
+            </Form.Item>
+            <Form.Item label="菜单名称" required>
+              <Input v-model:value="formState.name" :maxlength="64" />
+            </Form.Item>
+            <Form.Item class="platform-menu__full" label="路径" required>
+              <Input v-model:value="formState.path" :maxlength="256" />
+            </Form.Item>
+            <Form.Item v-if="formState.type !== 3" class="platform-menu__full" label="组件路径">
+              <Input
+                v-model:value="formState.component"
+                :maxlength="256"
+                placeholder="/platform/users/index"
+              />
+            </Form.Item>
+            <Form.Item label="图标">
+              <Input v-model:value="formState.icon" :maxlength="128" placeholder="lucide:users" />
+            </Form.Item>
+            <Form.Item label="按钮码">
+              <Input
+                v-model:value="formState.permissionCode"
+                :maxlength="128"
+                placeholder="Platform.User.Manage"
+              />
+            </Form.Item>
+            <Form.Item label="排序">
+              <InputNumber v-model:value="formState.order" :min="0" style="width: 100%" />
+            </Form.Item>
+          </div>
+        </Form>
       </Card>
     </div>
-
-    <Modal
-      v-model:open="modalVisible"
-      :confirm-loading="saving"
-      :title="editingId ? '编辑菜单' : '新增菜单'"
-      width="720px"
-      @ok="handleSubmit"
-    >
-      <Form layout="vertical">
-        <div class="platform-menu__form-grid">
-          <Form.Item label="应用编码" required>
-            <Select v-model:value="formState.appCode" :options="APP_OPTIONS" />
-          </Form.Item>
-          <Form.Item label="菜单类型" required>
-            <Select v-model:value="formState.type" :options="TYPE_OPTIONS" />
-          </Form.Item>
-          <Form.Item label="菜单标题" required>
-            <Input v-model:value="formState.title" :maxlength="128" />
-          </Form.Item>
-          <Form.Item label="菜单名称" required>
-            <Input v-model:value="formState.name" :maxlength="64" />
-          </Form.Item>
-          <Form.Item class="platform-menu__full" label="路径" required>
-            <Input v-model:value="formState.path" :maxlength="256" />
-          </Form.Item>
-          <Form.Item v-if="formState.type !== 3" class="platform-menu__full" label="组件路径">
-            <Input
-              v-model:value="formState.component"
-              :maxlength="256"
-              placeholder="/platform/users/index"
-            />
-          </Form.Item>
-          <Form.Item label="图标">
-            <Input v-model:value="formState.icon" :maxlength="128" placeholder="lucide:users" />
-          </Form.Item>
-          <Form.Item label="按钮码">
-            <Input
-              v-model:value="formState.permissionCode"
-              :maxlength="128"
-              placeholder="Platform.User.Manage"
-            />
-          </Form.Item>
-          <Form.Item label="排序">
-            <InputNumber v-model:value="formState.order" :min="0" style="width: 100%" />
-          </Form.Item>
-          <Form.Item label="启用状态">
-            <Switch v-model:checked="formState.isEnabled" />
-          </Form.Item>
-        </div>
-      </Form>
-    </Modal>
   </Page>
 </template>
 
@@ -284,6 +293,12 @@ loadMenus();
   display: grid;
   gap: 16px;
   grid-template-columns: 360px minmax(0, 1fr);
+}
+
+.platform-menu__empty {
+  display: grid;
+  min-height: 360px;
+  place-items: center;
 }
 
 .platform-menu__form-grid {

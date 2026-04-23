@@ -53,10 +53,10 @@ public class PhaseOneBusinessService : ITransientDependency
     public async Task<PhaseOneBusinessOverviewDto> GetOverviewAsync()
     {
         var context = await BuildContextAsync();
-        var summaries = context.Projects.Select(project => MapProjectSummary(project, context)).ToList();
-        var warnings = BuildWarningItems(summaries, context);
         var canViewSensitiveAmounts = CanViewSensitiveAmounts();
-        var canViewProfitAnalysis = CanViewProfitAnalysis();
+        var canViewProfitAnalysis   = CanViewProfitAnalysis();
+        var summaries = context.Projects.Select(project => MapProjectSummary(project, context, canViewSensitiveAmounts, canViewProfitAnalysis)).ToList();
+        var warnings = BuildWarningItems(summaries, context);
 
         var contractAmount = summaries.Sum(item => item.ContractAmount ?? 0m);
         var costAmount = summaries.Sum(item => item.CostAmount ?? 0m);
@@ -91,9 +91,11 @@ public class PhaseOneBusinessService : ITransientDependency
     {
         var context = await BuildContextAsync();
         var keyword = input.Keyword?.Trim();
+        var canViewSensitiveAmounts = CanViewSensitiveAmounts();
+        var canViewProfitAnalysis   = CanViewProfitAnalysis();
 
         return context.Projects
-            .Select(project => MapProjectSummary(project, context))
+            .Select(project => MapProjectSummary(project, context, canViewSensitiveAmounts, canViewProfitAnalysis))
             .Where(item => string.IsNullOrWhiteSpace(keyword)
                 || item.ProjectCode.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                 || item.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)
@@ -210,7 +212,7 @@ public class PhaseOneBusinessService : ITransientDependency
                     TotalAmount = MaskAmount(item.TotalAmount, canViewSensitiveAmounts)
                 })
                 .ToList(),
-            Summary = MapProjectSummary(project, context)
+            Summary = MapProjectSummary(project, context, canViewSensitiveAmounts, canViewProfitAnalysis)
         };
     }
 
@@ -225,8 +227,11 @@ public class PhaseOneBusinessService : ITransientDependency
         var contractType = input.ContractType?.Trim();
         var receivableStatus = input.ReceivableStatus?.Trim();
 
+        var canViewSensitiveAmounts = CanViewSensitiveAmounts();
+        var canViewProfitAnalysis   = CanViewProfitAnalysis();
+
         var projectItems = context.Projects
-            .Select(project => MapProjectSummary(project, context))
+            .Select(project => MapProjectSummary(project, context, canViewSensitiveAmounts, canViewProfitAnalysis))
             .Where(item => MatchKeyword(keyword, item.ProjectCode, item.Name, item.CustomerName, item.ManagerName))
             .Where(item => string.IsNullOrWhiteSpace(projectCode) || item.ProjectCode.Contains(projectCode, StringComparison.OrdinalIgnoreCase))
             .Where(item => string.IsNullOrWhiteSpace(counterpartyName) || item.CustomerName.Contains(counterpartyName, StringComparison.OrdinalIgnoreCase))
@@ -238,7 +243,6 @@ public class PhaseOneBusinessService : ITransientDependency
             .Where(item => string.IsNullOrWhiteSpace(projectCode) || item.ProjectCode.Contains(projectCode, StringComparison.OrdinalIgnoreCase))
             .Where(item => string.IsNullOrWhiteSpace(businessCloseStatus) || item.Status.Equals(businessCloseStatus, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var canViewSensitiveAmounts = CanViewSensitiveAmounts();
 
         return new PhaseOneBusinessReportDto
         {
@@ -325,8 +329,7 @@ public class PhaseOneBusinessService : ITransientDependency
 
         foreach (var summary in summaries)
         {
-            var project = context.Projects.FirstOrDefault(item => item.Id == summary.Id);
-            if (project == null)
+            if (!context.ProjectById.TryGetValue(summary.Id, out var project))
             {
                 continue;
             }
@@ -338,7 +341,7 @@ public class PhaseOneBusinessService : ITransientDependency
                     project,
                     summary,
                     type: "利润风险",
-                    level: summary.GrossProfitRate.Value < 15m ? "高" : "中",
+                    level: summary.GrossProfitRate.Value < 15m ? PhaseOnePriorities.High : PhaseOnePriorities.Medium,
                     actionTab: "profit",
                     description: $"当前毛利率 {summary.GrossProfitRate.Value:0.0}% ，建议优先复核分包成本和补充合同变化。"));
             }
@@ -351,7 +354,7 @@ public class PhaseOneBusinessService : ITransientDependency
                     project,
                     summary,
                     type: "收尾风险",
-                    level: summary.BusinessCloseStatus.Contains("待回款", StringComparison.OrdinalIgnoreCase) ? "高" : "中",
+                    level: summary.BusinessCloseStatus.Contains("待回款", StringComparison.OrdinalIgnoreCase) ? PhaseOnePriorities.High : PhaseOnePriorities.Medium,
                     actionTab: "receivable",
                     description: "项目执行已接近结束，但经营收尾或尾款回收仍未闭环。"));
             }
@@ -363,7 +366,7 @@ public class PhaseOneBusinessService : ITransientDependency
                     project,
                     summary,
                     type: "回款风险",
-                    level: summary.BusinessCloseStatus.Contains("待回款", StringComparison.OrdinalIgnoreCase) ? "高" : "中",
+                    level: summary.BusinessCloseStatus.Contains("待回款", StringComparison.OrdinalIgnoreCase) ? PhaseOnePriorities.High : PhaseOnePriorities.Medium,
                     actionTab: "receivable",
                     description: $"预计回款 {FormatAmount(summary.YearEndReceivableForecast)}，当前已回款 {FormatAmount(summary.ReceivedAmount)}，请复核回款计划。"));
             }
@@ -390,7 +393,7 @@ public class PhaseOneBusinessService : ITransientDependency
             ActionTab = actionTab,
             Description = description,
             Id = $"{project.Id:N}:{type}",
-            LastUpdatedTime = ResolveLastUpdatedTime(project.Id, context).ToString("yyyy-MM-dd HH:mm"),
+            LastUpdatedTime = context.LastUpdatedByProject.GetValueOrDefault(project.Id, DateTime.UtcNow).ToString("yyyy-MM-dd HH:mm"),
             Level = level,
             OwnerName = context.UserNameMap.GetValueOrDefault(project.ManagerUserId) ?? "-",
             OwnerUserId = project.ManagerUserId,
@@ -402,33 +405,12 @@ public class PhaseOneBusinessService : ITransientDependency
         };
     }
 
-    private static DateTime ResolveLastUpdatedTime(Guid projectId, BusinessContext context)
-    {
-        var timestamps = new List<DateTime>();
-
-        timestamps.AddRange(context.Projects.Where(item => item.Id == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.BudgetExecutions.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.BusinessChains.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.Contracts.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.ForecastHistories.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.Procurements.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-        timestamps.AddRange(context.Receivables.Where(item => item.ProjectId == projectId).Select(ResolveEntityTimestamp));
-
-        return timestamps.Count == 0 ? DateTime.UtcNow : timestamps.Max();
-    }
-
-    private static DateTime ResolveEntityTimestamp<T>(T item)
-        where T : IHasCreationTime, IHasModificationTime
-    {
-        return item.LastModificationTime ?? item.CreationTime;
-    }
-
     private static int ResolveWarningRank(string level)
     {
         return level switch
         {
-            "高" => 3,
-            "中" => 2,
+            var l when l == PhaseOnePriorities.High   => 3,
+            var l when l == PhaseOnePriorities.Medium => 2,
             _ => 1
         };
     }
@@ -438,10 +420,79 @@ public class PhaseOneBusinessService : ITransientDependency
         return amount.HasValue ? amount.Value.ToString("0.##") : "--";
     }
 
+    private sealed record BusinessContext(
+        List<PhaseOneBusinessBudgetExecution>    BudgetExecutions,
+        List<PhaseOneBusinessChain>              BusinessChains,
+        List<PhaseOneBusinessContract>           Contracts,
+        List<PhaseOneBusinessForecastHistory>    ForecastHistories,
+        Dictionary<Guid, string>                 OrganizationUnitNameMap,
+        List<PhaseOneBusinessProcurement>        Procurements,
+        Dictionary<Guid, string>                 ProjectCodeMap,
+        Dictionary<Guid, string>                 ProjectNameMap,
+        List<PhaseOneProject>                    Projects,
+        List<PhaseOneBusinessReceivable>         Receivables,
+        Dictionary<Guid, string>                 UserNameMap)
+    {
+        // O(1) 单条项目查找
+        public Dictionary<Guid, PhaseOneProject> ProjectById { get; } =
+            Projects.ToDictionary(p => p.Id);
+
+        // 预分组字典：O(1) 按项目取子集
+        public Dictionary<Guid, List<PhaseOneBusinessContract>>        ContractsByProject        { get; } = Contracts.GroupBy(c => c.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneBusinessProcurement>>     ProcurementsByProject     { get; } = Procurements.GroupBy(p => p.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneBusinessReceivable>>      ReceivablesByProject      { get; } = Receivables.GroupBy(r => r.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneBusinessBudgetExecution>> BudgetExecutionsByProject { get; } = BudgetExecutions.GroupBy(b => b.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneBusinessChain>>           BusinessChainsByProject   { get; } = BusinessChains.GroupBy(b => b.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+        public Dictionary<Guid, List<PhaseOneBusinessForecastHistory>> ForecastHistoriesByProject { get; } = ForecastHistories.GroupBy(f => f.ProjectId).ToDictionary(g => g.Key, g => g.ToList());
+
+        // 预计算每个项目的最新操作时间，避免 BuildWarningItems 的 O(N×M) 扫描
+        public Dictionary<Guid, DateTime> LastUpdatedByProject { get; } =
+            ComputeLastUpdated(Projects, BudgetExecutions, BusinessChains, Contracts, ForecastHistories, Procurements, Receivables);
+
+        private static Dictionary<Guid, DateTime> ComputeLastUpdated(
+            List<PhaseOneProject> projects,
+            List<PhaseOneBusinessBudgetExecution> budgetExecutions,
+            List<PhaseOneBusinessChain> businessChains,
+            List<PhaseOneBusinessContract> contracts,
+            List<PhaseOneBusinessForecastHistory> forecastHistories,
+            List<PhaseOneBusinessProcurement> procurements,
+            List<PhaseOneBusinessReceivable> receivables)
+        {
+            var result = projects.ToDictionary(p => p.Id, p => ResolveEntityTimestamp(p));
+
+            void MergeMax<T>(IEnumerable<T> items, Func<T, Guid> getId, Func<T, DateTime> getTime)
+            {
+                foreach (var item in items)
+                {
+                    var id = getId(item);
+                    var t  = getTime(item);
+                    if (!result.TryGetValue(id, out var existing) || t > existing)
+                        result[id] = t;
+                }
+            }
+
+            MergeMax(budgetExecutions,  i => i.ProjectId, i => ResolveEntityTimestamp(i));
+            MergeMax(businessChains,    i => i.ProjectId, i => ResolveEntityTimestamp(i));
+            MergeMax(contracts,         i => i.ProjectId, i => ResolveEntityTimestamp(i));
+            MergeMax(forecastHistories, i => i.ProjectId, i => ResolveEntityTimestamp(i));
+            MergeMax(procurements,      i => i.ProjectId, i => ResolveEntityTimestamp(i));
+            MergeMax(receivables,       i => i.ProjectId, i => ResolveEntityTimestamp(i));
+
+            return result;
+        }
+
+        private static DateTime ResolveEntityTimestamp<T>(T item)
+            where T : IHasCreationTime, IHasModificationTime
+            => item.LastModificationTime ?? item.CreationTime;
+    }
+
     private async Task<BusinessContext> BuildContextAsync()
     {
         var accessibleOrganizationUnitIds = await _dataScopeService.GetAccessibleOrganizationUnitIdsAsync();
-        var projects = (await _projectRepository.GetListAsync())
+
+        // 只查一次项目表（修复 #1 双重查询）
+        var allProjects = await _projectRepository.GetListAsync();
+        var projects = allProjects
             .Where(project => _currentUser.IsInRole(PhaseOneRoleNames.Admin) || accessibleOrganizationUnitIds.Contains(project.OrganizationUnitId))
             .ToList();
 
@@ -453,7 +504,7 @@ public class PhaseOneBusinessService : ITransientDependency
                 .ToHashSet();
 
             projects = projects
-                .Concat((await _projectRepository.GetListAsync()).Where(item => projectIdsByMembership.Contains(item.Id)))
+                .Concat(allProjects.Where(item => projectIdsByMembership.Contains(item.Id)))
                 .DistinctBy(item => item.Id)
                 .ToList();
         }
@@ -462,20 +513,25 @@ public class PhaseOneBusinessService : ITransientDependency
         var users = await _userRepository.GetListAsync();
         var organizationUnits = await _organizationUnitRepository.GetListAsync();
 
-        return new BusinessContext
-        {
-            BudgetExecutions = (await _budgetExecutionRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            BusinessChains = (await _businessChainRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            Contracts = (await _businessContractRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            ForecastHistories = (await _forecastHistoryRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            OrganizationUnitNameMap = organizationUnits.ToDictionary(item => item.Id, item => item.DisplayName),
-            Procurements = (await _procurementRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            ProjectCodeMap = projects.ToDictionary(item => item.Id, item => item.ProjectCode),
-            ProjectNameMap = projects.ToDictionary(item => item.Id, item => item.Name),
-            Projects = projects,
-            Receivables = (await _receivableRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList(),
-            UserNameMap = users.ToDictionary(item => item.Id, item => item.Name ?? item.UserName)
-        };
+        var budgetExecutions   = (await _budgetExecutionRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+        var businessChains     = (await _businessChainRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+        var contracts          = (await _businessContractRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+        var forecastHistories  = (await _forecastHistoryRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+        var procurements       = (await _procurementRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+        var receivables        = (await _receivableRepository.GetListAsync()).Where(item => projectIds.Contains(item.ProjectId)).ToList();
+
+        return new BusinessContext(
+            budgetExecutions,
+            businessChains,
+            contracts,
+            forecastHistories,
+            organizationUnits.ToDictionary(item => item.Id, item => item.DisplayName),
+            procurements,
+            projects.ToDictionary(item => item.Id, item => item.ProjectCode),
+            projects.ToDictionary(item => item.Id, item => item.Name),
+            projects,
+            receivables,
+            users.ToDictionary(item => item.Id, item => item.Name ?? item.UserName));
     }
 
     private PhaseOneBusinessContractItemDto MapContract(PhaseOneBusinessContract item, BusinessContext context, bool canViewSensitiveAmounts)
@@ -498,51 +554,48 @@ public class PhaseOneBusinessService : ITransientDependency
         };
     }
 
-    private PhaseOneBusinessProjectSummaryDto MapProjectSummary(PhaseOneProject project, BusinessContext context)
+    private PhaseOneBusinessProjectSummaryDto MapProjectSummary(PhaseOneProject project, BusinessContext context, bool canViewSensitiveAmounts, bool canViewProfitAnalysis)
     {
-        var revenueContracts = context.Contracts.Where(item => item.ProjectId == project.Id && item.IsRevenueContract).ToList();
-        var procurements = context.Procurements.Where(item => item.ProjectId == project.Id).ToList();
-        var receivables = context.Receivables.Where(item => item.ProjectId == project.Id).ToList();
-        var canViewSensitiveAmounts = CanViewSensitiveAmounts();
-        var canViewProfitAnalysis = CanViewProfitAnalysis();
+        var revenueContracts = context.ContractsByProject.GetValueOrDefault(project.Id) is { } allContracts
+            ? allContracts.Where(c => c.IsRevenueContract).ToList()
+            : [];
+        var procurements = context.ProcurementsByProject.GetValueOrDefault(project.Id) ?? [];
+        var receivables  = context.ReceivablesByProject.GetValueOrDefault(project.Id) ?? [];
+        var budgetExecs  = context.BudgetExecutionsByProject.GetValueOrDefault(project.Id) ?? [];
 
-        var contractAmount = revenueContracts.Sum(item => item.Amount);
-        var procurementAmount = procurements.Sum(item => item.Amount);
-        var receivedAmount = receivables.Sum(item => item.ReceivedAmount);
+        var contractAmount            = revenueContracts.Sum(item => item.Amount);
+        var procurementAmount         = procurements.Sum(item => item.Amount);
+        var receivedAmount            = receivables.Sum(item => item.ReceivedAmount);
         var yearEndReceivableForecast = receivables.Sum(item => item.TotalAmount);
-        var costAmount = procurementAmount + context.BudgetExecutions.Where(item => item.ProjectId == project.Id).Sum(item => item.ExecutedAmount);
-        var grossProfitAmount = contractAmount - costAmount;
-        var grossProfitRate = contractAmount <= 0 ? 0m : Math.Round(grossProfitAmount * 100m / contractAmount, 1);
+        var costAmount                = procurementAmount + budgetExecs.Sum(item => item.ExecutedAmount);
+        var grossProfitAmount         = contractAmount - costAmount;
+        var grossProfitRate           = contractAmount <= 0 ? 0m : Math.Round(grossProfitAmount * 100m / contractAmount, 1);
 
         return new PhaseOneBusinessProjectSummaryDto
         {
-            BusinessCloseStatus = ResolveBusinessCloseStatus(project, receivables),
-            ContractAmount = MaskAmount(contractAmount, canViewSensitiveAmounts),
-            CostAmount = MaskAmount(costAmount, canViewSensitiveAmounts),
-            CustomerName = revenueContracts.FirstOrDefault()?.CounterpartyName ?? project.ProjectSource ?? "-",
-            GrossProfitAmount = MaskAmount(grossProfitAmount, canViewProfitAnalysis),
-            GrossProfitRate = canViewProfitAnalysis ? grossProfitRate : null,
-            Id = project.Id,
-            InvoicedAmount = MaskAmount(receivables.Sum(item => string.IsNullOrWhiteSpace(item.InvoiceCode) ? item.ReceivedAmount : item.TotalAmount), canViewSensitiveAmounts),
-            ManagerName = context.UserNameMap.GetValueOrDefault(project.ManagerUserId) ?? "-",
-            Name = project.Name,
-            ProcurementAmount = MaskAmount(procurementAmount, canViewSensitiveAmounts),
-            ProjectCode = project.ProjectCode,
-            ReceivedAmount = MaskAmount(receivedAmount, canViewSensitiveAmounts),
-            Status = project.Status,
+            BusinessCloseStatus       = ResolveBusinessCloseStatus(project, receivables),
+            ContractAmount            = MaskAmount(contractAmount, canViewSensitiveAmounts),
+            CostAmount                = MaskAmount(costAmount, canViewSensitiveAmounts),
+            CustomerName              = revenueContracts.FirstOrDefault()?.CounterpartyName ?? project.ProjectSource ?? "-",
+            GrossProfitAmount         = MaskAmount(grossProfitAmount, canViewProfitAnalysis),
+            GrossProfitRate           = canViewProfitAnalysis ? grossProfitRate : null,
+            Id                        = project.Id,
+            InvoicedAmount            = MaskAmount(receivables.Sum(item => string.IsNullOrWhiteSpace(item.InvoiceCode) ? item.ReceivedAmount : item.TotalAmount), canViewSensitiveAmounts),
+            ManagerName               = context.UserNameMap.GetValueOrDefault(project.ManagerUserId) ?? "-",
+            Name                      = project.Name,
+            ProcurementAmount         = MaskAmount(procurementAmount, canViewSensitiveAmounts),
+            ProjectCode               = project.ProjectCode,
+            ReceivedAmount            = MaskAmount(receivedAmount, canViewSensitiveAmounts),
+            Status                    = project.Status,
             YearEndReceivableForecast = MaskAmount(yearEndReceivableForecast, canViewSensitiveAmounts)
         };
     }
 
-    private bool CanViewProfitAnalysis()
-    {
-        return _currentUser.IsInRole(PhaseOneRoleNames.Admin)
-            || _currentUser.IsInRole(PhaseOneRoleNames.Pmo)
-            || _currentUser.IsInRole(PhaseOneRoleNames.Viewer)
-            || _currentUser.IsInRole(PhaseOneRoleNames.Pm);
-    }
+    private bool CanViewProfitAnalysis() => IsPrivilegedRole();
 
-    private bool CanViewSensitiveAmounts()
+    private bool CanViewSensitiveAmounts() => IsPrivilegedRole();
+
+    private bool IsPrivilegedRole()
     {
         return _currentUser.IsInRole(PhaseOneRoleNames.Admin)
             || _currentUser.IsInRole(PhaseOneRoleNames.Pmo)
@@ -582,33 +635,5 @@ public class PhaseOneBusinessService : ITransientDependency
         return "经营执行中";
     }
 
-    private static bool IsClosed(string status)
-    {
-        return status is "已完成" or "已关闭";
-    }
-
-    private sealed class BusinessContext
-    {
-        public List<PhaseOneBusinessBudgetExecution> BudgetExecutions { get; set; } = [];
-
-        public List<PhaseOneBusinessChain> BusinessChains { get; set; } = [];
-
-        public List<PhaseOneBusinessContract> Contracts { get; set; } = [];
-
-        public List<PhaseOneBusinessForecastHistory> ForecastHistories { get; set; } = [];
-
-        public Dictionary<Guid, string> OrganizationUnitNameMap { get; set; } = [];
-
-        public List<PhaseOneBusinessProcurement> Procurements { get; set; } = [];
-
-        public Dictionary<Guid, string> ProjectCodeMap { get; set; } = [];
-
-        public Dictionary<Guid, string> ProjectNameMap { get; set; } = [];
-
-        public List<PhaseOneProject> Projects { get; set; } = [];
-
-        public List<PhaseOneBusinessReceivable> Receivables { get; set; } = [];
-
-        public Dictionary<Guid, string> UserNameMap { get; set; } = [];
-    }
+    private static bool IsClosed(string status) => PhaseOneProjectStatuses.IsClosed(status);
 }

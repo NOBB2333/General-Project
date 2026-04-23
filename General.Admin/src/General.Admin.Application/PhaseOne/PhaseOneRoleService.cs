@@ -15,6 +15,7 @@ public class PhaseOneRoleService : ITransientDependency
         PhaseOneRoleNames.Viewer,
     ];
 
+    private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IdentityUserManager _userManager;
     private readonly IdentityRoleManager _roleManager;
     private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
@@ -23,11 +24,13 @@ public class PhaseOneRoleService : ITransientDependency
     public PhaseOneRoleService(
         IdentityUserManager userManager,
         IdentityRoleManager roleManager,
+        IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<IdentityRole, Guid> roleRepository)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _roleAuthorizationRepository = roleAuthorizationRepository;
         _roleMenuRepository = roleMenuRepository;
         _roleRepository = roleRepository;
     }
@@ -40,18 +43,46 @@ public class PhaseOneRoleService : ITransientDependency
             .ToList();
 
         var roleMenus = await _roleMenuRepository.GetListAsync();
+        var roleAuthorizations = await _roleAuthorizationRepository.GetListAsync();
         var result = new List<PhaseOneRoleDto>();
 
         foreach (var role in roles)
         {
             var users = await _userManager.GetUsersInRoleAsync(role.Name);
+            var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id);
+            var effectiveMenuIds = roleMenus
+                .Where(x => x.RoleId == role.Id)
+                .Select(x => x.MenuId)
+                .Distinct()
+                .ToList();
+
+            if (effectiveMenuIds.Count == 0 && PhaseOneRoleNames.All.Contains(role.Name))
+            {
+                effectiveMenuIds = GetDefaultMenuIds(role.Name, roleMenus)
+                    .Distinct()
+                    .ToList();
+            }
+
             result.Add(new PhaseOneRoleDto
             {
+                ApiBlacklist = authorization == null
+                    ? []
+                    : PhaseOneSerializationHelper.DeserializeStringList(authorization.ApiBlacklist),
+                AccountScopeMode = authorization?.AccountScopeMode ?? PhaseOneAuthorizationDefaults.AccountScopeDataAndUsers,
+                AccountUserIds = authorization == null
+                    ? []
+                    : PhaseOneSerializationHelper.DeserializeGuidList(authorization.AllowedUserIds),
+                CustomOrganizationUnitIds = authorization == null
+                    ? []
+                    : PhaseOneSerializationHelper.DeserializeGuidList(authorization.CustomOrganizationUnitIds),
+                DataScopeMode = authorization?.DataScopeMode ?? PhaseOneAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants,
                 Description = GetDescription(role.Name),
                 HomePath = PhaseOneUserService.ResolveHomePath([role.Name]),
                 Id = role.Id,
-                MenuCount = roleMenus.Count(x => x.RoleId == role.Id),
+                MenuAuthorizationCount = effectiveMenuIds.Count,
+                MenuCount = effectiveMenuIds.Count,
                 Name = role.Name,
+                Status = true,
                 UserCount = users.Count
             });
         }
@@ -93,7 +124,148 @@ public class PhaseOneRoleService : ITransientDependency
             await _roleMenuRepository.DeleteManyAsync(mappings, autoSave: true);
         }
 
+        var authorization = await _roleAuthorizationRepository.FindAsync(x => x.RoleId == id);
+        if (authorization != null)
+        {
+            await _roleAuthorizationRepository.DeleteAsync(authorization, autoSave: true);
+        }
+
         EnsureSucceeded(await _roleManager.DeleteAsync(role));
+    }
+
+    public async Task<PhaseOneRoleAuthorizationDto> GetAuthorizationAsync(Guid roleId)
+    {
+        var role = await _roleManager.GetByIdAsync(roleId);
+        var authorization = await _roleAuthorizationRepository.FindAsync(x => x.RoleId == role.Id);
+        var allRoleMenus = await _roleMenuRepository.GetListAsync();
+        var menuIds = allRoleMenus
+            .Where(x => x.RoleId == roleId)
+            .Select(x => x.MenuId)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+
+        if (menuIds.Count == 0 && PhaseOneRoleNames.All.Contains(role.Name))
+        {
+            menuIds = GetDefaultMenuIds(role.Name, allRoleMenus)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+        }
+
+        return new PhaseOneRoleAuthorizationDto
+        {
+            ApiBlacklist = authorization == null
+                ? []
+                : PhaseOneSerializationHelper.DeserializeStringList(authorization.ApiBlacklist),
+            AccountScopeMode = authorization?.AccountScopeMode ?? PhaseOneAuthorizationDefaults.AccountScopeDataAndUsers,
+            AccountUserIds = authorization == null
+                ? []
+                : PhaseOneSerializationHelper.DeserializeGuidList(authorization.AllowedUserIds),
+            CustomOrganizationUnitIds = authorization == null
+                ? []
+                : PhaseOneSerializationHelper.DeserializeGuidList(authorization.CustomOrganizationUnitIds),
+            DataScopeMode = authorization?.DataScopeMode ?? PhaseOneAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants,
+            MenuIds = menuIds
+        };
+    }
+
+    private static IReadOnlyCollection<Guid> GetDefaultMenuIds(string roleName, IReadOnlyCollection<AppRoleMenu> allRoleMenus)
+    {
+        return roleName switch
+        {
+            PhaseOneRoleNames.Admin => allRoleMenus.Select(x => x.MenuId).Distinct().ToList(),
+            PhaseOneRoleNames.Pmo =>
+            [
+                PhaseOneSeedIds.PlatformRoot,
+                PhaseOneSeedIds.PlatformWorkspace,
+                PhaseOneSeedIds.PlatformProfile,
+                PhaseOneSeedIds.PlatformScheduler,
+                PhaseOneSeedIds.ProjectRoot,
+                PhaseOneSeedIds.ProjectList,
+                PhaseOneSeedIds.ProjectDetail,
+                PhaseOneSeedIds.ProjectMyRelated,
+                PhaseOneSeedIds.ProjectPmoOverview,
+                PhaseOneSeedIds.ProjectCreate,
+                PhaseOneSeedIds.BusinessRoot,
+                PhaseOneSeedIds.BusinessOverview,
+                PhaseOneSeedIds.BusinessProjects,
+                PhaseOneSeedIds.BusinessReports,
+                PhaseOneSeedIds.BusinessBudgetSensitive
+            ],
+            PhaseOneRoleNames.Pm =>
+            [
+                PhaseOneSeedIds.PlatformRoot,
+                PhaseOneSeedIds.PlatformWorkspace,
+                PhaseOneSeedIds.PlatformProfile,
+                PhaseOneSeedIds.ProjectRoot,
+                PhaseOneSeedIds.ProjectList,
+                PhaseOneSeedIds.ProjectDetail,
+                PhaseOneSeedIds.ProjectMyRelated,
+                PhaseOneSeedIds.ProjectPmDashboard,
+                PhaseOneSeedIds.ProjectCreate,
+                PhaseOneSeedIds.ProjectTaskManage,
+                PhaseOneSeedIds.BusinessRoot,
+                PhaseOneSeedIds.BusinessOverview,
+                PhaseOneSeedIds.BusinessProjects
+            ],
+            PhaseOneRoleNames.Member =>
+            [
+                PhaseOneSeedIds.PlatformRoot,
+                PhaseOneSeedIds.PlatformWorkspace,
+                PhaseOneSeedIds.PlatformProfile,
+                PhaseOneSeedIds.ProjectRoot,
+                PhaseOneSeedIds.ProjectList,
+                PhaseOneSeedIds.ProjectDetail,
+                PhaseOneSeedIds.ProjectMyRelated
+            ],
+            PhaseOneRoleNames.Viewer =>
+            [
+                PhaseOneSeedIds.PlatformRoot,
+                PhaseOneSeedIds.PlatformWorkspace,
+                PhaseOneSeedIds.PlatformProfile,
+                PhaseOneSeedIds.ProjectRoot,
+                PhaseOneSeedIds.ProjectList,
+                PhaseOneSeedIds.ProjectDetail,
+                PhaseOneSeedIds.ProjectPmoOverview,
+                PhaseOneSeedIds.BusinessRoot,
+                PhaseOneSeedIds.BusinessOverview,
+                PhaseOneSeedIds.BusinessProjects,
+                PhaseOneSeedIds.BusinessReports
+            ],
+            _ => []
+        };
+    }
+
+    public async Task SaveAuthorizationAsync(Guid roleId, PhaseOneRoleAuthorizationSaveInput input)
+    {
+        var role = await _roleManager.GetByIdAsync(roleId);
+        var authorization = await _roleAuthorizationRepository.FindAsync(x => x.RoleId == role.Id);
+        var customOrganizationUnitIds = PhaseOneSerializationHelper.SerializeGuids(input.CustomOrganizationUnitIds);
+        var accountUserIds = PhaseOneSerializationHelper.SerializeGuids(input.AccountUserIds);
+        var apiBlacklist = PhaseOneSerializationHelper.SerializeStrings(input.ApiBlacklist);
+
+        if (authorization == null)
+        {
+            authorization = new AppRoleAuthorization(
+                Guid.NewGuid(),
+                roleId,
+                input.DataScopeMode,
+                input.AccountScopeMode,
+                customOrganizationUnitIds,
+                accountUserIds,
+                apiBlacklist);
+            await _roleAuthorizationRepository.InsertAsync(authorization, autoSave: true);
+            return;
+        }
+
+        authorization.Update(
+            input.DataScopeMode,
+            input.AccountScopeMode,
+            customOrganizationUnitIds,
+            accountUserIds,
+            apiBlacklist);
+        await _roleAuthorizationRepository.UpdateAsync(authorization, autoSave: true);
     }
 
     private static string GetDescription(string roleName)

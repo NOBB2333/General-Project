@@ -648,15 +648,17 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
             Catalog(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformRoot, null, "PlatformCenter", "/platform", "平台中心", "lucide:settings-2"),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformWorkspace, PhaseOneSeedIds.PlatformRoot, "PlatformWorkspace", "/platform/workspace", "/platform/workspace/index", "平台总览", "lucide:layout-dashboard", 10, affixTab: true),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformOrganization, PhaseOneSeedIds.PlatformRoot, "PlatformOrganization", "/platform/organization", "/platform/organization/index", "组织架构", "lucide:building-2", 20),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformTenants, PhaseOneSeedIds.PlatformRoot, "PlatformTenants", "/platform/tenants", "/platform/tenants/index", "租户管理", "lucide:building", 50),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformUsers, PhaseOneSeedIds.PlatformRoot, "PlatformUsers", "/platform/users", "/platform/users/index", "用户管理", "lucide:users", 30),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformRoles, PhaseOneSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40),
-            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformTenants, PhaseOneSeedIds.PlatformRoot, "PlatformTenants", "/platform/tenants", "/platform/tenants/index", "租户管理", "lucide:building", 50),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformMenus, PhaseOneSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformFiles, PhaseOneSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
-            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformAuditLogs, PhaseOneSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "审计日志", "lucide:shield-check", 80),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformStats, PhaseOneSeedIds.PlatformRoot, "PlatformStats", "/platform/stats", "/platform/stats/index", "访问统计", "lucide:chart-no-axes-column", 75),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformSystemMonitor, PhaseOneSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformScheduler, PhaseOneSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
-            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformProfile, PhaseOneSeedIds.PlatformRoot, "PlatformProfile", "/platform/profile", "/platform/profile/index", "个人中心", "lucide:user-circle-2", 110),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformAuditLogs, PhaseOneSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "审计日志", "lucide:shield-check", 80),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformUpdateLogs, PhaseOneSeedIds.PlatformRoot, "PlatformUpdateLogs", "/platform/update-logs", "/platform/update-logs/index", "更新日志", "lucide:scroll-text", 110),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformProfile, PhaseOneSeedIds.PlatformRoot, "PlatformProfile", "/platform/profile", "/platform/profile/index", "个人中心", "lucide:user-circle-2", 120),
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformOrganizationManage, PhaseOneSeedIds.PlatformOrganization, "PlatformOrganizationManage", "Platform.Organization.Manage"),
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformUsersManage, PhaseOneSeedIds.PlatformUsers, "PlatformUsersManage", "Platform.User.Manage"),
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformRolesManage, PhaseOneSeedIds.PlatformRoles, "PlatformRoleManage", "Platform.Role.Manage"),
@@ -664,7 +666,7 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformMenusManage, PhaseOneSeedIds.PlatformMenus, "PlatformMenuManage", "Platform.Menu.Manage"),
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformFilesManage, PhaseOneSeedIds.PlatformFiles, "PlatformFileManage", "Platform.File.Manage"),
 
-            Catalog(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectRoot, null, "ProjectCenter", "/project", "项目执行区", "lucide:folder-kanban", 20),
+            Catalog(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectRoot, null, "ProjectCenter", "/project", "项目执行", "lucide:folder-kanban", 20),
             Menu(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectList, PhaseOneSeedIds.ProjectRoot, "ProjectList", "/project/projects", "/project/projects/index", "项目列表", "lucide:folder-open-dot", 20),
             Menu(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectDetail, PhaseOneSeedIds.ProjectRoot, "ProjectDetail", "/project/detail", "/project/detail/index", "项目详情", "lucide:panel-right-open", 30),
             Menu(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectMyRelated, PhaseOneSeedIds.ProjectRoot, "ProjectMyRelated", "/project/my-related", "/project/my-related/index", "与我相关", "lucide:user-round-check", 40),
@@ -673,7 +675,7 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
             Button(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectCreate, PhaseOneSeedIds.ProjectList, "ProjectCreate", "Project.Project.Create"),
             Button(PhaseOneAppCodes.Project, PhaseOneSeedIds.ProjectTaskManage, PhaseOneSeedIds.ProjectDetail, "ProjectTaskManage", "Project.Task.Manage"),
 
-            Catalog(PhaseOneAppCodes.Business, PhaseOneSeedIds.BusinessRoot, null, "BusinessCenter", "/business", "经营管理区", "lucide:briefcase-business", 30),
+            Catalog(PhaseOneAppCodes.Business, PhaseOneSeedIds.BusinessRoot, null, "BusinessCenter", "/business", "经营管理", "lucide:briefcase-business", 30),
             Menu(PhaseOneAppCodes.Business, PhaseOneSeedIds.BusinessOverview, PhaseOneSeedIds.BusinessRoot, "BusinessOverview", "/business/overview", "/business/overview/index", "经营总览", "lucide:chart-column-big", 10),
             Menu(PhaseOneAppCodes.Business, PhaseOneSeedIds.BusinessProjects, PhaseOneSeedIds.BusinessRoot, "BusinessProjects", "/business/projects", "/business/projects/index", "项目经营", "lucide:folder-output", 20),
             Menu(PhaseOneAppCodes.Business, PhaseOneSeedIds.BusinessReports, PhaseOneSeedIds.BusinessRoot, "BusinessReports", "/business/reports", "/business/reports/index", "报表中心", "lucide:sheet", 30),
@@ -685,6 +687,7 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
     {
         var deprecatedMenuIds = new HashSet<Guid>
         {
+            PhaseOneSeedIds.PlatformOnlineUsers,
             PhaseOneSeedIds.ProjectWorkspace,
             PhaseOneSeedIds.ProjectInitiation,
             PhaseOneSeedIds.BusinessAcceptances,

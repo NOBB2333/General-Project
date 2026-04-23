@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize(Roles = PhaseOneRoleNames.Admin)]
 [Route("api/app/audit-log")]
 public class AuditLogController : ControllerBase
@@ -23,5 +22,11 @@ public class AuditLogController : ControllerBase
     public async Task<ActionResult<ApiResponse<List<PhaseOneAuditLogItemDto>>>> GetListAsync([FromQuery] PhaseOneAuditLogQueryInput input)
     {
         return ApiResponse<List<PhaseOneAuditLogItemDto>>.Ok(await _auditLogService.GetListAsync(input));
+    }
+
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<ApiResponse<PhaseOneLogDashboardDto>>> GetDashboardAsync([FromQuery] PhaseOneAuditLogQueryInput input)
+    {
+        return ApiResponse<PhaseOneLogDashboardDto>.Ok(await _auditLogService.GetDashboardAsync(input));
     }
 }

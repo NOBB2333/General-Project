@@ -71,6 +71,18 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
     fulfilled: async (config) => {
       const accessStore = useAccessStore();
 
+      if (config.data instanceof FormData) {
+        const headers = config.headers as any;
+        headers?.delete?.('Content-Type');
+        headers?.delete?.('content-type');
+        if (headers && 'Content-Type' in headers) {
+          delete headers['Content-Type'];
+        }
+        if (headers && 'content-type' in headers) {
+          delete headers['content-type'];
+        }
+      }
+
       config.headers.Authorization = formatToken(accessStore.accessToken);
       config.headers['Accept-Language'] = preferences.app.locale;
       return config;

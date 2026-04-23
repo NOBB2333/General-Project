@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Col, Descriptions, Empty, Row, Statistic, Table } from 'ant-design-vue';
+import { Alert, Button, Card, Col, Descriptions, Empty, Row, Statistic, Table, Tooltip } from 'ant-design-vue';
 
 import { getSystemMonitorApi, type SystemMonitorApi } from '#/api/core';
 
@@ -20,6 +20,21 @@ const diskColumns = [
   { dataIndex: 'freeSpaceBytes', key: 'freeSpaceBytes', title: '可用容量', width: 140 },
 ];
 
+// System memory: used bytes = totalMemoryBytes * systemMemoryUsagePercent / 100
+const systemMemoryDisplay = computed(() => {
+  const m = monitor.value;
+  if (!m || !m.totalMemoryBytes) return '-';
+  const usedPercent = m.systemMemoryUsagePercent ?? 0;
+  const usedBytes = Math.round((usedPercent / 100) * m.totalMemoryBytes);
+  return `${formatBytes(usedBytes)} / ${formatBytes(m.totalMemoryBytes)}`;
+});
+
+const processMemoryDisplay = computed(() => {
+  const m = monitor.value;
+  if (!m || !m.processMemoryDisplayDenominatorBytes) return formatBytes(m?.workingSetBytes ?? 0);
+  return `${formatBytes(m.workingSetBytes)} / ${formatBytes(m.processMemoryDisplayDenominatorBytes)}`;
+});
+
 async function loadMonitor() {
   loading.value = true;
   try {
@@ -30,15 +45,9 @@ async function loadMonitor() {
 }
 
 function formatBytes(value: number) {
-  if (value < 1024) {
-    return `${value} B`;
-  }
-  if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(1)} KB`;
-  }
-  if (value < 1024 * 1024 * 1024) {
-    return `${(value / 1024 / 1024).toFixed(1)} MB`;
-  }
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
   return `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
@@ -56,12 +65,34 @@ onMounted(loadMonitor);
         </Col>
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
-            <Statistic title="进程线程数" :value="monitor?.threadCount || 0" />
+            <Statistic
+              :suffix="monitor?.cpuUsagePercent != null ? '%' : ''"
+              title="CPU 使用率（均值）"
+              :value="monitor?.cpuUsagePercent != null ? monitor.cpuUsagePercent.toFixed(2) : '-'"
+            />
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
-            <Statistic title="工作集" :value="formatBytes(monitor?.workingSetBytes || 0)" />
+            <Tooltip :title="monitor?.memoryUsageNote || undefined">
+              <Statistic title="系统内存使用" :value="systemMemoryDisplay" />
+            </Tooltip>
+            <div v-if="monitor?.memoryUsageNote" class="platform-monitor__note">
+              {{ monitor.memoryUsageNote }}
+            </div>
+          </Card>
+        </Col>
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
+            <Statistic title="进程内存（工作集）" :value="processMemoryDisplay" />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row :gutter="[16, 16]">
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
+            <Statistic title="进程线程数" :value="monitor?.threadCount || 0" />
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
@@ -98,7 +129,7 @@ onMounted(loadMonitor);
                 {{ monitor ? `${monitor.cpuTimeSeconds.toFixed(1)} 秒` : '-' }}
               </Descriptions.Item>
               <Descriptions.Item label="句柄数">{{ monitor?.handleCount ?? '-' }}</Descriptions.Item>
-              <Descriptions.Item label="可用内存上限">
+              <Descriptions.Item label="可用内存">
                 {{ formatBytes(monitor?.availableMemoryBytes || 0) }}
               </Descriptions.Item>
             </Descriptions>
@@ -107,6 +138,13 @@ onMounted(loadMonitor);
 
         <Col :lg="12" :span="24">
           <Card :bordered="false" title="磁盘资源">
+            <Alert
+              v-if="monitor?.memoryUsageNote"
+              class="platform-monitor__alert"
+              :message="monitor.memoryUsageNote"
+              show-icon
+              type="info"
+            />
             <Table
               :columns="diskColumns"
               :data-source="monitor?.disks || []"
@@ -142,5 +180,15 @@ onMounted(loadMonitor);
   display: grid;
   min-height: 280px;
   place-items: center;
+}
+
+.platform-monitor__note {
+  margin-top: 6px;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+}
+
+.platform-monitor__alert {
+  margin-bottom: 12px;
 }
 </style>

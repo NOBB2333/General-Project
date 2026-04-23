@@ -3,15 +3,16 @@ import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Col, Empty, Input, Row, Statistic, Table, Tag } from 'ant-design-vue';
+import { Button, Card, Col, Empty, Input, Row, Statistic, Table, Tabs, Tag } from 'ant-design-vue';
 
-import { getAuditLogListApi, type AuditLogApi } from '#/api/core';
+import { getAuditLogDashboardApi, type AuditLogApi } from '#/api/core';
 
 defineOptions({ name: 'PlatformAuditLogsPage' });
 
+const activeKey = ref('accessLogs');
 const keyword = ref('');
 const loading = ref(false);
-const items = ref<AuditLogApi.AuditLogItem[]>([]);
+const dashboard = ref<AuditLogApi.LogDashboard | null>(null);
 
 const columns = [
   { dataIndex: 'executionTime', key: 'executionTime', title: '执行时间', width: 180 },
@@ -23,32 +24,19 @@ const columns = [
   { dataIndex: 'executionDuration', key: 'executionDuration', title: '耗时', width: 110 },
 ];
 
+const currentItems = computed(() => dashboard.value?.[activeKey.value as keyof AuditLogApi.LogDashboard] || []);
+
 const metrics = computed(() => [
-  { label: '日志条数', value: items.value.length },
-  {
-    label: '异常请求',
-    value: items.value.filter((item) => item.hasException).length,
-  },
-  {
-    label: '成功请求',
-    value: items.value.filter((item) => !item.hasException).length,
-  },
-  {
-    label: '平均耗时(ms)',
-    value:
-      items.value.length === 0
-        ? 0
-        : Math.round(
-            items.value.reduce((total, item) => total + item.executionDuration, 0) /
-              items.value.length,
-          ),
-  },
+  { label: '访问日志', value: dashboard.value?.accessLogs.length || 0 },
+  { label: '操作日志', value: dashboard.value?.operationLogs.length || 0 },
+  { label: '异常日志', value: dashboard.value?.exceptionLogs.length || 0 },
+  { label: '审计日志', value: dashboard.value?.auditLogs.length || 0 },
 ]);
 
-async function loadLogs() {
+async function loadDashboard() {
   loading.value = true;
   try {
-    items.value = await getAuditLogListApi({
+    dashboard.value = await getAuditLogDashboardApi({
       keyword: keyword.value || undefined,
       maxResultCount: 200,
     });
@@ -67,15 +55,11 @@ function resolveStatusColor(record: AuditLogApi.AuditLogItem) {
   return 'success';
 }
 
-function formatDuration(value: number) {
-  return `${value} ms`;
-}
-
-onMounted(loadLogs);
+onMounted(loadDashboard);
 </script>
 
 <template>
-  <Page description="审计日志按最近 200 条记录展示平台请求留痕，支持按关键字筛选。" title="审计日志">
+  <Page description="日志管理汇总访问、操作、异常与审计日志，并提供接口、菜单、用户统计。" title="日志管理">
     <section class="platform-audit">
       <Row :gutter="[16, 16]">
         <Col v-for="metric in metrics" :key="metric.label" :lg="6" :md="12" :span="24">
@@ -85,30 +69,63 @@ onMounted(loadLogs);
         </Col>
       </Row>
 
-      <Card :bordered="false" title="请求留痕">
+      <Row :gutter="[16, 16]">
+        <Col :lg="8" :span="24">
+          <Card :bordered="false" title="Top 接口">
+            <div v-for="item in dashboard?.topApis || []" :key="item.key" class="platform-audit__rank">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </Card>
+        </Col>
+        <Col :lg="8" :span="24">
+          <Card :bordered="false" title="Top 菜单/方法">
+            <div v-for="item in dashboard?.topMenus || []" :key="item.key" class="platform-audit__rank">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </Card>
+        </Col>
+        <Col :lg="8" :span="24">
+          <Card :bordered="false" title="Top 用户">
+            <div v-for="item in dashboard?.topUsers || []" :key="item.key" class="platform-audit__rank">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      <Card :bordered="false" title="日志明细">
         <template #extra>
           <div class="platform-audit__toolbar">
             <Input
               v-model:value="keyword"
               allow-clear
               placeholder="按用户、租户、接口、动作筛选"
-              @pressEnter="loadLogs"
+              @pressEnter="loadDashboard"
             />
-            <Button type="primary" @click="loadLogs">刷新</Button>
+            <Button type="primary" @click="loadDashboard">刷新</Button>
           </div>
         </template>
 
-        <div v-if="!loading && items.length === 0" class="platform-audit__empty">
-          <Empty description="暂无审计日志" />
+        <Tabs v-model:activeKey="activeKey">
+          <Tabs.TabPane key="accessLogs" tab="访问日志" />
+          <Tabs.TabPane key="operationLogs" tab="操作日志" />
+          <Tabs.TabPane key="exceptionLogs" tab="异常日志" />
+          <Tabs.TabPane key="auditLogs" tab="审计日志" />
+        </Tabs>
+
+        <div v-if="!loading && currentItems.length === 0" class="platform-audit__empty">
+          <Empty description="暂无日志" />
         </div>
         <Table
           v-else
           :columns="columns"
-          :data-source="items"
+          :data-source="currentItems"
           :loading="loading"
           :pagination="{ pageSize: 10 }"
           row-key="id"
-          size="middle"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'executionTime'">
@@ -120,13 +137,7 @@ onMounted(loadLogs);
               </Tag>
             </template>
             <template v-else-if="column.key === 'executionDuration'">
-              {{ formatDuration((record as AuditLogApi.AuditLogItem).executionDuration) }}
-            </template>
-            <template v-else-if="column.key === 'actionSummary'">
-              <div class="platform-audit__action">
-                <strong>{{ (record as AuditLogApi.AuditLogItem).actionSummary || '-' }}</strong>
-                <span v-if="(record as AuditLogApi.AuditLogItem).exceptionMessage">{{ (record as AuditLogApi.AuditLogItem).exceptionMessage }}</span>
-              </div>
+              {{ (record as AuditLogApi.AuditLogItem).executionDuration }} ms
             </template>
           </template>
         </Table>
@@ -153,21 +164,11 @@ onMounted(loadLogs);
   place-items: center;
 }
 
-.platform-audit__action {
+.platform-audit__rank {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.platform-audit__action span {
-  color: var(--ant-color-text-secondary);
-  font-size: 12px;
-}
-
-@media (max-width: 960px) {
-  .platform-audit__toolbar {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
 }
 </style>

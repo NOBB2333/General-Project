@@ -22,20 +22,14 @@ class FileUploader {
         value.forEach((item, index) => {
           !isUndefined(item) && formData.append(`${key}[${index}]`, item);
         });
+      } else if (value === null) {
+        return;
       } else {
         !isUndefined(value) && formData.append(key, value);
       }
     });
 
-    const finalConfig: RequestClientConfig = {
-      ...config,
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...config?.headers,
-      },
-    };
-
-    return this.client.post(url, formData, finalConfig);
+    return this.client.post(url, formData, config);
   }
 }
 

@@ -3,12 +3,32 @@ import type { UserInfo } from '@vben/types';
 import { requestClient } from '#/api/request';
 
 export namespace UserApi {
+  export interface ExternalAccountMapping {
+    boundAt: string;
+    externalSource: string;
+    externalUserId: string;
+    id: string;
+    lastSyncedAt?: null | string;
+    remark?: null | string;
+    status: string;
+    userId: string;
+  }
+
+  export interface PasswordChangeInput {
+    currentPassword: string;
+    newPassword: string;
+  }
+
   export interface UserSaveInput {
     displayName: string;
     email: string;
+    employeeNo?: null | string;
+    externalSource?: null | string;
+    externalUserId?: null | string;
     isActive: boolean;
     organizationUnitId?: null | string;
     password?: string;
+    phoneNumber?: null | string;
     roleNames: string[];
     username: string;
   }
@@ -21,9 +41,16 @@ export namespace UserApi {
   export interface UserListItem {
     displayName: string;
     email: string;
+    employeeNo?: null | string;
+    externalAccounts: ExternalAccountMapping[];
+    externalSource?: null | string;
+    externalUserId?: null | string;
     id: string;
     isActive: boolean;
+    isOnline: boolean;
+    lastLoginTime?: null | string;
     organizationUnitNames: string[];
+    phoneNumber?: null | string;
     roles: string[];
     username: string;
   }
@@ -50,4 +77,8 @@ export async function updateUserApi(id: string, data: UserApi.UserSaveInput) {
 
 export async function deleteUserApi(id: string) {
   return requestClient.delete<boolean>(`/app/user/${id}`);
+}
+
+export async function changePasswordApi(data: UserApi.PasswordChangeInput) {
+  return requestClient.put<boolean>('/app/user/password', data);
 }

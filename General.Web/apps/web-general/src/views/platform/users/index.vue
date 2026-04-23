@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { OrganizationApi, RoleApi, UserApi } from '#/api/core';
+import type { OnlineUserApi, OrganizationApi, RoleApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -8,6 +8,8 @@ import { Page } from '@vben/common-ui';
 import {
   Button,
   Card,
+  Descriptions,
+  Drawer,
   Empty,
   Form,
   Input,
@@ -24,20 +26,40 @@ import {
 import {
   createUserApi,
   deleteUserApi,
+  forceLogoutOnlineUserApi,
+  getOnlineUserListApi,
   getOrganizationTreeApi,
   getRoleListApi,
   getUserListApi,
   updateUserApi,
 } from '#/api/core';
 
+defineOptions({ name: 'PlatformUserPage' });
+
 const columns = [
-  { dataIndex: 'displayName', key: 'displayName', title: '姓名' },
-  { dataIndex: 'username', key: 'username', title: '账号' },
-  { dataIndex: 'email', key: 'email', title: '邮箱' },
-  { dataIndex: 'roles', key: 'roles', title: '角色' },
-  { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门' },
+  { dataIndex: 'displayName', key: 'displayName', title: '姓名', width: 140 },
+  { dataIndex: 'username', key: 'username', title: '账号', width: 160 },
+  { dataIndex: 'employeeNo', key: 'employeeNo', title: '工号', width: 120 },
+  { dataIndex: 'phoneNumber', key: 'phoneNumber', title: '手机号', width: 140 },
+  { dataIndex: 'email', key: 'email', title: '邮箱', width: 220 },
+  { dataIndex: 'tenantName', key: 'tenantName', title: '租户', width: 120 },
+  { dataIndex: 'externalSource', key: 'externalSource', title: '外部来源', width: 120 },
+  { dataIndex: 'roles', key: 'roles', title: '角色', width: 180 },
+  { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门', width: 200 },
+  { dataIndex: 'isOnline', key: 'isOnline', title: '在线', width: 90 },
   { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 160 },
+  { key: 'actions', title: '操作', width: 240 },
+];
+
+const onlineColumns = [
+  { dataIndex: 'userName', key: 'userName', title: '账号' },
+  { dataIndex: 'tenantName', key: 'tenantName', title: '租户', width: 120 },
+  { dataIndex: 'device', key: 'device', title: '设备', width: 120 },
+  { dataIndex: 'browser', key: 'browser', title: '浏览器' },
+  { dataIndex: 'ipAddress', key: 'ipAddress', title: 'IP', width: 160 },
+  { dataIndex: 'signedInAt', key: 'signedInAt', title: '登录时间', width: 200 },
+  { dataIndex: 'lastAccessedAt', key: 'lastAccessedAt', title: '最近活动', width: 200 },
+  { key: 'actions', title: '操作', width: 120 },
 ];
 
 interface TreeSelectNode {
@@ -53,8 +75,15 @@ const saving = ref(false);
 const editingUserId = ref<null | string>(null);
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const organizationUnitId = ref<string>();
+const statusFilter = ref<string>();
+const roleName = ref<string>();
 const roleItems = ref<RoleApi.RoleItem[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
+const onlineUsers = ref<OnlineUserApi.OnlineUserItem[]>([]);
+const onlineVisible = ref(false);
+const onlineLoading = ref(false);
+const mappingVisible = ref(false);
+const activeMappingUser = ref<null | UserApi.UserListItem>(null);
 
 const formState = reactive<any>({
   displayName: '',
@@ -75,6 +104,10 @@ const metrics = computed(() => [
   {
     label: '涉及部门',
     value: new Set(users.value.flatMap((item) => item.organizationUnitNames)).size,
+  },
+  {
+    label: '在线会话',
+    value: onlineUsers.value.length,
   },
 ]);
 
@@ -101,20 +134,54 @@ async function loadUsers() {
   try {
     users.value = await getUserListApi({
       keyword: keyword.value || undefined,
+      isActive:
+        statusFilter.value === undefined
+          ? undefined
+          : statusFilter.value === 'true',
       organizationUnitId: organizationUnitId.value || undefined,
+      roleName: roleName.value || undefined,
     });
   } finally {
     loading.value = false;
   }
 }
 
+async function loadOnlineUsers() {
+  onlineLoading.value = true;
+  try {
+    onlineUsers.value = await getOnlineUserListApi();
+  } finally {
+    onlineLoading.value = false;
+  }
+}
+
+async function handleForceLogout(record: OnlineUserApi.OnlineUserItem) {
+  await forceLogoutOnlineUserApi(record.userId);
+  message.success(`已强制下线账号 ${record.userName}`);
+  await Promise.all([loadOnlineUsers(), loadUsers()]);
+}
+
+function openOnlineDrawer() {
+  onlineVisible.value = true;
+  void loadOnlineUsers();
+}
+
+function openMappingDrawer(record: UserApi.UserListItem) {
+  activeMappingUser.value = record;
+  mappingVisible.value = true;
+}
+
 function openCreate() {
   editingUserId.value = null;
   formState.displayName = '';
   formState.email = '';
+  formState.employeeNo = '';
+  formState.externalSource = '';
+  formState.externalUserId = '';
   formState.isActive = true;
   formState.organizationUnitId = undefined;
   formState.password = '1q2w3E*';
+  formState.phoneNumber = '';
   formState.roleNames = [];
   formState.username = '';
   modalVisible.value = true;
@@ -124,10 +191,14 @@ function openEdit(record: UserApi.UserListItem) {
   editingUserId.value = record.id;
   formState.displayName = record.displayName;
   formState.email = record.email;
+  formState.employeeNo = record.employeeNo || '';
+  formState.externalSource = record.externalSource || '';
+  formState.externalUserId = record.externalUserId || '';
   formState.isActive = record.isActive;
   formState.organizationUnitId =
     findOrganizationUnitIdByName(record.organizationUnitNames[0] || '') || undefined;
   formState.password = '';
+  formState.phoneNumber = record.phoneNumber || '';
   formState.roleNames = [...record.roles];
   formState.username = record.username;
   modalVisible.value = true;
@@ -171,7 +242,7 @@ async function handleSubmit() {
     }
 
     modalVisible.value = false;
-    await loadUsers();
+    await Promise.all([loadUsers(), loadOnlineUsers()]);
   } finally {
     saving.value = false;
   }
@@ -180,23 +251,45 @@ async function handleSubmit() {
 async function handleDelete(id: string) {
   await deleteUserApi(id);
   message.success('用户已删除');
-  await loadUsers();
+  await Promise.all([loadUsers(), loadOnlineUsers()]);
+}
+
+async function handleToggleStatus(record: UserApi.UserListItem, checked: boolean) {
+  const payload = {
+    displayName: record.displayName,
+    email: record.email,
+    employeeNo: record.employeeNo || undefined,
+    externalSource: record.externalSource || undefined,
+    externalUserId: record.externalUserId || undefined,
+    isActive: checked,
+    organizationUnitId:
+      findOrganizationUnitIdByName(record.organizationUnitNames[0] || '') || null,
+    phoneNumber: record.phoneNumber || undefined,
+    roleNames: [...record.roles],
+    username: record.username,
+  };
+
+  await updateUserApi(record.id, payload);
+  message.success(`账号已${checked ? '启用' : '停用'}`);
+  await Promise.all([loadUsers(), loadOnlineUsers()]);
 }
 
 async function resetFilters() {
   keyword.value = '';
   organizationUnitId.value = undefined;
+  roleName.value = undefined;
+  statusFilter.value = undefined;
   await loadUsers();
 }
 
 onMounted(async () => {
-  await Promise.all([loadFilters(), loadUsers()]);
+  await Promise.all([loadFilters(), loadUsers(), loadOnlineUsers()]);
 });
 </script>
 
 <template>
   <Page
-    description="用户管理页已接入新增、编辑、删除、角色分配和部门归属等一期常用操作。"
+    description="用户管理页已接入新增、编辑、删除、角色分配，并在右侧抽屉查看在线会话。"
     title="用户管理"
   >
     <section class="platform-page">
@@ -228,8 +321,26 @@ onMounted(async () => {
               :tree-data="normalizeTree(organizationTree)"
               tree-default-expand-all
             />
+            <Select
+              v-model:value="roleName"
+              allow-clear
+              class="toolbar__select"
+              placeholder="按角色筛选"
+              :options="roleOptions"
+            />
+            <Select
+              v-model:value="statusFilter"
+              allow-clear
+              class="toolbar__select"
+              placeholder="按状态筛选"
+              :options="[
+                { label: '启用', value: 'true' },
+                { label: '停用', value: 'false' },
+              ]"
+            />
             <Button type="primary" @click="loadUsers">查询</Button>
             <Button @click="resetFilters">重置</Button>
+            <Button @click="openOnlineDrawer">在线会话</Button>
             <Button type="primary" @click="openCreate">新增用户</Button>
           </div>
         </template>
@@ -244,6 +355,7 @@ onMounted(async () => {
           :loading="loading"
           :pagination="{ pageSize: 10 }"
           row-key="id"
+          :scroll="{ x: 1480 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'roles'">
@@ -263,15 +375,43 @@ onMounted(async () => {
                 </Tag>
               </div>
             </template>
+            <template v-else-if="column.key === 'tenantName'">
+              <Tag v-if="(record as UserApi.UserListItem).tenantName" color="blue">
+                {{ (record as UserApi.UserListItem).tenantName }}
+              </Tag>
+              <Tag v-else color="default">主机</Tag>
+            </template>
             <template v-else-if="column.key === 'isActive'">
-              <Tag :color="record.isActive ? 'green' : 'default'">
-                {{ record.isActive ? '启用' : '停用' }}
+              <Switch
+                :checked="record.isActive"
+                checked-children="启用"
+                un-checked-children="停用"
+                @change="(checked) => handleToggleStatus(record as UserApi.UserListItem, checked === true)"
+              />
+            </template>
+            <template v-else-if="column.key === 'isOnline'">
+              <Tag :color="record.isOnline ? 'success' : 'default'">
+                {{ record.isOnline ? '在线' : '离线' }}
               </Tag>
             </template>
             <template v-else-if="column.key === 'actions'">
               <div class="action-list">
                 <Button size="small" type="link" @click="openEdit(record as UserApi.UserListItem)">
                   编辑
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  @click="openMappingDrawer(record as UserApi.UserListItem)"
+                >
+                  映射记录
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  @click="handleToggleStatus(record as UserApi.UserListItem, !(record as UserApi.UserListItem).isActive)"
+                >
+                  {{ (record as UserApi.UserListItem).isActive ? '停用' : '启用' }}
                 </Button>
                 <Popconfirm title="确认删除该用户？" @confirm="handleDelete(record.id)">
                   <Button danger size="small" type="link">删除</Button>
@@ -282,6 +422,111 @@ onMounted(async () => {
         </Table>
       </Card>
     </section>
+
+    <Drawer
+      v-model:open="onlineVisible"
+      destroy-on-close
+      placement="right"
+      title="在线会话"
+      width="720"
+    >
+      <div v-if="!onlineLoading && onlineUsers.length === 0" class="platform-page__empty">
+        <Empty description="暂无在线用户" />
+      </div>
+      <Table
+        v-else
+        :columns="onlineColumns"
+        :data-source="onlineUsers"
+        :loading="onlineLoading"
+        :pagination="{ pageSize: 8 }"
+        row-key="id"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'tenantName'">
+            <Tag color="blue">{{ record.tenantName || '默认租户' }}</Tag>
+          </template>
+          <template v-else-if="column.key === 'lastAccessedAt'">
+            {{ record.lastAccessedAt ? new Date(record.lastAccessedAt).toLocaleString() : '-' }}
+          </template>
+          <template v-else-if="column.key === 'signedInAt'">
+            {{ record.signedInAt ? new Date(record.signedInAt).toLocaleString() : '-' }}
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <Popconfirm
+              title="确认强制下线该用户？"
+              @confirm="handleForceLogout(record as OnlineUserApi.OnlineUserItem)"
+            >
+              <Button
+                :disabled="!(record as OnlineUserApi.OnlineUserItem).canForceLogout"
+                danger
+                size="small"
+                type="link"
+              >
+                强制下线
+              </Button>
+            </Popconfirm>
+          </template>
+        </template>
+      </Table>
+    </Drawer>
+
+    <Drawer
+      v-model:open="mappingVisible"
+      destroy-on-close
+      placement="right"
+      title="账号映射记录"
+      width="760"
+    >
+      <Descriptions v-if="activeMappingUser" :column="2" bordered class="mb-4" size="small">
+        <Descriptions.Item label="姓名">{{ activeMappingUser.displayName }}</Descriptions.Item>
+        <Descriptions.Item label="账号">{{ activeMappingUser.username }}</Descriptions.Item>
+        <Descriptions.Item label="当前外部来源">
+          {{ activeMappingUser.externalSource || '-' }}
+        </Descriptions.Item>
+        <Descriptions.Item label="当前外部标识">
+          {{ activeMappingUser.externalUserId || '-' }}
+        </Descriptions.Item>
+      </Descriptions>
+
+      <div
+        v-if="!activeMappingUser || activeMappingUser.externalAccounts.length === 0"
+        class="platform-page__empty"
+      >
+        <Empty description="暂无映射记录" />
+      </div>
+      <Table
+        v-else
+        :columns="[
+          { dataIndex: 'externalSource', key: 'externalSource', title: '外部系统', width: 120 },
+          { dataIndex: 'externalUserId', key: 'externalUserId', title: '外部账号标识', width: 220 },
+          { dataIndex: 'status', key: 'status', title: '状态', width: 100 },
+          { dataIndex: 'boundAt', key: 'boundAt', title: '绑定时间', width: 180 },
+          { dataIndex: 'lastSyncedAt', key: 'lastSyncedAt', title: '最近同步', width: 180 },
+          { dataIndex: 'remark', key: 'remark', title: '备注', width: 220 },
+        ]"
+        :data-source="activeMappingUser?.externalAccounts || []"
+        :pagination="{ pageSize: 8 }"
+        row-key="id"
+        :scroll="{ x: 980 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <Tag :color="record.status === 'active' ? 'success' : 'default'">
+              {{ record.status === 'active' ? '有效' : record.status }}
+            </Tag>
+          </template>
+          <template v-else-if="column.key === 'boundAt'">
+            {{ record.boundAt ? new Date(record.boundAt).toLocaleString() : '-' }}
+          </template>
+          <template v-else-if="column.key === 'lastSyncedAt'">
+            {{ record.lastSyncedAt ? new Date(record.lastSyncedAt).toLocaleString() : '-' }}
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            {{ record.remark || '-' }}
+          </template>
+        </template>
+      </Table>
+    </Drawer>
 
     <Modal
       v-model:open="modalVisible"
@@ -300,6 +545,18 @@ onMounted(async () => {
           </Form.Item>
           <Form.Item class="form-grid__full" label="邮箱">
             <Input v-model:value="formState.email" :maxlength="256" />
+          </Form.Item>
+          <Form.Item label="工号">
+            <Input v-model:value="formState.employeeNo" :maxlength="64" />
+          </Form.Item>
+          <Form.Item label="手机号">
+            <Input v-model:value="formState.phoneNumber" :maxlength="32" />
+          </Form.Item>
+          <Form.Item label="外部来源">
+            <Input v-model:value="formState.externalSource" :maxlength="64" placeholder="钉钉 / 飞书 / 企微" />
+          </Form.Item>
+          <Form.Item label="外部账号标识">
+            <Input v-model:value="formState.externalUserId" :maxlength="128" />
           </Form.Item>
           <Form.Item label="密码">
             <Input.Password
@@ -354,7 +611,7 @@ onMounted(async () => {
 .platform-page__metrics {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .platform-page__metric,

@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize]
 [Route("api/app/menu")]
 public class MenuController : ControllerBase
@@ -50,6 +49,7 @@ public class MenuController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Menu.Manage")]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneMenuSaveInput input)
     {
@@ -58,6 +58,7 @@ public class MenuController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Menu.Manage")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PhaseOneMenuSaveInput input)
     {
@@ -66,6 +67,16 @@ public class MenuController : ControllerBase
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Menu.Manage")]
+    [HttpPut("{id:guid}/enabled")]
+    public async Task<ActionResult<ApiResponse<bool>>> SetEnabledAsync(Guid id, [FromQuery] bool isEnabled)
+    {
+        await _menuService.SetEnabledAsync(id, isEnabled);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Menu.Manage")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {

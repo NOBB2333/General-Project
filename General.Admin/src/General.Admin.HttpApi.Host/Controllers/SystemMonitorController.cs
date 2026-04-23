@@ -7,7 +7,6 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[DisableAuditing]
 [Authorize(Roles = PhaseOneRoleNames.Admin)]
 [Route("api/app/system-monitor")]
 public class SystemMonitorController : ControllerBase

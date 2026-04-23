@@ -1,12 +1,16 @@
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.TenantManagement;
 using Volo.Abp.Users;
 
 namespace General.Admin.PhaseOne;
 
 public class PhaseOneUserService : ITransientDependency
 {
+    private readonly IRepository<AppExternalAccountMapping, Guid> _externalAccountMappingRepository;
+    private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
+    private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
     private readonly ICurrentUser _currentUser;
     private readonly CurrentUserDataScopeService _dataScopeService;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
@@ -14,23 +18,32 @@ public class PhaseOneUserService : ITransientDependency
     private readonly IRepository<IdentityUser, Guid> _userRepository;
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
     private readonly IdentityUserManager _userManager;
+    private readonly ITenantRepository _tenantRepository;
 
     public PhaseOneUserService(
         ICurrentUser currentUser,
         CurrentUserDataScopeService dataScopeService,
+        IRepository<AppExternalAccountMapping, Guid> externalAccountMappingRepository,
+        IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
+        IRepository<AppUserProfile, Guid> userProfileRepository,
         IRepository<OrganizationUnit, Guid> organizationUnitRepository,
         IRepository<IdentityRole, Guid> roleRepository,
         IRepository<IdentityUser, Guid> userRepository,
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository,
-        IdentityUserManager userManager)
+        IdentityUserManager userManager,
+        ITenantRepository tenantRepository)
     {
         _currentUser = currentUser;
         _dataScopeService = dataScopeService;
+        _externalAccountMappingRepository = externalAccountMappingRepository;
+        _roleAuthorizationRepository = roleAuthorizationRepository;
         _organizationUnitRepository = organizationUnitRepository;
         _roleRepository = roleRepository;
+        _userProfileRepository = userProfileRepository;
         _userRepository = userRepository;
         _userOrganizationUnitRepository = userOrganizationUnitRepository;
         _userManager = userManager;
+        _tenantRepository = tenantRepository;
     }
 
     public async Task<CurrentUserInfoDto> GetCurrentUserInfoAsync(string accessToken)
@@ -45,11 +58,24 @@ public class PhaseOneUserService : ITransientDependency
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x)
             .ToList();
+        var organizationUnitIds = (await _userOrganizationUnitRepository.GetListAsync())
+            .Where(x => x.UserId == user.Id)
+            .Select(x => x.OrganizationUnitId)
+            .ToHashSet();
+        var organizationUnitNames = (await _organizationUnitRepository.GetListAsync())
+            .Where(x => organizationUnitIds.Contains(x.Id))
+            .Select(x => x.DisplayName)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        var profile = await _userProfileRepository.FindAsync(x => x.UserId == user.Id);
 
         return new CurrentUserInfoDto
         {
             Desc = BuildUserDescription(roles),
             HomePath = ResolveHomePath(roles),
+            LastLoginTime = profile?.LastLoginTime,
+            OrganizationUnitNames = organizationUnitNames,
             RealName = string.IsNullOrWhiteSpace($"{user.Name}{user.Surname}".Trim())
                 ? user.UserName ?? string.Empty
                 : $"{user.Name}{user.Surname}".Trim(),
@@ -71,26 +97,53 @@ public class PhaseOneUserService : ITransientDependency
             .Where(x => filteredIds.Contains(x.OrganizationUnitId))
             .ToList();
 
-        var userIds = userOrganizationUnits
+        var dataScopedUserIds = userOrganizationUnits
             .Select(x => x.UserId)
             .Distinct()
             .ToHashSet();
+        var visibleUserIds = await ResolveVisibleUserIdsAsync(dataScopedUserIds);
 
         var users = (await _userRepository.GetListAsync())
-            .Where(x => userIds.Contains(x.Id))
+            .Where(x => visibleUserIds.Contains(x.Id))
             .Where(x => string.IsNullOrWhiteSpace(input.Keyword)
                 || (x.UserName?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (x.Name?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (x.Email?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false))
             .OrderBy(x => x.UserName)
             .ToList();
-
+        var profiles = (await _userProfileRepository.GetListAsync())
+            .Where(x => visibleUserIds.Contains(x.UserId))
+            .ToDictionary(x => x.UserId);
+        var mappings = (await _externalAccountMappingRepository.GetListAsync())
+            .Where(x => visibleUserIds.Contains(x.UserId))
+            .GroupBy(x => x.UserId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.OrderByDescending(item => item.BoundAt)
+                    .Select(item => new PhaseOneExternalAccountMappingDto
+                    {
+                        BoundAt = item.BoundAt,
+                        ExternalSource = item.ExternalSource,
+                        ExternalUserId = item.ExternalUserId,
+                        Id = item.Id,
+                        LastSyncedAt = item.LastSyncedAt,
+                        Remark = item.Remark,
+                        Status = item.Status,
+                        UserId = item.UserId
+                    })
+                    .ToList());
         var organizationUnitNames = organizationUnits.ToDictionary(x => x.Id, x => x.DisplayName);
         var userOrganizationMap = userOrganizationUnits
             .GroupBy(x => x.UserId)
             .ToDictionary(
                 x => x.Key,
                 x => x.Select(item => organizationUnitNames[item.OrganizationUnitId]).Distinct().OrderBy(name => name).ToList());
+
+        // Build tenant name lookup from distinct TenantIds present in this user set
+        var distinctTenantIds = users.Select(x => x.TenantId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
+        var tenants = distinctTenantIds.Count > 0
+            ? (await _tenantRepository.GetListAsync()).Where(t => distinctTenantIds.Contains(t.Id)).ToDictionary(t => t.Id, t => t.Name)
+            : [];
 
         var result = new List<PhaseOneUserListItemDto>();
         foreach (var user in users)
@@ -100,21 +153,108 @@ public class PhaseOneUserService : ITransientDependency
                 .OrderBy(x => x)
                 .ToList();
 
+            if (input.IsActive.HasValue && user.IsActive != input.IsActive.Value)
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(input.RoleName) &&
+                !roles.Contains(input.RoleName, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             result.Add(new PhaseOneUserListItemDto
             {
                 DisplayName = string.IsNullOrWhiteSpace($"{user.Name}{user.Surname}".Trim())
                     ? user.UserName ?? string.Empty
                     : $"{user.Name}{user.Surname}".Trim(),
                 Email = user.Email ?? string.Empty,
+                EmployeeNo = profiles.GetValueOrDefault(user.Id)?.EmployeeNo,
+                ExternalAccounts = mappings.GetValueOrDefault(user.Id) ?? [],
+                ExternalSource = profiles.GetValueOrDefault(user.Id)?.ExternalSource,
+                ExternalUserId = profiles.GetValueOrDefault(user.Id)?.ExternalUserId,
                 Id = user.Id,
                 IsActive = user.IsActive,
+                IsOnline = PhaseOneUserActivityService.IsOnline(profiles.GetValueOrDefault(user.Id)?.LastSeenAt),
+                LastLoginTime = profiles.GetValueOrDefault(user.Id)?.LastLoginTime,
                 OrganizationUnitNames = userOrganizationMap.GetValueOrDefault(user.Id) ?? [],
+                PhoneNumber = profiles.GetValueOrDefault(user.Id)?.PhoneNumber,
                 Roles = roles,
+                TenantName = user.TenantId.HasValue && tenants.TryGetValue(user.TenantId.Value, out var tenantName) ? tenantName : null,
                 Username = user.UserName ?? string.Empty
             });
         }
 
         return result;
+    }
+
+    private async Task<HashSet<Guid>> ResolveVisibleUserIdsAsync(HashSet<Guid> dataScopedUserIds)
+    {
+        if (_currentUser.IsInRole(PhaseOneRoleNames.Admin))
+        {
+            return dataScopedUserIds;
+        }
+
+        if (!_currentUser.Id.HasValue)
+        {
+            return [];
+        }
+
+        var currentRoleNames = _currentUser.Roles?.Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? [];
+        if (currentRoleNames.Count == 0)
+        {
+            return new HashSet<Guid> { _currentUser.Id.Value };
+        }
+
+        var roleIds = (await _roleRepository.GetListAsync())
+            .Where(x => currentRoleNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase))
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        if (roleIds.Count == 0)
+        {
+            return new HashSet<Guid> { _currentUser.Id.Value };
+        }
+
+        var authorizations = (await _roleAuthorizationRepository.GetListAsync())
+            .Where(x => roleIds.Contains(x.RoleId))
+            .ToList();
+
+        if (authorizations.Count == 0)
+        {
+            return dataScopedUserIds.Count == 0
+                ? new HashSet<Guid> { _currentUser.Id.Value }
+                : dataScopedUserIds;
+        }
+
+        if (authorizations.Any(x => x.AccountScopeMode == PhaseOneAuthorizationDefaults.AccountScopeAll))
+        {
+            return (await _userRepository.GetListAsync())
+                .Select(x => x.Id)
+                .ToHashSet();
+        }
+
+        var explicitlyAllowedUserIds = authorizations
+            .SelectMany(x => PhaseOneSerializationHelper.DeserializeGuidList(x.AllowedUserIds))
+            .ToHashSet();
+        explicitlyAllowedUserIds.Add(_currentUser.Id.Value);
+
+        if (authorizations.Any(x => x.AccountScopeMode == PhaseOneAuthorizationDefaults.AccountScopeDataAndUsers))
+        {
+            var merged = dataScopedUserIds.ToHashSet();
+            merged.UnionWith(explicitlyAllowedUserIds);
+            return merged;
+        }
+
+        if (authorizations.Any(x => x.AccountScopeMode == PhaseOneAuthorizationDefaults.AccountScopeOnlyUsers))
+        {
+            return explicitlyAllowedUserIds;
+        }
+
+        return dataScopedUserIds.Count == 0
+            ? explicitlyAllowedUserIds
+            : dataScopedUserIds;
     }
 
     public async Task CreateAsync(PhaseOneUserSaveInput input)
@@ -129,6 +269,7 @@ public class PhaseOneUserService : ITransientDependency
         user.SetIsActive(input.IsActive);
 
         EnsureSucceeded(await _userManager.CreateAsync(user, string.IsNullOrWhiteSpace(input.Password) ? "1q2w3E*" : input.Password));
+        await UpsertUserProfileAsync(user.Id, input);
         await SyncUserRolesAsync(user, input.RoleNames);
         await SyncUserOrganizationUnitsAsync(user.Id, input.OrganizationUnitId);
     }
@@ -145,6 +286,7 @@ public class PhaseOneUserService : ITransientDependency
         user.SetIsActive(input.IsActive);
 
         EnsureSucceeded(await _userManager.UpdateAsync(user));
+        await UpsertUserProfileAsync(user.Id, input);
 
         if (!string.IsNullOrWhiteSpace(input.Password))
         {
@@ -164,7 +306,32 @@ public class PhaseOneUserService : ITransientDependency
         }
 
         var user = await _userManager.GetByIdAsync(id);
+        var profile = await _userProfileRepository.FindAsync(x => x.UserId == id);
+        if (profile != null)
+        {
+            await _userProfileRepository.DeleteAsync(profile, autoSave: true);
+        }
+
+        var mappings = (await _externalAccountMappingRepository.GetListAsync())
+            .Where(x => x.UserId == id)
+            .ToList();
+        if (mappings.Count > 0)
+        {
+            await _externalAccountMappingRepository.DeleteManyAsync(mappings, autoSave: true);
+        }
+
         EnsureSucceeded(await _userManager.DeleteAsync(user));
+    }
+
+    public async Task ChangePasswordAsync(PhaseOnePasswordChangeInput input)
+    {
+        if (!_currentUser.Id.HasValue)
+        {
+            throw new InvalidOperationException("Current user is not available.");
+        }
+
+        var user = await _userManager.GetByIdAsync(_currentUser.Id.Value);
+        EnsureSucceeded(await _userManager.ChangePasswordAsync(user, input.CurrentPassword, input.NewPassword));
     }
 
     public static string ResolveHomePath(IReadOnlyCollection<string> roles)
@@ -302,6 +469,60 @@ public class PhaseOneUserService : ITransientDependency
         if (rolesToAdd.Count > 0)
         {
             EnsureSucceeded(await _userManager.AddToRolesAsync(user, rolesToAdd));
+        }
+    }
+
+    private async Task UpsertUserProfileAsync(Guid userId, PhaseOneUserSaveInput input)
+    {
+        var profile = await _userProfileRepository.FindAsync(x => x.UserId == userId);
+        if (profile == null)
+        {
+            profile = new AppUserProfile(
+                Guid.NewGuid(),
+                userId,
+                input.EmployeeNo,
+                input.PhoneNumber,
+                input.ExternalSource,
+                input.ExternalUserId,
+                null);
+            await _userProfileRepository.InsertAsync(profile, autoSave: true);
+        }
+        else
+        {
+            profile.Update(
+                input.EmployeeNo,
+                input.PhoneNumber,
+                input.ExternalSource,
+                input.ExternalUserId);
+            await _userProfileRepository.UpdateAsync(profile, autoSave: true);
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.ExternalSource) && !string.IsNullOrWhiteSpace(input.ExternalUserId))
+        {
+            var mapping = await _externalAccountMappingRepository.FindAsync(x =>
+                x.UserId == userId &&
+                x.ExternalSource == input.ExternalSource &&
+                x.ExternalUserId == input.ExternalUserId);
+
+            if (mapping == null)
+            {
+                await _externalAccountMappingRepository.InsertAsync(
+                    new AppExternalAccountMapping(
+                        Guid.NewGuid(),
+                        userId,
+                        input.ExternalSource,
+                        input.ExternalUserId,
+                        "active",
+                        DateTime.UtcNow,
+                        DateTime.UtcNow,
+                        "绑定来源于平台用户维护"),
+                    autoSave: true);
+            }
+            else
+            {
+                mapping.Update("active", DateTime.UtcNow, mapping.Remark);
+                await _externalAccountMappingRepository.UpdateAsync(mapping, autoSave: true);
+            }
         }
     }
 

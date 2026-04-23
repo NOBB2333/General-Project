@@ -1,19 +1,23 @@
 <script lang="ts" setup>
-import type { MenuApi, RoleApi } from '#/api/core';
+import type { MenuApi, OrganizationApi, RoleApi, UserApi } from '#/api/core';
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
 import {
-  Alert,
   Button,
   Card,
+  Drawer,
   Empty,
   Form,
   Input,
   Modal,
+  Radio,
+  Select,
   Skeleton,
+  Space,
+  Table,
   Tag,
   Tree,
   message,
@@ -23,10 +27,17 @@ import {
   createRoleApi,
   deleteRoleApi,
   getMenuPermissionTreeApi,
+  getOrganizationTreeApi,
+  getRoleAuthorizationApi,
   getRoleListApi,
-  getRoleMenuIdsApi,
+  getUserListApi,
+  saveRoleAuthorizationApi,
   saveRoleMenusApi,
 } from '#/api/core';
+
+defineOptions({ name: 'PlatformRolePage' });
+
+type DrawerType = 'api' | 'account' | 'data' | 'menu';
 
 interface UiTreeNode {
   children?: UiTreeNode[];
@@ -34,107 +45,181 @@ interface UiTreeNode {
   title: string;
 }
 
-const checkedMenuKeys = ref<string[]>([]);
-const loadingMenus = ref(false);
-const loadingRoleMenus = ref(false);
-const loadingRoles = ref(true);
-const modalVisible = ref(false);
-const saving = ref(false);
-const roles = ref<RoleApi.RoleItem[]>([]);
-const selectedRoleId = ref<string>('');
-const treeData = ref<UiTreeNode[]>([]);
-const formState = reactive<RoleApi.RoleSaveInput>({ name: '' });
+const API_OPTIONS = [
+  'Platform.Organization.Manage',
+  'Platform.User.Manage',
+  'Platform.Role.Manage',
+  'Platform.Tenant.Manage',
+  'Platform.Menu.Manage',
+  'Platform.File.Manage',
+];
 
-const selectedRole = computed(
-  () => roles.value.find((item) => item.id === selectedRoleId.value) ?? null,
+const ACCOUNT_SCOPE_OPTIONS = [
+  { label: '数据范围 + 指定账号', value: 'data_and_users' },
+  { label: '仅数据范围', value: 'data' },
+  { label: '仅指定账号', value: 'only_users' },
+  { label: '全部账号', value: 'all' },
+];
+
+const DATA_SCOPE_OPTIONS = [
+  { label: '本组织及下级', value: 'current_org_and_descendants' },
+  { label: '本组织', value: 'current_org' },
+  { label: '仅本人相关', value: 'self' },
+  { label: '自定义组织', value: 'custom' },
+  { label: '全部数据', value: 'all' },
+];
+
+const columns = [
+  { dataIndex: 'name', key: 'name', title: '角色名称', width: 180 },
+  { dataIndex: 'description', key: 'description', title: '说明' },
+  { dataIndex: 'userCount', key: 'userCount', title: '用户数', width: 90 },
+  { dataIndex: 'menuCount', key: 'menuCount', title: '菜单数', width: 90 },
+  { dataIndex: 'status', key: 'status', title: '状态', width: 90 },
+  { key: 'actions', title: '授权动作', width: 420 },
+];
+
+const roles = ref<RoleApi.RoleItem[]>([]);
+const roleLoading = ref(true);
+const createVisible = ref(false);
+const saving = ref(false);
+const drawerVisible = ref(false);
+const drawerLoading = ref(false);
+const activeRole = ref<null | RoleApi.RoleItem>(null);
+const drawerType = ref<DrawerType>('menu');
+const treeData = ref<UiTreeNode[]>([]);
+const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
+const users = ref<UserApi.UserListItem[]>([]);
+
+const createForm = reactive<RoleApi.RoleSaveInput>({ name: '' });
+const authorizationState = reactive<RoleApi.RoleAuthorization>({
+  apiBlacklist: [],
+  accountScopeMode: 'data_and_users',
+  accountUserIds: [],
+  customOrganizationUnitIds: [],
+  dataScopeMode: 'current_org_and_descendants',
+  menuIds: [],
+});
+
+const accountOptions = computed(() =>
+  users.value.map((item) => ({
+    label: `${item.displayName} (${item.username})`,
+    value: item.id,
+  })),
 );
 
-const roleMetrics = computed(() => [
+const metrics = computed(() => [
   { label: '平台角色', value: roles.value.length || 0 },
-  { label: '已选角色用户', value: selectedRole.value?.userCount ?? 0 },
-  { label: '已选角色菜单', value: selectedRole.value?.menuCount ?? 0 },
+  {
+    label: '角色总用户数',
+    value: roles.value.reduce((total, item) => total + item.userCount, 0),
+  },
+  {
+    label: '使用接口黑名单角色',
+    value: roles.value.filter((item) => item.apiBlacklist.length > 0).length,
+  },
+  {
+    label: '自定义数据范围角色',
+    value: roles.value.filter((item) => item.dataScopeMode === 'custom').length,
+  },
 ]);
 
-function formatMenuTitle(item: MenuApi.PermissionTreeItem) {
-  const typeLabel =
-    item.type === 1 ? '目录' : item.type === 2 ? '页面' : '按钮';
-  const suffix = item.permissionCode ? ` · ${item.permissionCode}` : '';
-  return `[${typeLabel}] ${item.title}${suffix}`;
-}
-
-function normalizeTree(items: MenuApi.PermissionTreeItem[]): UiTreeNode[] {
+function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): UiTreeNode[] {
   return items.map((item) => ({
-    children: normalizeTree(item.children || []),
+    children: normalizeMenuTree(item.children || []),
     key: item.id,
-    title: formatMenuTitle(item),
+    title: `[${item.appCode}] ${item.title}${item.permissionCode ? ` · ${item.permissionCode}` : ''}`,
   }));
 }
 
-async function loadRoles() {
-  loadingRoles.value = true;
+function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]): UiTreeNode[] {
+  return items.map((item) => ({
+    children: normalizeOrganizationTree(item.children || []),
+    key: item.id,
+    title: item.displayName,
+  }));
+}
+
+async function loadBaseData() {
+  roleLoading.value = true;
   try {
-    roles.value = await getRoleListApi();
-    const firstRole = roles.value[0];
-    if (!selectedRoleId.value && firstRole) {
-      selectedRoleId.value = firstRole.id;
-    }
+    const [roleResult, menuResult, organizationResult, userResult] = await Promise.all([
+      getRoleListApi(),
+      getMenuPermissionTreeApi('platform,project,business'),
+      getOrganizationTreeApi(),
+      getUserListApi(),
+    ]);
+    roles.value = roleResult;
+    treeData.value = normalizeMenuTree(menuResult);
+    organizationTree.value = organizationResult;
+    users.value = userResult;
   } finally {
-    loadingRoles.value = false;
+    roleLoading.value = false;
   }
 }
 
-async function loadMenuTree() {
-  loadingMenus.value = true;
+async function loadRoleAuthorization(role: RoleApi.RoleItem) {
+  drawerLoading.value = true;
   try {
-    const menus = await getMenuPermissionTreeApi('platform,project,business');
-    treeData.value = normalizeTree(menus);
+    const authorization = await getRoleAuthorizationApi(role.id);
+    authorizationState.apiBlacklist = [...authorization.apiBlacklist];
+    authorizationState.accountScopeMode = authorization.accountScopeMode;
+    authorizationState.accountUserIds = [...authorization.accountUserIds];
+    authorizationState.customOrganizationUnitIds = [...authorization.customOrganizationUnitIds];
+    authorizationState.dataScopeMode = authorization.dataScopeMode;
+    authorizationState.menuIds = [...authorization.menuIds];
   } finally {
-    loadingMenus.value = false;
+    drawerLoading.value = false;
   }
 }
 
-async function loadRoleMenus(roleId: string) {
-  if (!roleId) {
-    checkedMenuKeys.value = [];
-    return;
-  }
-  loadingRoleMenus.value = true;
-  try {
-    checkedMenuKeys.value = await getRoleMenuIdsApi(roleId);
-  } finally {
-    loadingRoleMenus.value = false;
-  }
+async function openDrawer(type: DrawerType, role: RoleApi.RoleItem) {
+  activeRole.value = role;
+  drawerType.value = type;
+  drawerVisible.value = true;
+  await loadRoleAuthorization(role);
 }
 
-async function handleSaveMenus() {
-  if (!selectedRoleId.value) {
+async function saveCurrentDrawer() {
+  if (!activeRole.value) {
     return;
   }
 
   saving.value = true;
   try {
-    await saveRoleMenusApi(selectedRoleId.value, checkedMenuKeys.value);
-    message.success('角色菜单授权已保存');
-    await loadRoles();
-    await loadRoleMenus(selectedRoleId.value);
+    if (drawerType.value === 'menu') {
+      await saveRoleMenusApi(activeRole.value.id, authorizationState.menuIds);
+      message.success('菜单授权已保存');
+    } else {
+      await saveRoleAuthorizationApi(activeRole.value.id, {
+        apiBlacklist: authorizationState.apiBlacklist,
+        accountScopeMode: authorizationState.accountScopeMode,
+        accountUserIds: authorizationState.accountUserIds,
+        customOrganizationUnitIds: authorizationState.customOrganizationUnitIds,
+        dataScopeMode: authorizationState.dataScopeMode,
+      });
+      message.success('授权配置已保存');
+    }
+
+    drawerVisible.value = false;
+    await loadBaseData();
   } finally {
     saving.value = false;
   }
 }
 
 async function handleCreateRole() {
-  if (!formState.name.trim()) {
+  if (!createForm.name.trim()) {
     message.warning('请输入角色名称');
     return;
   }
 
   saving.value = true;
   try {
-    await createRoleApi({ name: formState.name.trim() });
+    await createRoleApi({ name: createForm.name.trim() });
     message.success('角色已创建');
-    modalVisible.value = false;
-    formState.name = '';
-    await loadRoles();
+    createVisible.value = false;
+    createForm.name = '';
+    await loadBaseData();
   } finally {
     saving.value = false;
   }
@@ -143,34 +228,34 @@ async function handleCreateRole() {
 async function handleDeleteRole(id: string) {
   await deleteRoleApi(id);
   message.success('角色已删除');
-  selectedRoleId.value = '';
-  await loadRoles();
+  await loadBaseData();
 }
 
-watch(
-  () => selectedRoleId.value,
-  async (roleId) => {
-    if (!roleId) {
-      return;
-    }
-    await loadRoleMenus(roleId);
-  },
-);
+function resolveDrawerTitle() {
+  if (!activeRole.value) {
+    return '';
+  }
+  const labelMap: Record<DrawerType, string> = {
+    api: '接口黑名单',
+    account: '账号范围',
+    data: '数据范围',
+    menu: '菜单授权',
+  };
+  return `${activeRole.value.name} · ${labelMap[drawerType.value]}`;
+}
 
-onMounted(async () => {
-  await Promise.all([loadRoles(), loadMenuTree()]);
-});
+onMounted(loadBaseData);
 </script>
 
 <template>
   <Page
-    description="角色权限页已支持新增角色、删除角色和菜单授权；用户角色分配统一在用户管理页维护。"
+    description="角色权限页按角色行内动作统一承接菜单授权、数据范围、账号范围和接口黑名单。"
     title="角色权限"
   >
     <section class="platform-page">
       <div class="platform-page__metrics">
         <article
-          v-for="metric in roleMetrics"
+          v-for="metric in metrics"
           :key="metric.label"
           class="platform-page__metric"
         >
@@ -179,229 +264,192 @@ onMounted(async () => {
         </article>
       </div>
 
-      <div class="platform-page__grid">
-        <Card class="platform-page__card" title="角色列表">
-          <template #extra>
-            <Button type="primary" @click="modalVisible = true">新增角色</Button>
-          </template>
+      <Card class="platform-page__card" title="角色列表">
+        <template #extra>
+          <Button type="primary" @click="createVisible = true">新增角色</Button>
+        </template>
 
-          <Skeleton :loading="loadingRoles" active>
-            <div v-if="roles.length === 0" class="platform-page__empty">
-              <Empty description="未找到角色数据" />
-            </div>
-            <div v-else class="role-list">
-              <button
-                v-for="role in roles"
-                :key="role.id"
-                :class="[
-                  'role-list__item',
-                  { 'role-list__item--active': role.id === selectedRoleId },
-                ]"
-                type="button"
-                @click="selectedRoleId = role.id"
-              >
-                <div class="role-list__header">
-                  <strong>{{ role.name }}</strong>
-                  <Tag color="blue">{{ role.userCount }} 人</Tag>
-                </div>
-                <p>{{ role.description }}</p>
-                <div class="role-list__meta">
-                  <span>菜单 {{ role.menuCount }}</span>
-                  <Button
-                    danger
-                    size="small"
-                    type="link"
-                    @click.stop="handleDeleteRole(role.id)"
-                  >
+        <Skeleton :loading="roleLoading" active>
+          <div v-if="roles.length === 0" class="platform-page__empty">
+            <Empty description="未找到角色数据" />
+          </div>
+          <Table
+            v-else
+            :columns="columns"
+            :data-source="roles"
+            :pagination="{ pageSize: 10 }"
+            row-key="id"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'status'">
+                <Tag :color="record.status ? 'success' : 'default'">
+                  {{ record.status ? '启用' : '停用' }}
+                </Tag>
+              </template>
+              <template v-else-if="column.key === 'actions'">
+                <Space wrap>
+                  <Button size="small" type="default" @click="openDrawer('menu', record as RoleApi.RoleItem)">菜单</Button>
+                  <Button size="small" type="default" @click="openDrawer('data', record as RoleApi.RoleItem)">数据</Button>
+                  <Button size="small" type="default" @click="openDrawer('account', record as RoleApi.RoleItem)">账号</Button>
+                  <Button size="small" type="default" @click="openDrawer('api', record as RoleApi.RoleItem)">接口</Button>
+                  <Button danger size="small" type="link" @click="handleDeleteRole((record as RoleApi.RoleItem).id)">
                     删除
                   </Button>
-                </div>
-              </button>
+                </Space>
+              </template>
+            </template>
+          </Table>
+        </Skeleton>
+      </Card>
+
+      <Modal
+        v-model:open="createVisible"
+        :confirm-loading="saving"
+        title="新增角色"
+        @ok="handleCreateRole"
+      >
+        <Form layout="vertical">
+          <Form.Item label="角色名称" required>
+            <Input v-model:value="createForm.name" :maxlength="64" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Drawer
+        v-model:open="drawerVisible"
+        :confirm-loading="saving"
+        destroy-on-close
+        placement="right"
+        width="560"
+        :title="resolveDrawerTitle()"
+        @close="activeRole = null"
+      >
+        <Skeleton :loading="drawerLoading" active>
+          <div v-if="activeRole" class="role-drawer">
+            <template v-if="drawerType === 'menu'">
+              <Tree
+                v-model:checkedKeys="authorizationState.menuIds"
+                block-node
+                checkable
+                default-expand-all
+                :height="620"
+                :tree-data="treeData"
+              />
+            </template>
+
+            <template v-else-if="drawerType === 'data'">
+              <Form layout="vertical">
+                <Form.Item label="数据范围模式">
+                  <Radio.Group v-model:value="authorizationState.dataScopeMode">
+                    <Space direction="vertical">
+                      <Radio
+                        v-for="item in DATA_SCOPE_OPTIONS"
+                        :key="item.value"
+                        :value="item.value"
+                      >
+                        {{ item.label }}
+                      </Radio>
+                    </Space>
+                  </Radio.Group>
+                </Form.Item>
+                <Form.Item
+                  v-if="authorizationState.dataScopeMode === 'custom'"
+                  label="自定义组织节点"
+                >
+                  <Tree
+                    v-model:checkedKeys="authorizationState.customOrganizationUnitIds"
+                    block-node
+                    checkable
+                    default-expand-all
+                    :tree-data="normalizeOrganizationTree(organizationTree)"
+                  />
+                </Form.Item>
+              </Form>
+            </template>
+
+            <template v-else-if="drawerType === 'account'">
+              <Form layout="vertical">
+                <Form.Item label="当前角色成员">
+                  <div v-if="activeRole" class="role-member-list">
+                    <template v-for="user in users.filter(u => u.roles.includes(activeRole!.name))" :key="user.id">
+                      <Tag color="blue">{{ user.displayName }}（{{ user.username }}）</Tag>
+                    </template>
+                    <span
+                      v-if="!users.filter(u => u.roles.includes(activeRole!.name)).length"
+                      class="role-member-list__empty"
+                    >
+                      暂无用户分配此角色
+                    </span>
+                  </div>
+                </Form.Item>
+                <Form.Item label="账号范围模式">
+                  <Select
+                    v-model:value="authorizationState.accountScopeMode"
+                    :options="ACCOUNT_SCOPE_OPTIONS"
+                  />
+                </Form.Item>
+                <Form.Item
+                  v-if="authorizationState.accountScopeMode !== 'data' && authorizationState.accountScopeMode !== 'all'"
+                  label="指定账号"
+                >
+                  <Select
+                    v-model:value="authorizationState.accountUserIds"
+                    mode="multiple"
+                    :options="accountOptions"
+                    placeholder="选择允许访问的账号"
+                  />
+                </Form.Item>
+              </Form>
+            </template>
+
+            <template v-else>
+              <Form layout="vertical">
+                <Form.Item label="接口黑名单">
+                  <Select
+                    v-model:value="authorizationState.apiBlacklist"
+                    mode="multiple"
+                    :options="API_OPTIONS.map((item) => ({ label: item, value: item }))"
+                    placeholder="选择禁止访问的接口权限码"
+                  />
+                </Form.Item>
+              </Form>
+            </template>
+
+            <div class="role-drawer__footer">
+              <Button @click="drawerVisible = false">取消</Button>
+              <Button :loading="saving" type="primary" @click="saveCurrentDrawer">保存</Button>
             </div>
-          </Skeleton>
-        </Card>
-
-        <Card class="platform-page__card" title="菜单授权">
-          <template #extra>
-            <Button
-              :disabled="!selectedRoleId"
-              :loading="saving"
-              type="primary"
-              @click="handleSaveMenus"
-            >
-              保存授权
-            </Button>
-          </template>
-
-          <Skeleton :loading="loadingMenus || loadingRoleMenus" active>
-            <Alert
-              v-if="selectedRole"
-              :message="`${selectedRole.name}：${selectedRole.description}`"
-              class="mb-4"
-              show-icon
-              type="info"
-            />
-
-            <div v-if="treeData.length === 0" class="platform-page__empty">
-              <Empty description="未找到菜单授权树" />
-            </div>
-            <Tree
-              v-else
-              v-model:checkedKeys="checkedMenuKeys"
-              block-node
-              checkable
-              default-expand-all
-              :height="620"
-              :tree-data="treeData"
-            />
-          </Skeleton>
-        </Card>
-      </div>
+          </div>
+        </Skeleton>
+      </Drawer>
     </section>
-
-    <Modal
-      v-model:open="modalVisible"
-      :confirm-loading="saving"
-      title="新增角色"
-      @ok="handleCreateRole"
-    >
-      <Form layout="vertical">
-        <Form.Item label="角色名称" required>
-          <Input v-model:value="formState.name" :maxlength="64" placeholder="例如：qa" />
-        </Form.Item>
-      </Form>
-    </Modal>
   </Page>
 </template>
 
 <style scoped>
-.platform-page {
-  --platform-surface: var(--ant-color-bg-container, hsl(var(--card)));
-  --platform-surface-alt: var(--ant-color-bg-elevated, var(--platform-surface));
-  --platform-surface-soft: var(--ant-color-fill-quaternary, hsl(var(--accent)));
-  --platform-surface-active: var(
-    --ant-color-primary-bg,
-    var(--platform-surface-soft)
-  );
-  --platform-border: var(--ant-color-border-secondary, hsl(var(--border)));
-  --platform-border-strong: var(--ant-color-primary-border, var(--ant-color-primary));
-  --platform-text: var(--ant-color-text, hsl(var(--foreground)));
-  --platform-text-secondary: var(
-    --ant-color-text-secondary,
-    hsl(var(--muted-foreground))
-  );
-  --platform-shadow: var(--ant-box-shadow-secondary, 0 18px 50px rgb(15 23 42 / 6%));
-
+.role-drawer {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: var(--platform-text);
+  min-height: 100%;
 }
 
-.platform-page__metrics {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.platform-page__metric,
-.platform-page__card {
-  border: 1px solid var(--platform-border);
-  border-radius: 20px;
-  background: var(--platform-surface);
-  box-shadow: var(--platform-shadow);
-  color: inherit;
-}
-
-.platform-page__metric {
+.role-drawer__footer {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 16px;
 }
 
-.platform-page__metric span {
-  color: var(--platform-text-secondary);
+.role-member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-member-list__empty {
+  color: var(--ant-color-text-quaternary);
   font-size: 13px;
-}
-
-.platform-page__metric strong {
-  color: var(--platform-text);
-  font-size: 30px;
-}
-
-.platform-page__grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 360px minmax(0, 1fr);
-}
-
-.platform-page__card :deep(.ant-card-head) {
-  border-bottom-color: var(--platform-border);
-}
-
-.platform-page__card :deep(.ant-card-head),
-.platform-page__card :deep(.ant-card-body) {
-  background: transparent;
-  color: inherit;
-}
-
-.platform-page__empty {
-  display: grid;
-  min-height: 320px;
-  place-items: center;
-}
-
-.role-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.role-list__item {
-  width: 100%;
-  padding: 16px;
-  border: 1px solid var(--platform-border);
-  border-radius: 18px;
-  background: linear-gradient(
-    180deg,
-    var(--platform-surface-alt) 0%,
-    var(--platform-surface-soft) 100%
-  );
-  color: var(--platform-text);
-  text-align: left;
-}
-
-.role-list__item--active,
-.role-list__item:hover {
-  border-color: var(--platform-border-strong);
-  background: var(--platform-surface-active);
-  box-shadow: var(--platform-shadow);
-}
-
-.role-list__header,
-.role-list__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.role-list__item p {
-  margin: 10px 0 12px;
-  color: var(--platform-text-secondary);
-  line-height: 1.7;
-}
-
-.role-list__meta {
-  color: var(--platform-text-secondary);
-  font-size: 12px;
-}
-
-@media (max-width: 1080px) {
-  .platform-page__metrics,
-  .platform-page__grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
