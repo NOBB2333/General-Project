@@ -303,9 +303,6 @@ loadMenus();
             <Form.Item label="排序">
               <InputNumber v-model:value="formState.order" :disabled="!creating && !editing" :min="0" style="width: 100%" />
             </Form.Item>
-            <Form.Item label="默认状态">
-              <Switch v-model:checked="formState.isEnabled" :disabled="!creating && !editing" />
-            </Form.Item>
           </div>
         </Form>
       </Card>

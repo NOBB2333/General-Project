@@ -6,7 +6,9 @@ public class PhaseOneSystemMonitorDto
 
     public string? MemoryUsageNote { get; set; }
 
-    public double? CpuUsagePercent { get; set; }
+    public double? ProcessCpuUsagePercent { get; set; }
+
+    public double? SystemCpuUsagePercent { get; set; }
 
     public double CpuTimeSeconds { get; set; }
 

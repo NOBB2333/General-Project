@@ -158,6 +158,8 @@ public class PhaseOneLogDashboardDto
 
     public List<PhaseOneLogStatItemDto> TopMenus { get; set; } = [];
 
+    public List<PhaseOneLogStatItemDto> TopPages { get; set; } = [];
+
     public List<PhaseOneLogStatItemDto> TopUsers { get; set; } = [];
 }
 

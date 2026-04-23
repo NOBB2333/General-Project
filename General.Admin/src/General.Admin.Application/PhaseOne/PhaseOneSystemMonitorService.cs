@@ -10,13 +10,14 @@ namespace General.Admin.PhaseOne;
 public class PhaseOneSystemMonitorService : ITransientDependency
 {
     private readonly IHostEnvironment _hostEnvironment;
+    private const int CpuSampleDurationMilliseconds = 400;
 
     public PhaseOneSystemMonitorService(IHostEnvironment hostEnvironment)
     {
         _hostEnvironment = hostEnvironment;
     }
 
-    public Task<PhaseOneSystemMonitorDto> GetAsync()
+    public async Task<PhaseOneSystemMonitorDto> GetAsync()
     {
         using var currentProcess = Process.GetCurrentProcess();
         var now = DateTime.Now;
@@ -25,11 +26,11 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         var availableMemoryBytes = GetAvailableMemoryBytes();
         var workingSetBytes = currentProcess.WorkingSet64;
         var systemUsedMemoryBytes = GetSystemUsedMemoryBytes(totalMemoryBytes, availableMemoryBytes);
+        var cpuSnapshot = await CaptureCpuUsageAsync(currentProcess);
 
         var result = new PhaseOneSystemMonitorDto
         {
             AvailableMemoryBytes = availableMemoryBytes,
-            CpuUsagePercent = GetCpuUsagePercent(currentProcess, now),
             CpuTimeSeconds = currentProcess.TotalProcessorTime.TotalSeconds,
             Disks = GetDiskInfos(),
             EnvironmentName = _hostEnvironment.EnvironmentName,
@@ -44,9 +45,11 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             OsDescription = RuntimeInformation.OSDescription,
             ProcessorCount = Environment.ProcessorCount,
             ProcessArchitecture = RuntimeInformation.ProcessArchitecture.ToString(),
+            ProcessCpuUsagePercent = cpuSnapshot.ProcessCpuUsagePercent,
             ProcessMemoryDisplayDenominatorBytes = totalMemoryBytes,
             ProcessStartTime = startTime,
             ProcessMemoryUsagePercent = totalMemoryBytes > 0 ? workingSetBytes * 100d / totalMemoryBytes : null,
+            SystemCpuUsagePercent = cpuSnapshot.SystemCpuUsagePercent,
             SystemMemoryUsagePercent = GetSystemMemoryUsagePercent(totalMemoryBytes, availableMemoryBytes, systemUsedMemoryBytes),
             TotalMemoryBytes = totalMemoryBytes,
             ThreadCount = currentProcess.Threads.Count,
@@ -54,7 +57,34 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             WorkingSetBytes = workingSetBytes
         };
 
-        return Task.FromResult(result);
+        return result;
+    }
+
+    private static async Task<PhaseOneCpuSnapshot> CaptureCpuUsageAsync(Process currentProcess)
+    {
+        try
+        {
+            var processCpuStart = currentProcess.TotalProcessorTime;
+            var systemCpuStart = GetSystemCpuSample();
+            var wallClockStart = DateTime.UtcNow;
+
+            await Task.Delay(CpuSampleDurationMilliseconds);
+            currentProcess.Refresh();
+
+            var processCpuEnd = currentProcess.TotalProcessorTime;
+            var systemCpuEnd = GetSystemCpuSample();
+            var wallClockSeconds = (DateTime.UtcNow - wallClockStart).TotalSeconds;
+
+            return new PhaseOneCpuSnapshot
+            {
+                ProcessCpuUsagePercent = GetProcessCpuUsagePercent(processCpuStart, processCpuEnd, wallClockSeconds),
+                SystemCpuUsagePercent = GetSystemCpuUsagePercent(systemCpuStart, systemCpuEnd)
+            };
+        }
+        catch
+        {
+            return new PhaseOneCpuSnapshot();
+        }
     }
 
     private static List<PhaseOneSystemMonitorDiskDto> GetDiskInfos()
@@ -85,20 +115,43 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         }
     }
 
-    private static double? GetCpuUsagePercent(Process currentProcess, DateTime now)
+    private static double? GetProcessCpuUsagePercent(TimeSpan processCpuStart, TimeSpan processCpuEnd, double wallClockSeconds)
     {
-        var uptimeSeconds = (now - currentProcess.StartTime).TotalSeconds;
-        if (uptimeSeconds <= 0 || Environment.ProcessorCount <= 0)
+        if (wallClockSeconds <= 0 || Environment.ProcessorCount <= 0)
         {
             return null;
         }
 
-        var percent = currentProcess.TotalProcessorTime.TotalSeconds
-            / uptimeSeconds
+        var consumedCpuSeconds = (processCpuEnd - processCpuStart).TotalSeconds;
+        if (consumedCpuSeconds < 0)
+        {
+            return null;
+        }
+
+        var percent = consumedCpuSeconds
+            / wallClockSeconds
             / Environment.ProcessorCount
             * 100d;
 
         return Math.Round(Math.Clamp(percent, 0, 100), 2);
+    }
+
+    private static double? GetSystemCpuUsagePercent(SystemCpuSample? start, SystemCpuSample? end)
+    {
+        if (start is null || end is null)
+        {
+            return null;
+        }
+
+        var totalDelta = end.TotalTicks - start.TotalTicks;
+        var idleDelta = end.IdleTicks - start.IdleTicks;
+        if (totalDelta <= 0)
+        {
+            return null;
+        }
+
+        var usage = (totalDelta - idleDelta) * 100d / totalDelta;
+        return Math.Round(Math.Clamp(usage, 0, 100), 2);
     }
 
     private static double? GetSystemMemoryUsagePercent(long totalMemoryBytes, long availableMemoryBytes, long? systemUsedMemoryBytes = null)
@@ -220,6 +273,91 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         return 0;
     }
 
+    private static SystemCpuSample? GetSystemCpuSample()
+    {
+        try
+        {
+            if (OperatingSystem.IsLinux())
+            {
+                return GetLinuxSystemCpuSample();
+            }
+
+            if (OperatingSystem.IsMacOS())
+            {
+                return GetMacSystemCpuSample();
+            }
+        }
+        catch
+        {
+            // Ignore host-specific metric failures and degrade gracefully.
+        }
+
+        return null;
+    }
+
+    private static SystemCpuSample? GetLinuxSystemCpuSample()
+    {
+        var statLine = File.ReadLines("/proc/stat").FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(statLine) || !statLine.StartsWith("cpu "))
+        {
+            return null;
+        }
+
+        var parts = statLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 5)
+        {
+            return null;
+        }
+
+        long totalTicks = 0;
+        for (var index = 1; index < parts.Length; index++)
+        {
+            if (!long.TryParse(parts[index], out var value))
+            {
+                return null;
+            }
+
+            totalTicks += value;
+        }
+
+        if (!long.TryParse(parts[4], out var idleTicks))
+        {
+            return null;
+        }
+
+        return new SystemCpuSample(totalTicks, idleTicks);
+    }
+
+    private static SystemCpuSample? GetMacSystemCpuSample()
+    {
+        var output = ExecuteCommand("/usr/bin/top", "-l 1 -n 0");
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return null;
+        }
+
+        var cpuLine = output.Split('\n')
+            .FirstOrDefault(line => line.Contains("CPU usage:", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(cpuLine))
+        {
+            return null;
+        }
+
+        var user = ParseTopCpuSegment(cpuLine, "user");
+        var system = ParseTopCpuSegment(cpuLine, "sys");
+        var idle = ParseTopCpuSegment(cpuLine, "idle");
+
+        if (user is null || system is null || idle is null)
+        {
+            return null;
+        }
+
+        const long scale = 10000;
+        var totalTicks = scale;
+        var idleTicks = (long)Math.Round(idle.Value * 100);
+        return new SystemCpuSample(totalTicks, idleTicks);
+    }
+
     private static string? ExecuteCommand(string fileName, string arguments)
     {
         try
@@ -255,6 +393,15 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             : 0;
     }
 
+    private static double? ParseTopCpuSegment(string cpuLine, string label)
+    {
+        var pattern = $@"(?<value>\d+(?:\.\d+)?)%\s*{Regex.Escape(label)}";
+        var match = Regex.Match(cpuLine, pattern, RegexOptions.IgnoreCase);
+        return match.Success && double.TryParse(match.Groups["value"].Value, out var value)
+            ? value
+            : null;
+    }
+
     private static long ConvertToBytes(string value, string unit)
     {
         if (!double.TryParse(value, out var numericValue))
@@ -274,4 +421,13 @@ public class PhaseOneSystemMonitorService : ITransientDependency
 
         return (long)Math.Round(numericValue * multiplier);
     }
+
+    private sealed record PhaseOneCpuSnapshot
+    {
+        public double? ProcessCpuUsagePercent { get; init; }
+
+        public double? SystemCpuUsagePercent { get; init; }
+    }
+
+    private sealed record SystemCpuSample(long TotalTicks, long IdleTicks);
 }

@@ -17,6 +17,29 @@ public class PhaseOneAuditLogService : ITransientDependency
         _requestAuditStore = requestAuditStore;
     }
 
+    public async Task RecordPageVisitAsync(string? userName, string? tenantName, PhaseOnePageVisitInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.MenuPath) && string.IsNullOrWhiteSpace(input.MenuTitle))
+        {
+            return;
+        }
+
+        await _requestAuditStore.AppendAsync(new PhaseOneRequestAuditEntry
+        {
+            Id = Guid.NewGuid(),
+            Category = "pagevisit",
+            ExecutionTime = DateTime.UtcNow,
+            ExecutionDuration = 0,
+            HttpMethod = "NAV",
+            HttpStatusCode = 200,
+            MenuTitle = input.MenuTitle ?? input.MenuPath,
+            Url = input.MenuPath,
+            ActionSummary = input.MenuTitle ?? input.MenuPath,
+            UserName = userName,
+            TenantName = tenantName
+        });
+    }
+
     public async Task<List<PhaseOneAuditLogItemDto>> GetListAsync(PhaseOneAuditLogQueryInput input)
     {
         var keyword = input.Keyword?.Trim();
@@ -86,26 +109,43 @@ public class PhaseOneAuditLogService : ITransientDependency
                 .Take(maxResultCount)
                 .ToList();
 
+            var apiLogs = orderedRequestLogs.Where(x => x.Category != "pagevisit").ToList();
+            var pageVisits = orderedRequestLogs.Where(x => x.Category == "pagevisit").ToList();
+
             return new PhaseOneLogDashboardDto
             {
                 AccessLogs = FilterByCategory(orderedRequestLogs, "access"),
                 AuditLogs = FilterByCategory(orderedRequestLogs, "audit"),
                 ExceptionLogs = FilterByCategory(orderedRequestLogs, "exception"),
                 OperationLogs = FilterByCategory(orderedRequestLogs, "operation"),
-                TopApis = orderedRequestLogs
-                    .GroupBy(x => x.Url ?? "-")
+                TopApis = apiLogs
+                    .GroupBy(x => CleanUrl(x.Url))
                     .OrderByDescending(x => x.Count())
                     .Take(8)
                     .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
                     .ToList(),
-                TopMenus = orderedRequestLogs
-                    .GroupBy(x => x.ActionSummary ?? "-")
+                TopMenus = pageVisits.Count > 0
+                    ? pageVisits
+                        .GroupBy(x => x.MenuTitle ?? x.Url ?? "-")
+                        .OrderByDescending(x => x.Count())
+                        .Take(8)
+                        .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
+                        .ToList()
+                    : apiLogs
+                        .GroupBy(x => x.ActionSummary ?? "-")
+                        .OrderByDescending(x => x.Count())
+                        .Take(8)
+                        .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
+                        .ToList(),
+                TopPages = pageVisits
+                    .GroupBy(x => x.MenuTitle ?? x.Url ?? "-")
                     .OrderByDescending(x => x.Count())
-                    .Take(8)
+                    .Take(10)
                     .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
                     .ToList(),
                 TopUsers = orderedRequestLogs
-                    .GroupBy(x => x.UserName ?? "-")
+                    .Where(x => !string.IsNullOrWhiteSpace(x.UserName))
+                    .GroupBy(x => x.UserName!)
                     .OrderByDescending(x => x.Count())
                     .Take(8)
                     .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
@@ -131,7 +171,7 @@ public class PhaseOneAuditLogService : ITransientDependency
             ExceptionLogs = FilterByCategory(ordered, "exception").Select(x => dtoMap[x.Id]).ToList(),
             OperationLogs = FilterByCategory(ordered, "operation").Select(x => dtoMap[x.Id]).ToList(),
             TopApis = ordered
-                .GroupBy(x => x.Url ?? "-")
+                .GroupBy(x => CleanUrl(x.Url))
                 .OrderByDescending(x => x.Count())
                 .Take(8)
                 .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
@@ -142,6 +182,7 @@ public class PhaseOneAuditLogService : ITransientDependency
                 .Take(8)
                 .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
                 .ToList(),
+            TopPages = [],
             TopUsers = ordered
                 .GroupBy(x => x.UserName ?? "-")
                 .OrderByDescending(x => x.Count())
@@ -149,6 +190,13 @@ public class PhaseOneAuditLogService : ITransientDependency
                 .Select(x => new PhaseOneLogStatItemDto { Count = x.Count(), Key = x.Key, Label = x.Key })
                 .ToList()
         };
+    }
+
+    private static string CleanUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "-";
+        var qIdx = url.IndexOf('?');
+        return qIdx >= 0 ? url[..qIdx] : url;
     }
 
     private static List<AuditLog> FilterByCategory(List<AuditLog> logs, string? category)
@@ -170,8 +218,9 @@ public class PhaseOneAuditLogService : ITransientDependency
             "access" => logs.Where(x => !x.HasException && string.Equals(x.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase)).ToList(),
             "audit" => logs.Where(x => !string.IsNullOrWhiteSpace(x.ActionSummary)).ToList(),
             "exception" => logs.Where(x => x.HasException || (x.HttpStatusCode ?? 200) >= 500).ToList(),
-            "operation" => logs.Where(x => !string.Equals(x.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase)).ToList(),
-            _ => logs
+            "operation" => logs.Where(x => !string.Equals(x.HttpMethod, "GET", StringComparison.OrdinalIgnoreCase) && x.Category != "pagevisit").ToList(),
+            "pagevisit" => logs.Where(x => x.Category == "pagevisit").ToList(),
+            _ => logs.Where(x => x.Category != "pagevisit").ToList()
         };
     }
 
@@ -227,6 +276,7 @@ public class PhaseOneAuditLogService : ITransientDependency
             {
                 ActionSummary = item.ActionSummary,
                 BrowserInfo = item.BrowserInfo,
+                Category = item.Category ?? "api",
                 ClientIpAddress = item.ClientIpAddress,
                 ExecutionDuration = item.ExecutionDuration,
                 ExecutionTime = item.ExecutionTime,
@@ -235,6 +285,7 @@ public class PhaseOneAuditLogService : ITransientDependency
                 HttpMethod = item.HttpMethod,
                 HttpStatusCode = item.HttpStatusCode,
                 Id = item.Id,
+                MenuTitle = item.MenuTitle,
                 TenantName = item.TenantName,
                 Url = item.Url,
                 UserName = item.UserName
@@ -259,9 +310,11 @@ public class PhaseOneAuditLogService : ITransientDependency
                 ContainsIgnoreCase(x.TenantName, keyword) ||
                 ContainsIgnoreCase(x.Url, keyword) ||
                 ContainsIgnoreCase(x.ClientIpAddress, keyword) ||
-                ContainsIgnoreCase(x.ActionSummary, keyword)).ToList();
+                ContainsIgnoreCase(x.ActionSummary, keyword) ||
+                ContainsIgnoreCase(x.MenuTitle, keyword)).ToList();
         }
 
         return FilterByCategory(logs, input.Category?.Trim().ToLowerInvariant());
     }
 }
+

@@ -28,13 +28,14 @@ import {
   getMenuPermissionTreeApi,
   getTenantAuthorizationApi,
   getTenantListApi,
+  getTenantUsersApi,
   saveTenantAuthorizationApi,
   type MenuApi as MenuApiNamespace,
 } from '#/api/core';
 
 defineOptions({ name: 'PlatformTenantPage' });
 
-type DrawerType = 'api' | 'menu';
+type DrawerType = 'api' | 'menu' | 'users';
 
 interface UiTreeNode {
   children?: UiTreeNode[];
@@ -67,6 +68,14 @@ const drawerVisible = ref(false);
 const drawerLoading = ref(false);
 const drawerType = ref<DrawerType>('menu');
 const activeTenant = ref<null | TenantApi.TenantItem>(null);
+const tenantUsers = ref<TenantApi.TenantUserItem[]>([]);
+
+const tenantUserColumns = [
+  { dataIndex: 'username', key: 'username', title: '账号', width: 160 },
+  { dataIndex: 'displayName', key: 'displayName', title: '姓名', width: 140 },
+  { dataIndex: 'email', key: 'email', title: '邮箱' },
+  { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 80 },
+];
 const treeData = ref<UiTreeNode[]>([]);
 
 const formState = reactive({
@@ -149,10 +158,14 @@ async function openDrawer(type: DrawerType, tenant: TenantApi.TenantItem) {
   drawerVisible.value = true;
   drawerLoading.value = true;
   try {
-    const authorization = await getTenantAuthorizationApi(tenant.id);
-    authorizationState.apiBlacklist = [...authorization.apiBlacklist];
-    authorizationState.isActive = authorization.isActive;
-    authorizationState.menuIds = [...authorization.menuIds];
+    if (type === 'users') {
+      tenantUsers.value = await getTenantUsersApi(tenant.id);
+    } else {
+      const authorization = await getTenantAuthorizationApi(tenant.id);
+      authorizationState.apiBlacklist = [...authorization.apiBlacklist];
+      authorizationState.isActive = authorization.isActive;
+      authorizationState.menuIds = [...authorization.menuIds];
+    }
   } finally {
     drawerLoading.value = false;
   }
@@ -224,6 +237,7 @@ loadTenants();
                 <Space wrap>
                   <Button size="small" @click="openDrawer('menu', record as TenantApi.TenantItem)">菜单授权</Button>
                   <Button size="small" @click="openDrawer('api', record as TenantApi.TenantItem)">接口黑名单</Button>
+                  <Button size="small" @click="openDrawer('users', record as TenantApi.TenantItem)">查看账号</Button>
                   <Button danger size="small" type="link" @click="handleDelete((record as TenantApi.TenantItem).id)">
                     删除
                   </Button>
@@ -259,50 +273,73 @@ loadTenants();
         destroy-on-close
         placement="right"
         width="560"
-        :title="activeTenant ? `${activeTenant.name} · ${drawerType === 'menu' ? '菜单授权' : '接口黑名单'}` : ''"
+        :title="activeTenant ? `${activeTenant.name} · ${drawerType === 'menu' ? '菜单授权' : drawerType === 'users' ? '账号列表' : '接口黑名单'}` : ''"
       >
         <Skeleton :loading="drawerLoading" active>
           <div v-if="activeTenant" class="tenant-drawer">
-            <Form layout="vertical">
-              <Form.Item label="租户状态">
-                <Select
-                  :value="authorizationState.isActive ? 'active' : 'inactive'"
-                  :options="[
-                    { label: '启用', value: 'active' },
-                    { label: '停用', value: 'inactive' },
-                  ]"
-                  @update:value="(value) => { authorizationState.isActive = value === 'active'; }"
-                />
-              </Form.Item>
-            </Form>
-
-            <template v-if="drawerType === 'menu'">
-              <Tree
-                v-model:checkedKeys="authorizationState.menuIds"
-                block-node
-                checkable
-                default-expand-all
-                :height="620"
-                :tree-data="treeData"
-              />
+            <template v-if="drawerType === 'users'">
+              <Table
+                :columns="tenantUserColumns"
+                :data-source="tenantUsers"
+                :pagination="{ pageSize: 10 }"
+                row-key="id"
+                size="small"
+              >
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'isActive'">
+                    <Tag :color="(record as TenantApi.TenantUserItem).isActive ? 'success' : 'default'">
+                      {{ (record as TenantApi.TenantUserItem).isActive ? '启用' : '停用' }}
+                    </Tag>
+                  </template>
+                </template>
+              </Table>
+              <div class="tenant-drawer__footer">
+                <Button @click="drawerVisible = false">关闭</Button>
+              </div>
             </template>
 
             <template v-else>
               <Form layout="vertical">
-                <Form.Item label="接口黑名单">
+                <Form.Item label="租户状态">
                   <Select
-                    v-model:value="authorizationState.apiBlacklist"
-                    mode="multiple"
-                    :options="API_OPTIONS.map((item) => ({ label: item, value: item }))"
+                    :value="authorizationState.isActive ? 'active' : 'inactive'"
+                    :options="[
+                      { label: '启用', value: 'active' },
+                      { label: '停用', value: 'inactive' },
+                    ]"
+                    @update:value="(value) => { authorizationState.isActive = value === 'active'; }"
                   />
                 </Form.Item>
               </Form>
-            </template>
 
-            <div class="tenant-drawer__footer">
-              <Button @click="drawerVisible = false">取消</Button>
-              <Button :loading="saving" type="primary" @click="saveDrawer">保存</Button>
-            </div>
+              <template v-if="drawerType === 'menu'">
+                <Tree
+                  v-model:checkedKeys="authorizationState.menuIds"
+                  block-node
+                  checkable
+                  default-expand-all
+                  :height="620"
+                  :tree-data="treeData"
+                />
+              </template>
+
+              <template v-else>
+                <Form layout="vertical">
+                  <Form.Item label="接口黑名单">
+                    <Select
+                      v-model:value="authorizationState.apiBlacklist"
+                      mode="multiple"
+                      :options="API_OPTIONS.map((item) => ({ label: item, value: item }))"
+                    />
+                  </Form.Item>
+                </Form>
+              </template>
+
+              <div class="tenant-drawer__footer">
+                <Button @click="drawerVisible = false">取消</Button>
+                <Button :loading="saving" type="primary" @click="saveDrawer">保存</Button>
+              </div>
+            </template>
           </div>
         </Skeleton>
       </Drawer>

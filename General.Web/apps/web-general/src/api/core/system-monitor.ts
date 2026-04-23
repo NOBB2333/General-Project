@@ -11,7 +11,6 @@ export namespace SystemMonitorApi {
 
   export interface MonitorItem {
     availableMemoryBytes: number;
-    cpuUsagePercent?: null | number;
     cpuTimeSeconds: number;
     disks: DiskItem[];
     environmentName: string;
@@ -23,10 +22,12 @@ export namespace SystemMonitorApi {
     osArchitecture: string;
     osDescription: string;
     processArchitecture: string;
+    processCpuUsagePercent?: null | number;
     processMemoryDisplayDenominatorBytes: number;
     processMemoryUsagePercent?: null | number;
     processStartTime: string;
     processorCount: number;
+    systemCpuUsagePercent?: null | number;
     systemMemoryUsagePercent?: null | number;
     threadCount: number;
     totalMemoryBytes: number;

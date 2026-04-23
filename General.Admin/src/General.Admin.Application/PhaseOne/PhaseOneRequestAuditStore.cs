@@ -70,6 +70,8 @@ public class PhaseOneRequestAuditEntry
 
     public string? BrowserInfo { get; set; }
 
+    public string? Category { get; set; } // "api" | "pagevisit"
+
     public string? ClientIpAddress { get; set; }
 
     public int ExecutionDuration { get; set; }
@@ -85,6 +87,8 @@ public class PhaseOneRequestAuditEntry
     public int? HttpStatusCode { get; set; }
 
     public Guid Id { get; set; }
+
+    public string? MenuTitle { get; set; } // populated for pagevisit category
 
     public string? TenantName { get; set; }
 

@@ -428,10 +428,34 @@ onMounted(loadBaseData);
             </template>
 
             <template v-else-if="drawerType === 'account'">
+              <!-- 当前已分配该角色的成员 -->
+              <div class="role-member-section">
+                <div class="role-member-section__header">
+                  <strong>当前角色成员</strong>
+                  <Tag color="blue">
+                    {{ users.filter(u => u.roles.includes(activeRole?.name ?? '')).length }}
+                  </Tag>
+                </div>
+                <div
+                  v-if="users.filter(u => u.roles.includes(activeRole?.name ?? '')).length === 0"
+                  class="role-member-section__empty"
+                >
+                  暂无成员分配此角色
+                </div>
+                <div v-else class="role-member-section__tags">
+                  <Tag
+                    v-for="u in users.filter(u => u.roles.includes(activeRole?.name ?? ''))"
+                    :key="u.id"
+                  >
+                    {{ u.displayName }} ({{ u.username }})
+                  </Tag>
+                </div>
+              </div>
+
               <div class="account-scope">
                 <div class="account-scope__panel">
                   <div class="account-scope__header">
-                    <strong>可选账号</strong>
+                    <strong>数据范围账号</strong>
                     <Input v-model:value="accountKeyword" allow-clear placeholder="按账号/姓名/邮箱筛选" />
                   </div>
                   <div class="account-scope__list">
@@ -560,6 +584,33 @@ onMounted(loadBaseData);
   flex-direction: column;
   gap: 16px;
   min-height: 100%;
+}
+
+.role-member-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  background: var(--ant-color-bg-layout);
+}
+
+.role-member-section__header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.role-member-section__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-member-section__empty {
+  font-size: 12px;
+  color: var(--ant-color-text-quaternary);
 }
 
 .account-scope {

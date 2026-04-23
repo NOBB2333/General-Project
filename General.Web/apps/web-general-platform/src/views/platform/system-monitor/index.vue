@@ -66,10 +66,10 @@ onMounted(loadMonitor);
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
             <Statistic
-              :suffix="monitor?.cpuUsagePercent != null ? '%' : ''"
-              title="CPU 使用率（均值）"
-              :value="monitor?.cpuUsagePercent != null ? monitor.cpuUsagePercent.toFixed(2) : '-'"
+              title="CPU 使用率"
+              :value="monitor ? `${(monitor.processCpuUsagePercent ?? 0).toFixed(2)}% / ${(monitor.systemCpuUsagePercent ?? 0).toFixed(2)}%` : '-'"
             />
+            <!-- <div class="platform-monitor__note">当前程序 / 系统总占用率</div> -->
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
@@ -127,6 +127,12 @@ onMounted(loadMonitor);
               </Descriptions.Item>
               <Descriptions.Item label="CPU 总耗时">
                 {{ monitor ? `${monitor.cpuTimeSeconds.toFixed(1)} 秒` : '-' }}
+              </Descriptions.Item>
+              <Descriptions.Item label="进程 CPU">
+                {{ monitor?.processCpuUsagePercent?.toFixed(2) || '0.00' }}%
+              </Descriptions.Item>
+              <Descriptions.Item label="系统 CPU">
+                {{ monitor?.systemCpuUsagePercent?.toFixed(2) || '0.00' }}%
               </Descriptions.Item>
               <Descriptions.Item label="句柄数">{{ monitor?.handleCount ?? '-' }}</Descriptions.Item>
               <Descriptions.Item label="可用内存">

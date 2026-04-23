@@ -49,17 +49,6 @@ function formatMemoryUsage(usedBytes?: number, totalBytes?: number) {
   return `${formatBytes(usedBytes || 0)}/${formatBytes(totalBytes || 0)}`;
 }
 
-function resolveSystemUsedMemoryBytes() {
-  if (!monitor.value) {
-    return 0;
-  }
-
-  return Math.max(
-    0,
-    (monitor.value.totalMemoryBytes || 0) - Math.max(0, monitor.value.availableMemoryBytes || 0),
-  );
-}
-
 onMounted(loadMonitor);
 </script>
 
@@ -78,17 +67,19 @@ onMounted(loadMonitor);
           <Card :bordered="false">
             <Statistic
               title="CPU 使用率"
-              :precision="2"
-              suffix="%"
-              :value="monitor?.cpuUsagePercent || 0"
+              :value="monitor ? `${(monitor.processCpuUsagePercent ?? 0).toFixed(2)}% / ${(monitor.systemCpuUsagePercent ?? 0).toFixed(2)}%` : '-'"
             />
+            <!-- <div class="platform-monitor__note">当前程序 / 系统总占用率</div> -->
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
             <Statistic
               title="系统内存使用"
-              :value="formatMemoryUsage(resolveSystemUsedMemoryBytes(), monitor?.totalMemoryBytes)"
+              :value="formatMemoryUsage(
+                Math.round((monitor?.systemMemoryUsagePercent || 0) / 100 * (monitor?.totalMemoryBytes || 0)),
+                monitor?.totalMemoryBytes
+              )"
             />
           </Card>
         </Col>
@@ -132,6 +123,12 @@ onMounted(loadMonitor);
               </Descriptions.Item>
               <Descriptions.Item label="CPU 总耗时">
                 {{ monitor ? `${monitor.cpuTimeSeconds.toFixed(1)} 秒` : '-' }}
+              </Descriptions.Item>
+              <Descriptions.Item label="进程 CPU">
+                {{ monitor?.processCpuUsagePercent?.toFixed(2) || '0.00' }}%
+              </Descriptions.Item>
+              <Descriptions.Item label="系统 CPU">
+                {{ monitor?.systemCpuUsagePercent?.toFixed(2) || '0.00' }}%
               </Descriptions.Item>
               <Descriptions.Item label="进程线程数">{{ monitor?.threadCount ?? '-' }}</Descriptions.Item>
               <Descriptions.Item label="句柄数">{{ monitor?.handleCount ?? '-' }}</Descriptions.Item>
@@ -194,5 +191,11 @@ onMounted(loadMonitor);
   display: grid;
   min-height: 280px;
   place-items: center;
+}
+
+.platform-monitor__note {
+  margin-top: 6px;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
 }
 </style>

@@ -514,6 +514,7 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
         var seedMenus = BuildSeedMenus();
         var existingMenus = (await _menuRepository.GetListAsync())
             .ToDictionary(x => x.Id, x => x);
+        var menusToUpdate = new List<AppMenu>();
 
         foreach (var seedMenu in seedMenus)
         {
@@ -539,10 +540,16 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
                     seedMenu.MenuVisibleWithForbidden,
                     seedMenu.Order,
                     seedMenu.IsEnabled);
+                menusToUpdate.Add(existingMenu);
                 continue;
             }
 
             await _menuRepository.InsertAsync(seedMenu, autoSave: true);
+        }
+
+        if (menusToUpdate.Count > 0)
+        {
+            await _menuRepository.UpdateManyAsync(menusToUpdate, autoSave: true);
         }
 
         await RemoveDeprecatedMenusAsync();
@@ -653,10 +660,9 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformRoles, PhaseOneSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformMenus, PhaseOneSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformFiles, PhaseOneSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
-            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformStats, PhaseOneSeedIds.PlatformRoot, "PlatformStats", "/platform/stats", "/platform/stats/index", "访问统计", "lucide:chart-no-axes-column", 75),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformSystemMonitor, PhaseOneSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformScheduler, PhaseOneSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
-            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformAuditLogs, PhaseOneSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "审计日志", "lucide:shield-check", 80),
+            Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformAuditLogs, PhaseOneSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "日志中心", "lucide:shield-check", 75),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformUpdateLogs, PhaseOneSeedIds.PlatformRoot, "PlatformUpdateLogs", "/platform/update-logs", "/platform/update-logs/index", "更新日志", "lucide:scroll-text", 110),
             Menu(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformProfile, PhaseOneSeedIds.PlatformRoot, "PlatformProfile", "/platform/profile", "/platform/profile/index", "个人中心", "lucide:user-circle-2", 120),
             Button(PhaseOneAppCodes.Platform, PhaseOneSeedIds.PlatformOrganizationManage, PhaseOneSeedIds.PlatformOrganization, "PlatformOrganizationManage", "Platform.Organization.Manage"),
@@ -687,6 +693,7 @@ public class PhaseOneDataSeedContributor : IDataSeedContributor, ITransientDepen
     {
         var deprecatedMenuIds = new HashSet<Guid>
         {
+            PhaseOneSeedIds.PlatformStats,
             PhaseOneSeedIds.PlatformOnlineUsers,
             PhaseOneSeedIds.ProjectWorkspace,
             PhaseOneSeedIds.ProjectInitiation,

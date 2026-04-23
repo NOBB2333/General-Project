@@ -7,6 +7,7 @@ import { startProgress, stopProgress } from '@vben/utils';
 
 import { accessRoutes, coreRouteNames } from '#/router/routes';
 import { useAuthStore } from '#/store';
+import { reportPageVisitApi } from '#/api/core/audit-log';
 
 import { generateAccess } from './access';
 
@@ -54,12 +55,22 @@ function setupCommonGuard(router: Router) {
 
   router.afterEach((to) => {
     // 记录页面是否加载,如果已经加载，后续的页面切换动画等效果不在重复执行
-
     loadedPaths.add(to.path);
 
     // 关闭页面加载进度条
     if (preferences.transition.progress) {
       stopProgress();
+    }
+
+    // 菜单访问埋点：仅对已认证的业务页面上报
+    const accessStore = useAccessStore();
+    if (
+      accessStore.accessToken &&
+      !coreRouteNames.includes(to.name as string) &&
+      !to.meta?.ignoreAccess
+    ) {
+      const title = (to.meta?.title as string | undefined) ?? to.path;
+      reportPageVisitApi({ menuPath: to.path, menuTitle: title }).catch(() => {});
     }
   });
 }

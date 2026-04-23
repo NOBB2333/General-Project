@@ -59,7 +59,7 @@ onMounted(loadDashboard);
 </script>
 
 <template>
-  <Page description="日志管理汇总访问、操作、异常与审计日志，并提供接口、菜单、用户统计。" title="日志管理">
+  <Page description="日志中心汇总访问、操作、异常与审计日志，并提供接口与菜单访问分析。" title="日志中心">
     <section class="platform-audit">
       <Row :gutter="[16, 16]">
         <Col v-for="metric in metrics" :key="metric.label" :lg="6" :md="12" :span="24">
@@ -71,16 +71,26 @@ onMounted(loadDashboard);
 
       <Row :gutter="[16, 16]">
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="Top 接口">
-            <div v-for="item in dashboard?.topApis || []" :key="item.key" class="platform-audit__rank">
+          <Card :bordered="false" title="Top 菜单访问">
+            <div
+              v-if="(dashboard?.topPages?.length || 0) === 0 && (dashboard?.topMenus?.length || 0) === 0"
+              style="font-size: 12px; color: #999; padding: 8px 0"
+            >
+              暂无数据（菜单访问埋点将在用户浏览后自动收集）
+            </div>
+            <div
+              v-for="item in (dashboard?.topPages?.length ? dashboard.topPages : dashboard?.topMenus) || []"
+              :key="item.key"
+              class="platform-audit__rank"
+            >
               <span>{{ item.label }}</span>
               <strong>{{ item.count }}</strong>
             </div>
           </Card>
         </Col>
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="Top 菜单/方法">
-            <div v-for="item in dashboard?.topMenus || []" :key="item.key" class="platform-audit__rank">
+          <Card :bordered="false" title="Top API">
+            <div v-for="item in dashboard?.topApis || []" :key="item.key" class="platform-audit__rank">
               <span>{{ item.label }}</span>
               <strong>{{ item.count }}</strong>
             </div>
@@ -170,5 +180,18 @@ onMounted(loadDashboard);
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.platform-audit__rank span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-audit__rank strong {
+  flex: none;
+  white-space: nowrap;
 }
 </style>

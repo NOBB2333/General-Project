@@ -19,6 +19,7 @@ const dashboard = ref<AuditLogApi.LogDashboard>({
   operationLogs: [],
   topApis: [],
   topMenus: [],
+  topPages: [],
   topUsers: [],
 });
 
@@ -33,8 +34,8 @@ const logColumns = [
 ];
 
 const statColumns = [
-  { dataIndex: 'label', key: 'label', title: '对象' },
-  { dataIndex: 'count', key: 'count', title: '次数', width: 100 },
+  { dataIndex: 'label', key: 'label', title: '对象', ellipsis: true },
+  { dataIndex: 'count', key: 'count', title: '次数', width: 88, align: 'right' as const },
 ];
 
 const currentLogs = computed(() => {
@@ -101,7 +102,7 @@ onMounted(loadLogs);
 </script>
 
 <template>
-  <Page description="日志管理聚合访问、操作、异常与审计留痕，并补充接口/用户访问统计。" title="日志管理">
+  <Page description="日志中心聚合访问、操作、异常与审计留痕，并补充接口与菜单访问分析。" title="日志中心">
     <section class="platform-audit">
       <Alert
         banner
@@ -174,8 +175,25 @@ onMounted(loadLogs);
 
       <Row :gutter="[16, 16]">
         <Col :lg="8" :span="24">
+          <Card :bordered="false" title="Top 菜单访问">
+            <Table
+              class="platform-audit__stat-table"
+              :columns="statColumns"
+              :data-source="dashboard.topPages.length ? dashboard.topPages : dashboard.topMenus"
+              :pagination="false"
+              row-key="key"
+              size="small"
+            >
+              <template #emptyText>
+                <span style="font-size: 12px; color: #999">暂无数据（菜单访问埋点将在用户浏览后自动收集）</span>
+              </template>
+            </Table>
+          </Card>
+        </Col>
+        <Col :lg="8" :span="24">
           <Card :bordered="false" title="Top API">
             <Table
+              class="platform-audit__stat-table"
               :columns="statColumns"
               :data-source="dashboard.topApis"
               :pagination="false"
@@ -185,19 +203,9 @@ onMounted(loadLogs);
           </Card>
         </Col>
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="Top 菜单动作">
-            <Table
-              :columns="statColumns"
-              :data-source="dashboard.topMenus"
-              :pagination="false"
-              row-key="key"
-              size="small"
-            />
-          </Card>
-        </Col>
-        <Col :lg="8" :span="24">
           <Card :bordered="false" title="Top 用户">
             <Table
+              class="platform-audit__stat-table"
               :columns="statColumns"
               :data-source="dashboard.topUsers"
               :pagination="false"
@@ -238,6 +246,21 @@ onMounted(loadLogs);
 .platform-audit__action span {
   color: var(--ant-color-text-secondary);
   font-size: 12px;
+}
+
+.platform-audit__stat-table :deep(table) {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.platform-audit__stat-table :deep(.ant-table-cell-ellipsis) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-audit__stat-table :deep(.ant-table-tbody > tr > td:last-child) {
+  white-space: nowrap;
 }
 
 @media (max-width: 960px) {

@@ -379,7 +379,7 @@ onMounted(async () => {
               <Tag v-if="(record as UserApi.UserListItem).tenantName" color="blue">
                 {{ (record as UserApi.UserListItem).tenantName }}
               </Tag>
-              <Tag v-else color="default">主机</Tag>
+              <span v-else>—</span>
             </template>
             <template v-else-if="column.key === 'isActive'">
               <Switch
@@ -443,7 +443,8 @@ onMounted(async () => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'tenantName'">
-            <Tag color="blue">{{ record.tenantName || '默认租户' }}</Tag>
+            <Tag v-if="record.tenantName" color="blue">{{ record.tenantName }}</Tag>
+            <span v-else>—</span>
           </template>
           <template v-else-if="column.key === 'lastAccessedAt'">
             {{ record.lastAccessedAt ? new Date(record.lastAccessedAt).toLocaleString() : '-' }}

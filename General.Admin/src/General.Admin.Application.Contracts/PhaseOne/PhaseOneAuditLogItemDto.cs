@@ -8,6 +8,8 @@ public class PhaseOneAuditLogItemDto
 
     public string? BrowserInfo { get; set; }
 
+    public string? Category { get; set; }
+
     public string? ClientIpAddress { get; set; }
 
     public int ExecutionDuration { get; set; }
@@ -21,6 +23,8 @@ public class PhaseOneAuditLogItemDto
     public string? HttpMethod { get; set; }
 
     public int? HttpStatusCode { get; set; }
+
+    public string? MenuTitle { get; set; }
 
     public string? TenantName { get; set; }
 

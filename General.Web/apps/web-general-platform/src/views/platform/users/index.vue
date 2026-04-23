@@ -355,7 +355,10 @@ onMounted(async () => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'tenantName'">
-            <Tag color="blue">{{ record.tenantName || '默认租户' }}</Tag>
+            <span v-if="record.tenantName">
+              <Tag color="blue">{{ record.tenantName }}</Tag>
+            </span>
+            <span v-else>—</span>
           </template>
           <template v-else-if="column.key === 'lastAccessedAt'">
             {{ record.lastAccessedAt ? new Date(record.lastAccessedAt).toLocaleString() : '-' }}

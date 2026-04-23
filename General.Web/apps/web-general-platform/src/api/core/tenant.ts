@@ -24,6 +24,14 @@ export namespace TenantApi {
     defaultConnectionString?: null | string;
     name: string;
   }
+
+  export interface TenantUserItem {
+    displayName?: null | string;
+    email?: null | string;
+    id: string;
+    isActive: boolean;
+    username: string;
+  }
 }
 
 export async function getTenantListApi() {
@@ -47,4 +55,8 @@ export async function saveTenantAuthorizationApi(
   data: TenantApi.TenantAuthorization,
 ) {
   return requestClient.put<boolean>(`/app/tenant/${id}/authorization`, data);
+}
+
+export async function getTenantUsersApi(id: string) {
+  return requestClient.get<TenantApi.TenantUserItem[]>(`/app/tenant/${id}/users`);
 }

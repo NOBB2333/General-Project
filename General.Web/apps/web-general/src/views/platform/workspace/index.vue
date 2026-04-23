@@ -47,7 +47,7 @@ const quickEntries = [
   { path: '/platform/tenants', tag: '租户', title: '维护租户空间' },
   { path: '/platform/menus', tag: '菜单', title: '配置平台导航与按钮码' },
   { path: '/platform/files', tag: '文件', title: '统一管理制度与模板文件' },
-  { path: '/platform/audit-logs', tag: '审计', title: '查看最新访问留痕' },
+  { path: '/platform/audit-logs', tag: '日志', title: '查看日志中心与访问分析' },
   { path: '/platform/update-logs', tag: '版本', title: '维护平台更新记录' },
   { path: '/platform/system-monitor', tag: '监控', title: '查看服务器资源状态' },
 ];

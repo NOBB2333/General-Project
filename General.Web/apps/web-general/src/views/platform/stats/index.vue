@@ -18,6 +18,7 @@ const dashboard = ref<AuditLogApi.LogDashboard>({
   operationLogs: [],
   topApis: [],
   topMenus: [],
+  topPages: [],
   topUsers: [],
 });
 
