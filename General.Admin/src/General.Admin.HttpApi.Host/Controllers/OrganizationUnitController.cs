@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/organization-unit")]
 public class OrganizationUnitController : ControllerBase
 {
@@ -48,6 +49,17 @@ public class OrganizationUnitController : ControllerBase
     public async Task<ActionResult<ApiResponse<bool>>> MoveAsync(Guid id, [FromBody] OrganizationUnitMoveInput input)
     {
         await _organizationUnitService.MoveAsync(id, input.ParentId);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.Organization.Manage")]
+    [HttpPut("{id:guid}/members/transfer")]
+    public async Task<ActionResult<ApiResponse<bool>>> TransferMembersAsync(
+        Guid id,
+        [FromBody] OrganizationUnitMemberTransferInput input)
+    {
+        await _organizationUnitService.TransferMembersAsync(id, input);
         return ApiResponse<bool>.Ok(true);
     }
 

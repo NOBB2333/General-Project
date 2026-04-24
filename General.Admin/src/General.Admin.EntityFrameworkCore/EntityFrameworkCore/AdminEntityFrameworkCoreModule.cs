@@ -7,6 +7,7 @@ using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.Sqlite;
+using Volo.Abp.EntityFrameworkCore.PostgreSql;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Identity.EntityFrameworkCore;
 using Volo.Abp.Modularity;
@@ -24,6 +25,7 @@ namespace General.Admin.EntityFrameworkCore;
     typeof(AbpPermissionManagementEntityFrameworkCoreModule),
     typeof(AbpSettingManagementEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCoreSqliteModule),
+    typeof(AbpEntityFrameworkCorePostgreSqlModule),
     typeof(AbpBackgroundJobsEntityFrameworkCoreModule),
     typeof(AbpAuditLoggingEntityFrameworkCoreModule),
     typeof(AbpTenantManagementEntityFrameworkCoreModule),
@@ -39,13 +41,11 @@ public class AdminEntityFrameworkCoreModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
-        var connectionString = SqliteConnectionStringHelper.Normalize(
-            configuration.GetConnectionString("Default"));
+        var rawConnectionString = configuration.GetConnectionString("Default");
+        var provider = DatabaseProviderDetector.Detect(rawConnectionString);
 
         context.Services.AddAbpDbContext<AdminDbContext>(options =>
         {
-                /* Remove "includeAllEntities: true" to create
-                 * default repositories only for aggregate roots */
             options.AddDefaultRepositories(includeAllEntities: true);
         });
 
@@ -53,10 +53,17 @@ public class AdminEntityFrameworkCoreModule : AbpModule
         {
             options.Configure(dbContextOptions =>
             {
-                dbContextOptions.DbContextOptions.UseSqlite(connectionString);
-                dbContextOptions.DbContextOptions.AddInterceptors(new SqlitePragmaConnectionInterceptor());
+                if (provider == DatabaseProvider.PostgreSql)
+                {
+                    dbContextOptions.DbContextOptions.UseNpgsql(rawConnectionString);
+                }
+                else
+                {
+                    var normalizedSqlite = SqliteConnectionStringHelper.Normalize(rawConnectionString);
+                    dbContextOptions.DbContextOptions.UseSqlite(normalizedSqlite);
+                    dbContextOptions.DbContextOptions.AddInterceptors(new SqlitePragmaConnectionInterceptor());
+                }
             });
         });
-
     }
 }

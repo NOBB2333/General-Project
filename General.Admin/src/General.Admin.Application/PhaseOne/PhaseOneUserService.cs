@@ -1,6 +1,7 @@
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.Linq;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.Users;
 
@@ -12,6 +13,7 @@ public class PhaseOneUserService : ITransientDependency
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
     private readonly ICurrentUser _currentUser;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly CurrentUserDataScopeService _dataScopeService;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
@@ -22,6 +24,7 @@ public class PhaseOneUserService : ITransientDependency
 
     public PhaseOneUserService(
         ICurrentUser currentUser,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         CurrentUserDataScopeService dataScopeService,
         IRepository<AppExternalAccountMapping, Guid> externalAccountMappingRepository,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
@@ -34,6 +37,7 @@ public class PhaseOneUserService : ITransientDependency
         ITenantRepository tenantRepository)
     {
         _currentUser = currentUser;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _dataScopeService = dataScopeService;
         _externalAccountMappingRepository = externalAccountMappingRepository;
         _roleAuthorizationRepository = roleAuthorizationRepository;
@@ -87,35 +91,58 @@ public class PhaseOneUserService : ITransientDependency
 
     public async Task<List<PhaseOneUserListItemDto>> GetListAsync(PhaseOneUserListInput input)
     {
+        var keyword = input.Keyword?.Trim();
         var organizationUnits = (await _organizationUnitRepository.GetListAsync())
             .OrderBy(x => x.Code)
             .ToList();
         var accessibleIds = await _dataScopeService.GetAccessibleOrganizationUnitIdsAsync();
         var filteredIds = FilterOrganizationUnitIds(input.OrganizationUnitId, organizationUnits, accessibleIds);
 
-        var userOrganizationUnits = (await _userOrganizationUnitRepository.GetListAsync())
-            .Where(x => filteredIds.Contains(x.OrganizationUnitId))
-            .ToList();
+        var userOrganizationUnitsQueryable = await _userOrganizationUnitRepository.GetQueryableAsync();
+        var userOrganizationUnits = await _asyncQueryableExecuter.ToListAsync(
+            userOrganizationUnitsQueryable.Where(x => filteredIds.Contains(x.OrganizationUnitId)));
 
         var dataScopedUserIds = userOrganizationUnits
             .Select(x => x.UserId)
             .Distinct()
             .ToHashSet();
         var visibleUserIds = await ResolveVisibleUserIdsAsync(dataScopedUserIds);
+        if (visibleUserIds.Count == 0)
+        {
+            return [];
+        }
 
-        var users = (await _userRepository.GetListAsync())
-            .Where(x => visibleUserIds.Contains(x.Id))
-            .Where(x => string.IsNullOrWhiteSpace(input.Keyword)
-                || (x.UserName?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false)
-                || (x.Name?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false)
-                || (x.Email?.Contains(input.Keyword, StringComparison.OrdinalIgnoreCase) ?? false))
-            .OrderBy(x => x.UserName)
-            .ToList();
-        var profiles = (await _userProfileRepository.GetListAsync())
-            .Where(x => visibleUserIds.Contains(x.UserId))
+        var usersQueryable = await _userRepository.GetQueryableAsync();
+        usersQueryable = usersQueryable.Where(x => visibleUserIds.Contains(x.Id));
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            usersQueryable = usersQueryable.Where(x =>
+                (x.UserName != null && x.UserName.Contains(keyword)) ||
+                (x.Name != null && x.Name.Contains(keyword)) ||
+                (x.Email != null && x.Email.Contains(keyword)));
+        }
+
+        if (input.IsActive.HasValue)
+        {
+            usersQueryable = usersQueryable.Where(x => x.IsActive == input.IsActive.Value);
+        }
+
+        var users = await _asyncQueryableExecuter.ToListAsync(usersQueryable.OrderBy(x => x.UserName));
+        if (users.Count == 0)
+        {
+            return [];
+        }
+
+        var userIds = users.Select(x => x.Id).ToList();
+        var profilesQueryable = await _userProfileRepository.GetQueryableAsync();
+        var profiles = (await _asyncQueryableExecuter.ToListAsync(
+                profilesQueryable.Where(x => userIds.Contains(x.UserId))))
             .ToDictionary(x => x.UserId);
-        var mappings = (await _externalAccountMappingRepository.GetListAsync())
-            .Where(x => visibleUserIds.Contains(x.UserId))
+
+        var mappingsQueryable = await _externalAccountMappingRepository.GetQueryableAsync();
+        var mappings = (await _asyncQueryableExecuter.ToListAsync(
+                mappingsQueryable.Where(x => userIds.Contains(x.UserId))))
             .GroupBy(x => x.UserId)
             .ToDictionary(
                 x => x.Key,
@@ -139,6 +166,8 @@ public class PhaseOneUserService : ITransientDependency
                 x => x.Key,
                 x => x.Select(item => organizationUnitNames[item.OrganizationUnitId]).Distinct().OrderBy(name => name).ToList());
 
+        var userRoleMap = await BuildUserRoleMapAsync(users);
+
         // Build tenant name lookup from distinct TenantIds present in this user set
         var distinctTenantIds = users.Select(x => x.TenantId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
         var tenants = distinctTenantIds.Count > 0
@@ -148,15 +177,7 @@ public class PhaseOneUserService : ITransientDependency
         var result = new List<PhaseOneUserListItemDto>();
         foreach (var user in users)
         {
-            var roles = (await _userManager.GetRolesAsync(user))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x)
-                .ToList();
-
-            if (input.IsActive.HasValue && user.IsActive != input.IsActive.Value)
-            {
-                continue;
-            }
+            var roles = userRoleMap.GetValueOrDefault(user.Id) ?? [];
 
             if (!string.IsNullOrWhiteSpace(input.RoleName) &&
                 !roles.Contains(input.RoleName, StringComparer.OrdinalIgnoreCase))
@@ -187,6 +208,21 @@ public class PhaseOneUserService : ITransientDependency
         }
 
         return result;
+    }
+
+    private async Task<Dictionary<Guid, List<string>>> BuildUserRoleMapAsync(List<IdentityUser> users)
+    {
+        var rolePairs = await Task.WhenAll(users.Select(async user =>
+        {
+            var roleNames = (await _userManager.GetRolesAsync(user))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name)
+                .ToList();
+
+            return new KeyValuePair<Guid, List<string>>(user.Id, roleNames);
+        }));
+
+        return rolePairs.ToDictionary(x => x.Key, x => x.Value);
     }
 
     private async Task<HashSet<Guid>> ResolveVisibleUserIdsAsync(HashSet<Guid> dataScopedUserIds)
@@ -332,6 +368,18 @@ public class PhaseOneUserService : ITransientDependency
 
         var user = await _userManager.GetByIdAsync(_currentUser.Id.Value);
         EnsureSucceeded(await _userManager.ChangePasswordAsync(user, input.CurrentPassword, input.NewPassword));
+    }
+
+    public async Task ResetPasswordAsync(Guid id, PhaseOneAdminResetPasswordInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.NewPassword))
+        {
+            throw new InvalidOperationException("新密码不能为空。");
+        }
+
+        var user = await _userManager.GetByIdAsync(id);
+        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+        EnsureSucceeded(await _userManager.ResetPasswordAsync(user, resetToken, input.NewPassword.Trim()));
     }
 
     public static string ResolveHomePath(IReadOnlyCollection<string> roles)

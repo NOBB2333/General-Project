@@ -11,6 +11,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [DisableAuditing]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Common)]
 [Route("api/app/auth")]
 public class AuthController : ControllerBase
 {

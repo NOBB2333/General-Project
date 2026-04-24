@@ -4,6 +4,8 @@ public class PhaseOneSystemMonitorDto
 {
     public long AvailableMemoryBytes { get; set; }
 
+    public string? CpuUsageNote { get; set; }
+
     public string? MemoryUsageNote { get; set; }
 
     public double? ProcessCpuUsagePercent { get; set; }
@@ -39,6 +41,8 @@ public class PhaseOneSystemMonitorDto
     public double? ProcessMemoryUsagePercent { get; set; }
 
     public double? SystemMemoryUsagePercent { get; set; }
+
+    public long SystemUsedMemoryBytes { get; set; }
 
     public long TotalMemoryBytes { get; set; }
 

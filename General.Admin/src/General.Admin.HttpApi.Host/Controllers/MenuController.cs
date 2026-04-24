@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Common)]
 [Route("api/app/menu")]
 public class MenuController : ControllerBase
 {

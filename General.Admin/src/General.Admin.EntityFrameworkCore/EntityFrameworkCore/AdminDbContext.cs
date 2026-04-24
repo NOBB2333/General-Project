@@ -63,6 +63,7 @@ public class AdminDbContext :
     public DbSet<AppRoleAuthorization> AppRoleAuthorizations { get; set; }
     public DbSet<AppTenantAuthorization> AppTenantAuthorizations { get; set; }
     public DbSet<AppUserProfile> AppUserProfiles { get; set; }
+    public DbSet<AppRequestAuditLog> AppRequestAuditLogs { get; set; }
     public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
     public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
@@ -168,6 +169,25 @@ public class AdminDbContext :
             b.Property(x => x.LastSeenDevice).HasMaxLength(128);
             b.Property(x => x.LastSeenBrowser).HasMaxLength(512);
             b.HasIndex(x => x.UserId).IsUnique();
+        });
+
+        builder.Entity<AppRequestAuditLog>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}RequestAuditLogs", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Category).IsRequired().HasMaxLength(32);
+            b.Property(x => x.HttpMethod).HasMaxLength(16);
+            b.Property(x => x.Url).HasMaxLength(1024);
+            b.Property(x => x.UserName).HasMaxLength(128);
+            b.Property(x => x.TenantName).HasMaxLength(128);
+            b.Property(x => x.ClientIpAddress).HasMaxLength(64);
+            b.Property(x => x.BrowserInfo).HasMaxLength(512);
+            b.Property(x => x.ActionSummary).HasMaxLength(512);
+            b.Property(x => x.MenuTitle).HasMaxLength(256);
+            b.Property(x => x.ExceptionMessage).HasMaxLength(1024);
+            b.HasIndex(x => x.ExecutionTime);
+            b.HasIndex(x => new { x.Category, x.ExecutionTime });
+            b.HasIndex(x => new { x.UserName, x.ExecutionTime });
         });
 
         builder.Entity<AppExternalAccountMapping>(b =>

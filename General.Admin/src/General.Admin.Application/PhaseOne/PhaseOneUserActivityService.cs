@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
@@ -8,18 +10,24 @@ namespace General.Admin.PhaseOne;
 public class PhaseOneUserActivityService : ITransientDependency
 {
     private static readonly TimeSpan OnlineThreshold = TimeSpan.FromMinutes(20);
+    private static readonly TimeSpan TouchThrottle = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan ActivityCacheTtl = TimeSpan.FromHours(8);
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ICurrentUser _currentUser;
+    private readonly IDistributedCache _distributedCache;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
 
     public PhaseOneUserActivityService(
         IHttpContextAccessor httpContextAccessor,
         ICurrentUser currentUser,
+        IDistributedCache distributedCache,
         IRepository<AppUserProfile, Guid> userProfileRepository)
     {
         _httpContextAccessor = httpContextAccessor;
         _currentUser = currentUser;
+        _distributedCache = distributedCache;
         _userProfileRepository = userProfileRepository;
     }
 
@@ -38,6 +46,11 @@ public class PhaseOneUserActivityService : ITransientDependency
             ResolveBrowser(context));
 
         await _userProfileRepository.UpdateAsync(profile, autoSave: true);
+        await SetCacheAsync(userId, new PhaseOneUserActivityCacheItem
+        {
+            ForceLogoutAfter = profile.ForceLogoutAfter,
+            LastSeenAt = now
+        });
     }
 
     public async Task TouchCurrentUserAsync()
@@ -47,14 +60,15 @@ public class PhaseOneUserActivityService : ITransientDependency
             return;
         }
 
-        var profile = await GetOrCreateProfileAsync(_currentUser.Id.Value);
         var now = DateTime.UtcNow;
-        if (profile.LastSeenAt.HasValue && now - profile.LastSeenAt.Value < TimeSpan.FromSeconds(20))
+        var cacheItem = await GetCacheAsync(_currentUser.Id.Value) ?? await LoadCacheAsync(_currentUser.Id.Value);
+        if (cacheItem.LastSeenAt.HasValue && now - cacheItem.LastSeenAt.Value < TouchThrottle)
         {
             return;
         }
 
         var context = _httpContextAccessor.HttpContext;
+        var profile = await GetOrCreateProfileAsync(_currentUser.Id.Value);
         profile.UpdateLastSeen(
             now,
             context?.Connection.RemoteIpAddress?.ToString(),
@@ -62,6 +76,8 @@ public class PhaseOneUserActivityService : ITransientDependency
             ResolveBrowser(context));
 
         await _userProfileRepository.UpdateAsync(profile, autoSave: true);
+        cacheItem.LastSeenAt = now;
+        await SetCacheAsync(_currentUser.Id.Value, cacheItem);
     }
 
     public async Task<bool> IsCurrentUserForcedLogoutAsync()
@@ -71,8 +87,8 @@ public class PhaseOneUserActivityService : ITransientDependency
             return false;
         }
 
-        var profile = await _userProfileRepository.FindAsync(x => x.UserId == _currentUser.Id.Value);
-        return profile?.ForceLogoutAfter.HasValue == true;
+        var cacheItem = await GetCacheAsync(_currentUser.Id.Value) ?? await LoadCacheAsync(_currentUser.Id.Value);
+        return cacheItem.ForceLogoutAfter.HasValue;
     }
 
     public async Task ForceLogoutAsync(Guid userId)
@@ -80,6 +96,11 @@ public class PhaseOneUserActivityService : ITransientDependency
         var profile = await GetOrCreateProfileAsync(userId);
         profile.ForceLogout(DateTime.UtcNow);
         await _userProfileRepository.UpdateAsync(profile, autoSave: true);
+        await SetCacheAsync(userId, new PhaseOneUserActivityCacheItem
+        {
+            ForceLogoutAfter = profile.ForceLogoutAfter,
+            LastSeenAt = profile.LastSeenAt
+        });
     }
 
     public static bool IsOnline(DateTime? lastSeenAt)
@@ -98,6 +119,44 @@ public class PhaseOneUserActivityService : ITransientDependency
         profile = new AppUserProfile(Guid.NewGuid(), userId, null, null, null, null, null);
         await _userProfileRepository.InsertAsync(profile, autoSave: true);
         return profile;
+    }
+
+    private async Task<PhaseOneUserActivityCacheItem?> GetCacheAsync(Guid userId)
+    {
+        var json = await _distributedCache.GetStringAsync(GetCacheKey(userId));
+        return string.IsNullOrWhiteSpace(json)
+            ? null
+            : JsonSerializer.Deserialize<PhaseOneUserActivityCacheItem>(json, JsonSerializerOptions);
+    }
+
+    private async Task<PhaseOneUserActivityCacheItem> LoadCacheAsync(Guid userId)
+    {
+        var profile = await _userProfileRepository.FindAsync(x => x.UserId == userId);
+        var cacheItem = new PhaseOneUserActivityCacheItem
+        {
+            ForceLogoutAfter = profile?.ForceLogoutAfter,
+            LastSeenAt = profile?.LastSeenAt
+        };
+
+        await SetCacheAsync(userId, cacheItem);
+        return cacheItem;
+    }
+
+    private async Task SetCacheAsync(Guid userId, PhaseOneUserActivityCacheItem item)
+    {
+        var json = JsonSerializer.Serialize(item, JsonSerializerOptions);
+        await _distributedCache.SetStringAsync(
+            GetCacheKey(userId),
+            json,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ActivityCacheTtl
+            });
+    }
+
+    private static string GetCacheKey(Guid userId)
+    {
+        return $"phase-one:user-activity:{userId:N}";
     }
 
     private static string? ResolveBrowser(HttpContext? context)
@@ -134,5 +193,12 @@ public class PhaseOneUserActivityService : ITransientDependency
         }
 
         return "Web";
+    }
+
+    private sealed class PhaseOneUserActivityCacheItem
+    {
+        public DateTime? ForceLogoutAfter { get; set; }
+
+        public DateTime? LastSeenAt { get; set; }
     }
 }

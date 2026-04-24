@@ -1,5 +1,9 @@
 {
   "ConnectionStrings": {
-    "Default": "Data Source=build/data/general-admin.db"
+    // ── 选一个取消注释，另一个注释掉 ──
+    // SQLite（本地开发，无需数据库服务）：
+    // "Default": "Data Source=build/data/general-admin.db"
+    // PostgreSQL（生产 / Linux 部署，DbMigrator 会自动建库）：
+    "Default": "Host=nucbox-g3;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
   }
 }

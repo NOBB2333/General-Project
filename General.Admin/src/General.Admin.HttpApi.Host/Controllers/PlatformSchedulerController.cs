@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/platform/scheduler")]
 public class PlatformSchedulerController : ControllerBase
 {
@@ -27,8 +28,7 @@ public class PlatformSchedulerController : ControllerBase
     [HttpPost("{jobKey}/run")]
     public async Task<ActionResult<ApiResponse<string>>> RunAsync(string jobKey)
     {
-        await _schedulerService.RunAsync(jobKey);
-        return ApiResponse<string>.Ok("ok");
+        return ApiResponse<string>.Ok(await _schedulerService.RunAsync(jobKey));
     }
 
     [HttpPost("{jobKey}/toggle")]

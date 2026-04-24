@@ -1,6 +1,7 @@
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.Linq;
 using Volo.Abp.TenantManagement;
 
 namespace General.Admin.PhaseOne;
@@ -8,17 +9,20 @@ namespace General.Admin.PhaseOne;
 public class PhaseOneOnlineUserService : ITransientDependency
 {
     private readonly PhaseOneUserActivityService _userActivityService;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly ITenantRepository _tenantRepository;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PhaseOneOnlineUserService(
         PhaseOneUserActivityService userActivityService,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         ITenantRepository tenantRepository,
         IRepository<AppUserProfile, Guid> userProfileRepository,
         IRepository<IdentityUser, Guid> userRepository)
     {
         _userActivityService = userActivityService;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _tenantRepository = tenantRepository;
         _userProfileRepository = userProfileRepository;
         _userRepository = userRepository;
@@ -26,14 +30,26 @@ public class PhaseOneOnlineUserService : ITransientDependency
 
     public async Task<List<PhaseOneOnlineUserDto>> GetListAsync()
     {
-        var profiles = (await _userProfileRepository.GetListAsync())
-            .Where(x => PhaseOneUserActivityService.IsOnline(x.LastSeenAt))
-            .OrderByDescending(x => x.LastSeenAt ?? x.LastLoginTime)
-            .ToList();
-        var users = (await _userRepository.GetListAsync())
+        var threshold = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(20));
+        var profilesQueryable = await _userProfileRepository.GetQueryableAsync();
+        var profiles = await _asyncQueryableExecuter.ToListAsync(
+            profilesQueryable
+                .Where(x => x.LastSeenAt.HasValue && x.LastSeenAt.Value >= threshold)
+                .OrderByDescending(x => x.LastSeenAt ?? x.LastLoginTime));
+
+        if (profiles.Count == 0)
+        {
+            return [];
+        }
+
+        var userIds = profiles.Select(x => x.UserId).Distinct().ToList();
+        var usersQueryable = await _userRepository.GetQueryableAsync();
+        var users = (await _asyncQueryableExecuter.ToListAsync(usersQueryable.Where(x => userIds.Contains(x.Id))))
             .ToDictionary(x => x.Id);
-        var tenants = (await _tenantRepository.GetListAsync())
-            .ToDictionary(x => x.Id, x => x.Name);
+        var tenantIds = users.Values.Where(x => x.TenantId.HasValue).Select(x => x.TenantId!.Value).Distinct().ToList();
+        var tenants = tenantIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : (await _tenantRepository.GetListAsync()).Where(x => tenantIds.Contains(x.Id)).ToDictionary(x => x.Id, x => x.Name);
 
         return profiles
             .Select(profile =>

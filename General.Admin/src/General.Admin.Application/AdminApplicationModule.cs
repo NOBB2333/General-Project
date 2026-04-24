@@ -7,9 +7,15 @@ using Volo.Abp.PermissionManagement;
 using Volo.Abp.SettingManagement;
 using Volo.Abp.TenantManagement;
 using Microsoft.Extensions.DependencyInjection;
+using General.Admin.PhaseOne;
 
 namespace General.Admin;
 
+
+
+/// <summary>
+/// 三个定时任务
+/// </summary>
 [DependsOn(
     typeof(AdminDomainModule),
     typeof(AbpAccountApplicationModule),
@@ -25,5 +31,8 @@ public class AdminApplicationModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         context.Services.AddMapperlyObjectMapper<AdminApplicationModule>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformLogCleanupJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformWeeklyReportReminderJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformTenantHealthCheckJobHandler>();
     }
 }

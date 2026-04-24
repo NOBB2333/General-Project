@@ -1,5 +1,8 @@
 {
   "ConnectionStrings": {
-    "Default": "Data Source=build/data/general-admin.db"
+    // SQLite:
+    // "Default": "Data Source=build/data/general-admin.db"
+    // PostgreSQL 示例（当前仓库代码和 migrations 仍按 SQLite 实现，这里仅作连接串格式参考）：
+    "Default": "Host=nucbox-g3;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
   }
 }

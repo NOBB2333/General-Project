@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text.RegularExpressions;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Data;
 using Volo.Abp.Domain.Repositories;
@@ -37,33 +39,39 @@ public class PhaseOneTenantService : ITransientDependency
         var tenants = (await _tenantRepository.GetListAsync(includeDetails: true))
             .OrderBy(x => x.Name)
             .ToList();
-        var authorizations = await _tenantAuthorizationRepository.GetListAsync();
+        var authorizations = (await _tenantAuthorizationRepository.GetListAsync())
+            .ToDictionary(x => x.TenantId);
         var users = (await _userRepository.GetListAsync()).ToDictionary(x => x.Id);
 
         return tenants
             .Select(x => new PhaseOneTenantListItemDto
             {
-                AdminEmail = authorizations.FirstOrDefault(item => item.TenantId == x.Id) is { AdminUserId: { } adminUserId } authorizationForAdmin &&
+                AdminEmail = authorizations.GetValueOrDefault(x.Id) is { AdminUserId: { } adminUserId } authorizationForAdmin &&
                              users.TryGetValue(adminUserId, out var adminUser)
                     ? adminUser.Email
                     : null,
-                AdminUserId = authorizations.FirstOrDefault(item => item.TenantId == x.Id)?.AdminUserId,
-                AdminUserName = authorizations.FirstOrDefault(item => item.TenantId == x.Id) is { AdminUserId: { } adminUserId2 } authorizationForName &&
-                                users.TryGetValue(adminUserId2, out var adminUserForName)
+                AdminUserId = authorizations.GetValueOrDefault(x.Id)?.AdminUserId,
+                AdminUserName = authorizations.GetValueOrDefault(x.Id) is { AdminUserId: { } adminUserId2 } authorizationForName &&
+                                 users.TryGetValue(adminUserId2, out var adminUserForName)
                     ? adminUserForName.UserName
                     : null,
-                ApiBlacklist = authorizations.FirstOrDefault(item => item.TenantId == x.Id) is { } authorization
+                ApiBlacklist = authorizations.GetValueOrDefault(x.Id) is { } authorization
                     ? PhaseOneSerializationHelper.DeserializeStringList(authorization.ApiBlacklist)
                     : [],
                 CreationTime = x.CreationTime,
+                DefaultConnectionStringDisplay = BuildConnectionStringDisplay(
+                    x.ConnectionStrings
+                        .FirstOrDefault(item => item.Name == ConnectionStrings.DefaultConnectionStringName)
+                        ?.Value),
+                HasDefaultConnectionString = x.ConnectionStrings
+                    .Any(item =>
+                        item.Name == ConnectionStrings.DefaultConnectionStringName &&
+                        !string.IsNullOrWhiteSpace(item.Value)),
                 Id = x.Id,
-                HasExplicitAuthorization = authorizations.Any(item => item.TenantId == x.Id),
-                IsActive = authorizations.FirstOrDefault(item => item.TenantId == x.Id)?.IsActive ?? true,
+                HasExplicitAuthorization = authorizations.ContainsKey(x.Id),
+                IsActive = authorizations.GetValueOrDefault(x.Id)?.IsActive ?? true,
                 Name = x.Name,
-                Remark = authorizations.FirstOrDefault(item => item.TenantId == x.Id)?.Remark,
-                DefaultConnectionString = x.ConnectionStrings
-                    .FirstOrDefault(item => item.Name == ConnectionStrings.DefaultConnectionStringName)
-                    ?.Value
+                Remark = authorizations.GetValueOrDefault(x.Id)?.Remark
             })
             .ToList();
     }
@@ -202,5 +210,77 @@ public class PhaseOneTenantService : ITransientDependency
                 })
                 .ToList();
         }
+    }
+
+    private static string? BuildConnectionStringDisplay(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return null;
+        }
+
+        var provider = ResolveProvider(connectionString);
+        var database = ResolveDatabaseName(connectionString, provider);
+        return string.IsNullOrWhiteSpace(database)
+            ? $"已配置（{provider}）"
+            : $"已配置（{provider} · {database}）";
+    }
+
+    private static string? ExtractConnectionValue(string connectionString, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            var match = Regex.Match(
+                connectionString,
+                $@"(?:^|;)\s*{Regex.Escape(key)}\s*=\s*(?<value>[^;]+)",
+                RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                return match.Groups["value"].Value.Trim();
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveDatabaseName(string connectionString, string provider)
+    {
+        if (provider == "SQLite")
+        {
+            var dataSource = ExtractConnectionValue(connectionString, "Data Source");
+            return string.IsNullOrWhiteSpace(dataSource) ? null : Path.GetFileName(dataSource);
+        }
+
+        return ExtractConnectionValue(connectionString, "Initial Catalog", "Database");
+    }
+
+    private static string ResolveProvider(string connectionString)
+    {
+        if (connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase))
+        {
+            return "PostgreSQL";
+        }
+
+        if (connectionString.Contains("Uid=", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains("User Id=", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MySQL";
+        }
+
+        if (connectionString.Contains("Initial Catalog=", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains("Trusted_Connection=", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SQL Server";
+        }
+
+        if (connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.Contains(".sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SQLite";
+        }
+
+        return "数据库";
     }
 }

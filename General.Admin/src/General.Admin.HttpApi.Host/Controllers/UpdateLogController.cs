@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/update-log")]
 public class UpdateLogController : ControllerBase
 {

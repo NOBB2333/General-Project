@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Empty, Space, Switch, Table, Tag, message } from 'ant-design-vue';
+import { Button, Card, Col, Empty, Row, Space, Statistic, Switch, Table, Tag, message } from 'ant-design-vue';
 
 import {
   getSchedulerListApi,
@@ -18,6 +18,16 @@ const loading = ref(false);
 const actionLoadingKey = ref('');
 const items = ref<SchedulerApi.JobItem[]>([]);
 
+const metrics = computed(() => [
+  { label: '任务总数', value: items.value.length },
+  { label: '启用任务', value: items.value.filter((item) => item.isEnabled).length },
+  { label: '执行中', value: items.value.filter((item) => item.isRunning).length },
+  {
+    label: '最近失败',
+    value: items.value.filter((item) => item.lastRunResult.includes('失败')).length,
+  },
+]);
+
 const columns = [
   { dataIndex: 'title', key: 'title', title: '任务名称', width: 180 },
   { dataIndex: 'jobKey', key: 'jobKey', title: '任务键', width: 180 },
@@ -25,6 +35,7 @@ const columns = [
   { dataIndex: 'description', key: 'description', title: '说明', ellipsis: true, width: 320 },
   { dataIndex: 'nextRunTime', key: 'nextRunTime', title: '下次执行', width: 160 },
   { dataIndex: 'lastRunTime', key: 'lastRunTime', title: '最近执行', width: 160 },
+  { dataIndex: 'lastRunResult', key: 'lastRunResult', title: '最近结果', width: 260 },
   { dataIndex: 'isEnabled', key: 'isEnabled', title: '状态', width: 100 },
   { key: 'actions', title: '操作', width: 160 },
 ];
@@ -56,8 +67,12 @@ async function toggleJob(item: SchedulerApi.JobItem, isEnabled: boolean) {
 async function runJob(item: SchedulerApi.JobItem) {
   actionLoadingKey.value = `${item.jobKey}:run`;
   try {
-    await runSchedulerJobApi(item.jobKey);
-    message.success('已触发手动执行');
+    const result = await runSchedulerJobApi(item.jobKey);
+    if (result.includes('失败')) {
+      message.warning(result);
+    } else {
+      message.success(result);
+    }
     await loadData();
   } finally {
     actionLoadingKey.value = '';
@@ -68,8 +83,20 @@ onMounted(loadData);
 </script>
 
 <template>
-  <Page description="一期先落一个轻量定时任务中心，用于查看内置任务、启停和手动执行。" title="定时任务">
+  <Page description="定时任务中心支持自动调度、启停、手动触发，并直接展示最近一次执行结果。" title="定时任务">
+    <Row :gutter="[16, 16]" class="mb-1">
+      <Col v-for="metric in metrics" :key="metric.label" :lg="6" :md="12" :span="24">
+        <Card :bordered="false">
+          <Statistic :title="metric.label" :value="metric.value" />
+        </Card>
+      </Col>
+    </Row>
+
     <Card :bordered="false" title="任务中心">
+      <template #extra>
+        <Button :loading="loading" @click="loadData">刷新</Button>
+      </template>
+
       <div v-if="!loading && items.length === 0" class="scheduler__empty">
         <Empty description="暂无定时任务" />
       </div>
@@ -90,14 +117,47 @@ onMounted(loadData);
             {{ formatDate((record as SchedulerApi.JobItem).nextRunTime) }}
           </template>
           <template v-else-if="column.key === 'lastRunTime'">
+            {{ formatDate((record as SchedulerApi.JobItem).lastRunTime) }}
+          </template>
+          <template v-else-if="column.key === 'lastRunResult'">
             <div class="scheduler__cell">
-              <span>{{ formatDate((record as SchedulerApi.JobItem).lastRunTime) }}</span>
+              <Tag
+                :color="
+                  (record as SchedulerApi.JobItem).lastRunResult.includes('失败')
+                    ? 'error'
+                    : (record as SchedulerApi.JobItem).lastRunResult
+                        ? 'success'
+                        : 'default'
+                "
+              >
+                {{
+                  (record as SchedulerApi.JobItem).lastRunResult.includes('失败')
+                    ? '失败'
+                    : (record as SchedulerApi.JobItem).lastRunResult
+                        ? '成功'
+                        : '未执行'
+                }}
+              </Tag>
               <small>{{ (record as SchedulerApi.JobItem).lastRunResult || '-' }}</small>
             </div>
           </template>
           <template v-else-if="column.key === 'isEnabled'">
-            <Tag :color="(record as SchedulerApi.JobItem).isEnabled ? 'success' : 'default'">
-              {{ (record as SchedulerApi.JobItem).isEnabled ? '运行中' : '已停用' }}
+            <Tag
+              :color="
+                (record as SchedulerApi.JobItem).isRunning
+                  ? 'processing'
+                  : (record as SchedulerApi.JobItem).isEnabled
+                    ? 'success'
+                    : 'default'
+              "
+            >
+              {{
+                (record as SchedulerApi.JobItem).isRunning
+                  ? '执行中'
+                  : (record as SchedulerApi.JobItem).isEnabled
+                    ? '运行中'
+                    : '已停用'
+              }}
             </Tag>
           </template>
           <template v-else-if="column.key === 'actions'">
@@ -105,11 +165,13 @@ onMounted(loadData);
               <Switch
                 :checked="(record as SchedulerApi.JobItem).isEnabled"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:toggle`"
+                :disabled="(record as SchedulerApi.JobItem).isRunning"
                 @change="(checked) => toggleJob(record as SchedulerApi.JobItem, Boolean(checked))"
               />
               <Button
                 size="small"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:run`"
+                :disabled="(record as SchedulerApi.JobItem).isRunning"
                 @click="runJob(record as SchedulerApi.JobItem)"
               >
                 立即执行

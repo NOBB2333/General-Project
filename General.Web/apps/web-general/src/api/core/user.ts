@@ -19,6 +19,10 @@ export namespace UserApi {
     newPassword: string;
   }
 
+  export interface AdminResetPasswordInput {
+    newPassword: string;
+  }
+
   export interface UserSaveInput {
     displayName: string;
     email: string;
@@ -81,4 +85,11 @@ export async function deleteUserApi(id: string) {
 
 export async function changePasswordApi(data: UserApi.PasswordChangeInput) {
   return requestClient.put<boolean>('/app/user/password', data);
+}
+
+export async function resetUserPasswordApi(
+  id: string,
+  data: UserApi.AdminResetPasswordInput,
+) {
+  return requestClient.put<boolean>(`/app/user/${id}/reset-password`, data);
 }

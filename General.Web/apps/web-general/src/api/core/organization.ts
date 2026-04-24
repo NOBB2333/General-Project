@@ -1,6 +1,11 @@
 import { requestClient } from '#/api/request';
 
 export namespace OrganizationApi {
+  export interface OrganizationMemberTransferInput {
+    targetOrganizationUnitId: string;
+    userIds: string[];
+  }
+
   export interface OrganizationSaveInput {
     displayName: string;
     parentId?: null | string;
@@ -40,6 +45,13 @@ export async function moveOrganizationUnitApi(id: string, parentId?: null | stri
   return requestClient.put<boolean>(`/app/organization-unit/${id}/move`, {
     parentId,
   });
+}
+
+export async function transferOrganizationMembersApi(
+  id: string,
+  data: OrganizationApi.OrganizationMemberTransferInput,
+) {
+  return requestClient.put<boolean>(`/app/organization-unit/${id}/members/transfer`, data);
 }
 
 export async function deleteOrganizationUnitApi(id: string) {

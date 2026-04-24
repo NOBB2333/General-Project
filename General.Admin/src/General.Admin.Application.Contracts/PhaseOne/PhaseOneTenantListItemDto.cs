@@ -14,13 +14,15 @@ public class PhaseOneTenantListItemDto
 
     public Guid Id { get; set; }
 
+    public bool HasDefaultConnectionString { get; set; }
+
     public bool IsActive { get; set; }
 
     public string Name { get; set; } = string.Empty;
 
     public string? Remark { get; set; }
 
-    public string? DefaultConnectionString { get; set; }
+    public string? DefaultConnectionStringDisplay { get; set; }
 
     public bool HasExplicitAuthorization { get; set; }
 }

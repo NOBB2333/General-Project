@@ -15,8 +15,9 @@ export namespace TenantApi {
     adminUserName?: null | string;
     apiBlacklist: string[];
     creationTime: string;
-    defaultConnectionString?: null | string;
+    defaultConnectionStringDisplay?: null | string;
     hasExplicitAuthorization: boolean;
+    hasDefaultConnectionString: boolean;
     id: string;
     isActive: boolean;
     name: string;

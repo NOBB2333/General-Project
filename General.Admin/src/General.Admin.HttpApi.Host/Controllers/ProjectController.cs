@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Project)]
 [Route("api/app/project")]
 public class ProjectController : ControllerBase
 {

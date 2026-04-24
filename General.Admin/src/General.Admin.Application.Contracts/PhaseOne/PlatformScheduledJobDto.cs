@@ -8,6 +8,8 @@ public class PlatformScheduledJobDto
 
     public bool IsEnabled { get; set; }
 
+    public bool IsRunning { get; set; }
+
     public string JobKey { get; set; } = string.Empty;
 
     public DateTime? LastRunTime { get; set; }

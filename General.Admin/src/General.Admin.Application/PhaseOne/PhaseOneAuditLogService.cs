@@ -271,7 +271,7 @@ public class PhaseOneAuditLogService : ITransientDependency
 
     private async Task<List<PhaseOneAuditLogItemDto>> GetRequestLogsAsync(PhaseOneAuditLogQueryInput input)
     {
-        var logs = (await _requestAuditStore.ReadAsync())
+        var logs = (await _requestAuditStore.QueryAsync(input))
             .Select(item => new PhaseOneAuditLogItemDto
             {
                 ActionSummary = item.ActionSummary,
@@ -292,29 +292,6 @@ public class PhaseOneAuditLogService : ITransientDependency
             })
             .ToList();
 
-        if (input.StartTime.HasValue)
-        {
-            logs = logs.Where(x => x.ExecutionTime >= input.StartTime.Value).ToList();
-        }
-
-        if (input.EndTime.HasValue)
-        {
-            logs = logs.Where(x => x.ExecutionTime <= input.EndTime.Value).ToList();
-        }
-
-        if (!string.IsNullOrWhiteSpace(input.Keyword))
-        {
-            var keyword = input.Keyword.Trim();
-            logs = logs.Where(x =>
-                ContainsIgnoreCase(x.UserName, keyword) ||
-                ContainsIgnoreCase(x.TenantName, keyword) ||
-                ContainsIgnoreCase(x.Url, keyword) ||
-                ContainsIgnoreCase(x.ClientIpAddress, keyword) ||
-                ContainsIgnoreCase(x.ActionSummary, keyword) ||
-                ContainsIgnoreCase(x.MenuTitle, keyword)).ToList();
-        }
-
-        return FilterByCategory(logs, input.Category?.Trim().ToLowerInvariant());
+        return logs;
     }
 }
-

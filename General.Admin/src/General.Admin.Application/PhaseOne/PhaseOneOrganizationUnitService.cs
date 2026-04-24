@@ -7,17 +7,20 @@ namespace General.Admin.PhaseOne;
 public class PhaseOneOrganizationUnitService : ITransientDependency
 {
     private readonly CurrentUserDataScopeService _dataScopeService;
+    private readonly IdentityUserManager _identityUserManager;
     private readonly OrganizationUnitManager _organizationUnitManager;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
 
     public PhaseOneOrganizationUnitService(
         CurrentUserDataScopeService dataScopeService,
+        IdentityUserManager identityUserManager,
         OrganizationUnitManager organizationUnitManager,
         IRepository<OrganizationUnit, Guid> organizationUnitRepository,
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository)
     {
         _dataScopeService = dataScopeService;
+        _identityUserManager = identityUserManager;
         _organizationUnitManager = organizationUnitManager;
         _organizationUnitRepository = organizationUnitRepository;
         _userOrganizationUnitRepository = userOrganizationUnitRepository;
@@ -83,6 +86,75 @@ public class PhaseOneOrganizationUnitService : ITransientDependency
     {
         await EnsureAccessibleAsync(id);
         await _organizationUnitManager.DeleteAsync(id);
+    }
+
+    public async Task TransferMembersAsync(Guid sourceOrganizationUnitId, OrganizationUnitMemberTransferInput input)
+    {
+        await EnsureAccessibleAsync(sourceOrganizationUnitId);
+        await EnsureAccessibleAsync(input.TargetOrganizationUnitId);
+
+        if (sourceOrganizationUnitId == input.TargetOrganizationUnitId)
+        {
+            throw new InvalidOperationException("目标部门不能与当前部门相同。");
+        }
+
+        var requestedUserIds = input.UserIds
+            .Distinct()
+            .ToList();
+        if (requestedUserIds.Count == 0)
+        {
+            throw new InvalidOperationException("至少选择一名成员。");
+        }
+
+        var organizationUnits = (await _organizationUnitRepository.GetListAsync())
+            .OrderBy(x => x.Code)
+            .ToList();
+        var sourceOrganizationUnit = organizationUnits.FirstOrDefault(x => x.Id == sourceOrganizationUnitId)
+            ?? throw new InvalidOperationException("当前组织节点不存在。");
+        var sourceScopeOrganizationUnitIds = organizationUnits
+            .Where(x => x.Code.StartsWith(sourceOrganizationUnit.Code, StringComparison.Ordinal))
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        var memberships = (await _userOrganizationUnitRepository.GetListAsync())
+            .Where(x =>
+                sourceScopeOrganizationUnitIds.Contains(x.OrganizationUnitId) &&
+                requestedUserIds.Contains(x.UserId))
+            .ToList();
+
+        if (memberships
+                .Select(x => x.UserId)
+                .Distinct()
+                .Count() != requestedUserIds.Count)
+        {
+            throw new InvalidOperationException("部分成员不在当前组织节点范围内，请刷新后重试。");
+        }
+
+        var targetMembershipUserIds = (await _userOrganizationUnitRepository.GetListAsync())
+            .Where(x =>
+                x.OrganizationUnitId == input.TargetOrganizationUnitId &&
+                requestedUserIds.Contains(x.UserId))
+            .Select(x => x.UserId)
+            .ToHashSet();
+
+        foreach (var userId in requestedUserIds)
+        {
+            var sourceMembershipIds = memberships
+                .Where(x => x.UserId == userId && x.OrganizationUnitId != input.TargetOrganizationUnitId)
+                .Select(x => x.OrganizationUnitId)
+                .Distinct()
+                .ToList();
+
+            foreach (var sourceMembershipId in sourceMembershipIds)
+            {
+                await _identityUserManager.RemoveFromOrganizationUnitAsync(userId, sourceMembershipId);
+            }
+
+            if (!targetMembershipUserIds.Contains(userId))
+            {
+                await _identityUserManager.AddToOrganizationUnitAsync(userId, input.TargetOrganizationUnitId);
+            }
+        }
     }
 
     private static List<OrganizationUnitTreeDto> BuildTree(

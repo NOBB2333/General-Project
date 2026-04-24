@@ -10,6 +10,34 @@ namespace General.Admin.EntityFrameworkCore;
 
 public static class JsoncAppSettingsExtensions
 {
+    /// <summary>从指定基础目录下的 relativePath 子目录加载所有 .json/.jsonc 文件（供设计时工厂使用）</summary>
+    public static IConfigurationBuilder AddJsoncAppSettingsDirectory(
+        this IConfigurationBuilder configBuilder,
+        string basePath,
+        string relativePath = "appsettings")
+    {
+        var directoryPath = Path.Combine(basePath, relativePath);
+        if (!Directory.Exists(directoryPath))
+        {
+            return configBuilder;
+        }
+
+        foreach (var filePath in Directory
+                     .EnumerateFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
+                     .Where(path =>
+                     {
+                         var extension = Path.GetExtension(path);
+                         return extension.Equals(".json", StringComparison.OrdinalIgnoreCase) ||
+                                extension.Equals(".jsonc", StringComparison.OrdinalIgnoreCase);
+                     })
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            configBuilder.Add(new JsoncFileConfigurationSource(filePath));
+        }
+
+        return configBuilder;
+    }
+
     public static IHostBuilder AddJsoncAppSettingsDirectory(this IHostBuilder hostBuilder, string relativePath = "appsettings")
     {
         return hostBuilder.ConfigureAppConfiguration((context, configurationBuilder) =>

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Hosting;
 using Volo.Abp.DependencyInjection;
@@ -25,12 +26,16 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         var totalMemoryBytes = GetTotalMemoryBytes();
         var availableMemoryBytes = GetAvailableMemoryBytes();
         var workingSetBytes = currentProcess.WorkingSet64;
-        var systemUsedMemoryBytes = GetSystemUsedMemoryBytes(totalMemoryBytes, availableMemoryBytes);
+        var systemUsedMemoryBytes = GetSystemUsedMemoryBytes(totalMemoryBytes, availableMemoryBytes)
+            ?? Math.Max(0, totalMemoryBytes - Math.Max(0, availableMemoryBytes));
         var cpuSnapshot = await CaptureCpuUsageAsync(currentProcess);
 
         var result = new PhaseOneSystemMonitorDto
         {
             AvailableMemoryBytes = availableMemoryBytes,
+            CpuUsageNote = OperatingSystem.IsMacOS()
+                ? "当前系统 CPU 使用率按 macOS top 口径展示。"
+                : null,
             CpuTimeSeconds = currentProcess.TotalProcessorTime.TotalSeconds,
             Disks = GetDiskInfos(),
             EnvironmentName = _hostEnvironment.EnvironmentName,
@@ -39,7 +44,7 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             MachineName = Environment.MachineName,
             ManagedMemoryBytes = GC.GetTotalMemory(forceFullCollection: false),
             MemoryUsageNote = OperatingSystem.IsMacOS()
-                ? "当前系统内存使用按 macOS PhysMem 口径展示，包含压缩内存。"
+                ? "当前系统内存使用按 macOS PhysMem 口径展示，已与页面显示的“已用/总量”保持一致。"
                 : null,
             OsArchitecture = RuntimeInformation.OSArchitecture.ToString(),
             OsDescription = RuntimeInformation.OSDescription,
@@ -50,7 +55,8 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             ProcessStartTime = startTime,
             ProcessMemoryUsagePercent = totalMemoryBytes > 0 ? workingSetBytes * 100d / totalMemoryBytes : null,
             SystemCpuUsagePercent = cpuSnapshot.SystemCpuUsagePercent,
-            SystemMemoryUsagePercent = GetSystemMemoryUsagePercent(totalMemoryBytes, availableMemoryBytes, systemUsedMemoryBytes),
+            SystemMemoryUsagePercent = GetSystemMemoryUsagePercent(totalMemoryBytes, systemUsedMemoryBytes),
+            SystemUsedMemoryBytes = systemUsedMemoryBytes,
             TotalMemoryBytes = totalMemoryBytes,
             ThreadCount = currentProcess.Threads.Count,
             UptimeMinutes = Math.Max(0, (now - startTime).TotalMinutes),
@@ -65,20 +71,18 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         try
         {
             var processCpuStart = currentProcess.TotalProcessorTime;
-            var systemCpuStart = GetSystemCpuSample();
             var wallClockStart = DateTime.UtcNow;
 
             await Task.Delay(CpuSampleDurationMilliseconds);
             currentProcess.Refresh();
 
             var processCpuEnd = currentProcess.TotalProcessorTime;
-            var systemCpuEnd = GetSystemCpuSample();
             var wallClockSeconds = (DateTime.UtcNow - wallClockStart).TotalSeconds;
 
             return new PhaseOneCpuSnapshot
             {
                 ProcessCpuUsagePercent = GetProcessCpuUsagePercent(processCpuStart, processCpuEnd, wallClockSeconds),
-                SystemCpuUsagePercent = GetSystemCpuUsagePercent(systemCpuStart, systemCpuEnd)
+                SystemCpuUsagePercent = GetSystemCpuUsagePercent()
             };
         }
         catch
@@ -136,33 +140,21 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         return Math.Round(Math.Clamp(percent, 0, 100), 2);
     }
 
-    private static double? GetSystemCpuUsagePercent(SystemCpuSample? start, SystemCpuSample? end)
+    private static double? GetSystemCpuUsagePercent()
     {
-        if (start is null || end is null)
-        {
-            return null;
-        }
-
-        var totalDelta = end.TotalTicks - start.TotalTicks;
-        var idleDelta = end.IdleTicks - start.IdleTicks;
-        if (totalDelta <= 0)
-        {
-            return null;
-        }
-
-        var usage = (totalDelta - idleDelta) * 100d / totalDelta;
-        return Math.Round(Math.Clamp(usage, 0, 100), 2);
+        return OperatingSystem.IsMacOS()
+            ? GetMacSystemCpuUsagePercent()
+            : GetLinuxSystemCpuUsagePercent();
     }
 
-    private static double? GetSystemMemoryUsagePercent(long totalMemoryBytes, long availableMemoryBytes, long? systemUsedMemoryBytes = null)
+    private static double? GetSystemMemoryUsagePercent(long totalMemoryBytes, long systemUsedMemoryBytes)
     {
         if (totalMemoryBytes <= 0)
         {
             return null;
         }
 
-        var usedBytes = systemUsedMemoryBytes ?? Math.Max(0, totalMemoryBytes - Math.Max(0, availableMemoryBytes));
-        return Math.Round(usedBytes * 100d / totalMemoryBytes, 2);
+        return Math.Round(systemUsedMemoryBytes * 100d / totalMemoryBytes, 2);
     }
 
     private static long? GetSystemUsedMemoryBytes(long totalMemoryBytes, long availableMemoryBytes)
@@ -273,19 +265,32 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         return 0;
     }
 
-    private static SystemCpuSample? GetSystemCpuSample()
+    private static double? GetLinuxSystemCpuUsagePercent()
     {
         try
         {
-            if (OperatingSystem.IsLinux())
+            var start = GetLinuxSystemCpuSample();
+            if (start is null)
             {
-                return GetLinuxSystemCpuSample();
+                return null;
             }
 
-            if (OperatingSystem.IsMacOS())
+            Thread.Sleep(CpuSampleDurationMilliseconds);
+            var end = GetLinuxSystemCpuSample();
+            if (end is null)
             {
-                return GetMacSystemCpuSample();
+                return null;
             }
+
+            var totalDelta = end.TotalTicks - start.TotalTicks;
+            var idleDelta = end.IdleTicks - start.IdleTicks;
+            if (totalDelta <= 0)
+            {
+                return null;
+            }
+
+            var usage = (totalDelta - idleDelta) * 100d / totalDelta;
+            return Math.Round(Math.Clamp(usage, 0, 100), 2);
         }
         catch
         {
@@ -328,7 +333,7 @@ public class PhaseOneSystemMonitorService : ITransientDependency
         return new SystemCpuSample(totalTicks, idleTicks);
     }
 
-    private static SystemCpuSample? GetMacSystemCpuSample()
+    private static double? GetMacSystemCpuUsagePercent()
     {
         var output = ExecuteCommand("/usr/bin/top", "-l 1 -n 0");
         if (string.IsNullOrWhiteSpace(output))
@@ -352,10 +357,7 @@ public class PhaseOneSystemMonitorService : ITransientDependency
             return null;
         }
 
-        const long scale = 10000;
-        var totalTicks = scale;
-        var idleTicks = (long)Math.Round(idle.Value * 100);
-        return new SystemCpuSample(totalTicks, idleTicks);
+        return Math.Round(Math.Clamp(user.Value + system.Value, 0, 100), 2);
     }
 
     private static string? ExecuteCommand(string fileName, string arguments)

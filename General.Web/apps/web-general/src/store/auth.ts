@@ -20,6 +20,29 @@ export const useAuthStore = defineStore('auth', () => {
 
   const loginLoading = ref(false);
 
+  function normalizeHomePath(userInfo: UserInfo) {
+    const allowedAppCodes = (import.meta.env['VITE_GLOB_APP_CODES'] || '')
+      .split(',')
+      .map((item: string) => item.trim())
+      .filter(Boolean);
+
+    if (!userInfo.homePath || allowedAppCodes.length === 0) {
+      return userInfo;
+    }
+
+    const isAllowedHomePath = allowedAppCodes.some(
+      (code: string) =>
+        userInfo.homePath === `/${code}` ||
+        userInfo.homePath.startsWith(`/${code}/`),
+    );
+
+    if (!isAllowedHomePath) {
+      userInfo.homePath = preferences.app.defaultHomePath;
+    }
+
+    return userInfo;
+  }
+
   /**
    * 异步处理登录操作
    * Asynchronously handle the login process
@@ -45,7 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
           getAccessCodesApi(),
         ]);
 
-        userInfo = fetchUserInfoResult;
+        userInfo = normalizeHomePath(fetchUserInfoResult);
 
         userStore.setUserInfo(userInfo);
         accessStore.setAccessCodes(accessCodes);
@@ -99,8 +122,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchUserInfo() {
     const userInfo = await getUserInfoApi();
-    userStore.setUserInfo(userInfo);
-    return userInfo;
+    const normalizedUserInfo = normalizeHomePath(userInfo);
+    userStore.setUserInfo(normalizedUserInfo);
+    return normalizedUserInfo;
   }
 
   function $reset() {

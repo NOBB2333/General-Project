@@ -15,6 +15,9 @@ public class Program
 {
     public async static Task<int> Main(string[] args)
     {
+        // Npgsql 6+ 要求 DateTime 为 UTC；ABP 内部使用 Local，启用兼容模式
+        AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
         Log.Logger = new LoggerConfiguration()
 #if DEBUG
             .MinimumLevel.Debug()
@@ -37,12 +40,16 @@ public class Program
                 .ConfigureAppConfiguration((_, configurationBuilder) =>
                 {
                     var configuration = configurationBuilder.Build();
-                    var normalizedConnectionString = SqliteConnectionStringHelper.Normalize(
-                        configuration.GetConnectionString("Default"));
+                    var rawConnectionString = configuration.GetConnectionString("Default");
+                    var provider = DatabaseProviderDetector.Detect(rawConnectionString);
+
+                    var resolvedConnectionString = provider == DatabaseProvider.PostgreSql
+                        ? rawConnectionString
+                        : SqliteConnectionStringHelper.Normalize(rawConnectionString);
 
                     configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                     {
-                        ["ConnectionStrings:Default"] = normalizedConnectionString
+                        ["ConnectionStrings:Default"] = resolvedConnectionString
                     });
                 })
                 .UseAutofac()

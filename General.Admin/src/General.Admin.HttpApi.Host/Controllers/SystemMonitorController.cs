@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize(Roles = PhaseOneRoleNames.Admin)]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/system-monitor")]
 public class SystemMonitorController : ControllerBase
 {

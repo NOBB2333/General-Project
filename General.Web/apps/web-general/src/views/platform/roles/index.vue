@@ -192,16 +192,25 @@ function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]
 async function loadBaseData() {
   roleLoading.value = true;
   try {
-    const [roleResult, menuResult, organizationResult, userResult] = await Promise.all([
+    const [roleResult, menuResult, organizationResult, userResult] = await Promise.allSettled([
       getRoleListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
       getOrganizationTreeApi(),
       getUserListApi(),
     ]);
-    roles.value = roleResult;
-    treeData.value = normalizeMenuTree(menuResult);
-    organizationTree.value = organizationResult;
-    users.value = userResult;
+    roles.value = roleResult.status === 'fulfilled' ? roleResult.value : [];
+    treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
+    organizationTree.value = organizationResult.status === 'fulfilled' ? organizationResult.value : [];
+    users.value = userResult.status === 'fulfilled' ? userResult.value : [];
+
+    if (
+      roleResult.status === 'rejected' ||
+      menuResult.status === 'rejected' ||
+      organizationResult.status === 'rejected' ||
+      userResult.status === 'rejected'
+    ) {
+      message.warning('角色页面部分数据加载失败，已展示可用内容。');
+    }
   } finally {
     roleLoading.value = false;
   }

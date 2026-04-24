@@ -55,10 +55,22 @@ public class PlatformScheduledJob : FullAuditedAggregateRoot<Guid>
         IsEnabled = isEnabled;
     }
 
+    public void UpdateSchedule(bool isEnabled, DateTime? nextRunTime)
+    {
+        IsEnabled = isEnabled;
+        NextRunTime = nextRunTime;
+    }
+
     public void MarkRun(DateTime runTime, string result, DateTime? nextRunTime)
     {
         LastRunTime = runTime;
-        LastRunResult = result.Trim();
+        LastRunResult = NormalizeResult(result);
         NextRunTime = nextRunTime;
+    }
+
+    private static string NormalizeResult(string? value)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        return normalized.Length <= 256 ? normalized : normalized[..256];
     }
 }

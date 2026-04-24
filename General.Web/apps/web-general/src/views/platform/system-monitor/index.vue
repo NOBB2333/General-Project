@@ -49,12 +49,22 @@ function formatMemoryUsage(usedBytes?: number, totalBytes?: number) {
   return `${formatBytes(usedBytes || 0)}/${formatBytes(totalBytes || 0)}`;
 }
 
+function formatPercent(value?: null | number) {
+  return value === null || value === undefined ? '-' : `${value.toFixed(2)}%`;
+}
+
 onMounted(loadMonitor);
 </script>
 
 <template>
   <Page description="系统监控提供当前服务器环境、进程资源占用和磁盘情况。" title="系统监控">
     <section class="platform-monitor">
+      <Alert
+        v-if="monitor?.cpuUsageNote"
+        :message="monitor.cpuUsageNote"
+        show-icon
+        type="info"
+      />
       <Alert
         v-if="monitor?.memoryUsageNote"
         :message="monitor.memoryUsageNote"
@@ -65,21 +75,19 @@ onMounted(loadMonitor);
       <Row :gutter="[16, 16]">
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
-            <Statistic
-              title="CPU 使用率"
-              :value="monitor ? `${(monitor.processCpuUsagePercent ?? 0).toFixed(2)}% / ${(monitor.systemCpuUsagePercent ?? 0).toFixed(2)}%` : '-'"
-            />
-            <!-- <div class="platform-monitor__note">当前程序 / 系统总占用率</div> -->
+            <Statistic title="系统 CPU 使用率" :value="formatPercent(monitor?.systemCpuUsagePercent)" />
+          </Card>
+        </Col>
+        <Col :lg="6" :md="12" :span="24">
+          <Card :bordered="false">
+            <Statistic title="进程 CPU 使用率" :value="formatPercent(monitor?.processCpuUsagePercent)" />
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
           <Card :bordered="false">
             <Statistic
               title="系统内存使用"
-              :value="formatMemoryUsage(
-                Math.round((monitor?.systemMemoryUsagePercent || 0) / 100 * (monitor?.totalMemoryBytes || 0)),
-                monitor?.totalMemoryBytes
-              )"
+              :value="formatMemoryUsage(monitor?.systemUsedMemoryBytes, monitor?.totalMemoryBytes)"
             />
           </Card>
         </Col>
@@ -89,11 +97,6 @@ onMounted(loadMonitor);
               title="进程内存使用"
               :value="formatMemoryUsage(monitor?.workingSetBytes, monitor?.processMemoryDisplayDenominatorBytes)"
             />
-          </Card>
-        </Col>
-        <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
-            <Statistic title="CPU 核心数" :value="monitor?.processorCount || 0" />
           </Card>
         </Col>
       </Row>
@@ -139,10 +142,10 @@ onMounted(loadMonitor);
                 {{ formatBytes(monitor?.workingSetBytes || 0) }}
               </Descriptions.Item>
               <Descriptions.Item label="系统内存占比">
-                {{ monitor?.systemMemoryUsagePercent?.toFixed(2) || '0.00' }}%
+                {{ formatPercent(monitor?.systemMemoryUsagePercent) }}
               </Descriptions.Item>
               <Descriptions.Item label="进程内存占比">
-                {{ monitor?.processMemoryUsagePercent?.toFixed(2) || '0.00' }}%
+                {{ formatPercent(monitor?.processMemoryUsagePercent) }}
               </Descriptions.Item>
               <Descriptions.Item label="托管堆">
                 {{ formatBytes(monitor?.managedMemoryBytes || 0) }}
@@ -150,6 +153,7 @@ onMounted(loadMonitor);
               <Descriptions.Item label="可用内存上限">
                 {{ formatBytes(monitor?.availableMemoryBytes || 0) }}
               </Descriptions.Item>
+              <Descriptions.Item label="CPU 核心数">{{ monitor?.processorCount || 0 }}</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>

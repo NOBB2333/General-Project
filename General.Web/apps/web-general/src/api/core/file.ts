@@ -1,6 +1,14 @@
 import { requestClient } from '#/api/request';
 
 export namespace FileApi {
+  export interface FileListQuery {
+    category?: string;
+    keyword?: string;
+    uploadedBy?: string;
+    uploadedFrom?: string;
+    uploadedTo?: string;
+  }
+
   export interface FileItem {
     category: string;
     contentType: string;
@@ -14,8 +22,8 @@ export namespace FileApi {
   }
 }
 
-export async function getFileListApi() {
-  return requestClient.get<FileApi.FileItem[]>('/app/file/list');
+export async function getFileListApi(params: FileApi.FileListQuery = {}) {
+  return requestClient.get<FileApi.FileItem[]>('/app/file/list', { params });
 }
 
 export async function uploadFileApi(file: File, payload?: { category?: string; parentPath?: null | string }) {

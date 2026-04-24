@@ -15,20 +15,31 @@ public class AdminDbContextFactory : IDesignTimeDbContextFactory<AdminDbContext>
         AdminEfCoreEntityExtensionMappings.Configure();
 
         var configuration = BuildConfiguration();
-        var connectionString = SqliteConnectionStringHelper.Normalize(
-            configuration.GetConnectionString("Default"));
+        var rawConnectionString = configuration.GetConnectionString("Default");
+        var provider = DatabaseProviderDetector.Detect(rawConnectionString);
 
-        var builder = new DbContextOptionsBuilder<AdminDbContext>()
-            .UseSqlite(connectionString);
+        var builder = new DbContextOptionsBuilder<AdminDbContext>();
+
+        if (provider == DatabaseProvider.PostgreSql)
+        {
+            builder.UseNpgsql(rawConnectionString);
+        }
+        else
+        {
+            builder.UseSqlite(SqliteConnectionStringHelper.Normalize(rawConnectionString));
+        }
 
         return new AdminDbContext(builder.Options);
     }
 
     private static IConfigurationRoot BuildConfiguration()
     {
+        var basePath = Path.Combine(Directory.GetCurrentDirectory(), "../General.Admin.DbMigrator/");
+
         var builder = new ConfigurationBuilder()
-            .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../General.Admin.DbMigrator/"))
-            .AddJsonFile("appsettings.json", optional: false);
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsoncAppSettingsDirectory(basePath); // 加载 appsettings/*.jsonc
 
         return builder.Build();
     }

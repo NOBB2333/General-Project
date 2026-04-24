@@ -7,6 +7,7 @@ using General.Admin.Infrastructure;
 using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Volo.Abp.Linq;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Auditing;
 using Volo.Abp.Users;
@@ -25,51 +26,111 @@ public class FileUploadInput
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/file")]
 public class FileController : ControllerBase
 {
     private readonly IWebHostEnvironment _environment;
     private readonly ICurrentUser _currentUser;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly IRepository<AppPlatformFile, Guid> _platformFileRepository;
     private readonly IRepository<Volo.Abp.Identity.IdentityUser, Guid> _userRepository;
 
     public FileController(
         IWebHostEnvironment environment,
         ICurrentUser currentUser,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         IRepository<AppPlatformFile, Guid> platformFileRepository,
         IRepository<Volo.Abp.Identity.IdentityUser, Guid> userRepository)
     {
         _environment = environment;
         _currentUser = currentUser;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _platformFileRepository = platformFileRepository;
         _userRepository = userRepository;
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneFileItemDto>>>> GetListAsync()
+    public async Task<ActionResult<ApiResponse<List<PhaseOneFileItemDto>>>> GetListAsync([FromQuery] PhaseOneFileListInput input)
     {
-        var users = (await _userRepository.GetListAsync()).ToDictionary(x => x.Id);
-        var files = (await _platformFileRepository.GetListAsync())
-            .OrderByDescending(x => x.CreationTime)
-            .Select(x =>
-            {
-                users.TryGetValue(x.UploadedByUserId ?? Guid.Empty, out var user);
-                return new PhaseOneFileItemDto
-                {
-                    Category = x.Category,
-                    ContentType = x.ContentType,
-                    FileKey = x.FileKey,
-                    FileName = x.FileName,
-                    ParentPath = x.ParentPath,
-                    Size = x.Size,
-                    StorageLocation = x.StorageLocation,
-                    UploadedAt = x.CreationTime,
-                    UploadedBy = user?.UserName
-                };
-            })
-            .ToList();
+        var queryable = await _platformFileRepository.GetQueryableAsync();
+        var keyword = input.Keyword?.Trim();
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            queryable = queryable.Where(x =>
+                x.FileName.Contains(keyword) ||
+                x.ContentType.Contains(keyword) ||
+                x.StorageLocation.Contains(keyword) ||
+                (x.ParentPath != null && x.ParentPath.Contains(keyword)));
+        }
 
-        return ApiResponse<List<PhaseOneFileItemDto>>.Ok(files);
+        if (!string.IsNullOrWhiteSpace(input.Category))
+        {
+            var category = input.Category.Trim();
+            queryable = queryable.Where(x => x.Category == category);
+        }
+
+        if (input.UploadedFrom.HasValue)
+        {
+            queryable = queryable.Where(x => x.CreationTime >= input.UploadedFrom.Value);
+        }
+
+        if (input.UploadedTo.HasValue)
+        {
+            var uploadedTo = input.UploadedTo.Value.Date.AddDays(1);
+            queryable = queryable.Where(x => x.CreationTime < uploadedTo);
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.UploadedBy))
+        {
+            var uploadedBy = input.UploadedBy.Trim();
+            var userQueryable = await _userRepository.GetQueryableAsync();
+            var uploaderIds = await _asyncQueryableExecuter.ToListAsync(
+                userQueryable
+                    .Where(x =>
+                        (x.UserName != null && x.UserName.Contains(uploadedBy)) ||
+                        (x.Name != null && x.Name.Contains(uploadedBy)))
+                    .Select(x => x.Id));
+
+            if (uploaderIds.Count == 0)
+            {
+                return ApiResponse<List<PhaseOneFileItemDto>>.Ok([]);
+            }
+
+            queryable = queryable.Where(x => x.UploadedByUserId.HasValue && uploaderIds.Contains(x.UploadedByUserId.Value));
+        }
+
+        var files = await _asyncQueryableExecuter.ToListAsync(
+            queryable.OrderByDescending(x => x.CreationTime));
+        var userIds = files
+            .Where(x => x.UploadedByUserId.HasValue)
+            .Select(x => x.UploadedByUserId!.Value)
+            .Distinct()
+            .ToList();
+        var users = userIds.Count == 0
+            ? new Dictionary<Guid, Volo.Abp.Identity.IdentityUser>()
+            : (await _userRepository.GetListAsync())
+                .Where(x => userIds.Contains(x.Id))
+                .ToDictionary(x => x.Id);
+
+        var result = files.Select(x =>
+        {
+            users.TryGetValue(x.UploadedByUserId ?? Guid.Empty, out var user);
+            return new PhaseOneFileItemDto
+            {
+                Category = x.Category,
+                ContentType = x.ContentType,
+                FileKey = x.FileKey,
+                FileName = x.FileName,
+                ParentPath = x.ParentPath,
+                Size = x.Size,
+                StorageLocation = x.StorageLocation,
+                UploadedAt = x.CreationTime,
+                UploadedBy = user?.UserName
+            };
+        }).ToList();
+
+        return ApiResponse<List<PhaseOneFileItemDto>>.Ok(result);
     }
 
     [Authorize(Roles = PhaseOneRoleNames.Admin)]

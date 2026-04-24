@@ -5,6 +5,7 @@ export namespace SchedulerApi {
     cronExpression: string;
     description: string;
     isEnabled: boolean;
+    isRunning: boolean;
     jobKey: string;
     lastRunResult: string;
     lastRunTime?: null | string;
@@ -24,5 +25,5 @@ export async function toggleSchedulerJobApi(jobKey: string, isEnabled: boolean) 
 }
 
 export async function runSchedulerJobApi(jobKey: string) {
-  return requestClient.post(`/app/platform/scheduler/${jobKey}/run`);
+  return requestClient.post<string>(`/app/platform/scheduler/${jobKey}/run`);
 }

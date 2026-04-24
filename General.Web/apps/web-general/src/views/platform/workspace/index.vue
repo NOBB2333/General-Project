@@ -4,18 +4,12 @@ import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tag, Timeline } from 'ant-design-vue';
+import { Button, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tag, Timeline, message } from 'ant-design-vue';
 
 import {
-  getAuditLogDashboardApi,
-  getFileListApi,
-  getOrganizationTreeApi,
-  getOnlineUserListApi,
-  getRoleListApi,
-  getTenantListApi,
-  getUpdateLogListApi,
   getUserInfoApi,
-  getUserListApi,
+  getPlatformWorkspaceSummaryApi,
+  type WorkspaceApi,
 } from '#/api/core';
 
 defineOptions({ name: 'PlatformWorkspacePage' });
@@ -23,17 +17,17 @@ defineOptions({ name: 'PlatformWorkspacePage' });
 const router = useRouter();
 
 const loading = ref(true);
-const summary = ref({
-  exceptionLogs: 0,
-  files: 0,
-  onlineUsers: 0,
-  organizations: 0,
-  roles: 0,
-  tenants: 0,
-  updateLogs: 0,
-  users: 0,
+const summary = ref<WorkspaceApi.SummaryItem>({
+  attentionItems: [],
+  exceptionLogCount: 0,
+  fileCount: 0,
+  onlineUserCount: 0,
+  organizationCount: 0,
+  roleCount: 0,
+  tenantCount: 0,
+  updateLogCount: 0,
+  userCount: 0,
 });
-const highlights = ref<string[]>([]);
 const userInfo = ref<null | {
   desc?: string;
   realName?: string;
@@ -59,42 +53,53 @@ const timelineItems = computed(() => [
   '平台首页已切到独立工作台，避免默认落到项目端页面。',
 ]);
 
-function flattenOrganizationCount(items: Array<{ children: any[] }>): number {
-  return items.reduce((count, item) => count + 1 + flattenOrganizationCount(item.children || []), 0);
+const metricItems = computed(() => [
+  ['组织节点', summary.value.organizationCount],
+  ['平台用户', summary.value.userCount],
+  ['角色数量', summary.value.roleCount],
+  ['租户数量', summary.value.tenantCount],
+  ['文件数量', summary.value.fileCount],
+  ['在线会话', summary.value.onlineUserCount],
+  ['异常日志', summary.value.exceptionLogCount],
+  ['更新记录', summary.value.updateLogCount],
+]);
+
+function resolveAttentionColor(level: string) {
+  return {
+    error: 'error',
+    info: 'blue',
+    warning: 'warning',
+  }[level] || 'default';
 }
 
 async function loadWorkspace() {
   loading.value = true;
   try {
-    const [organizations, users, roles, tenants, files, onlineUsers, updateLogs, currentUser, logDashboard] = await Promise.all([
-      getOrganizationTreeApi(),
-      getUserListApi(),
-      getRoleListApi(),
-      getTenantListApi(),
-      getFileListApi(),
-      getOnlineUserListApi(),
-      getUpdateLogListApi(),
+    const [summaryResult, currentUserResult] = await Promise.allSettled([
+      getPlatformWorkspaceSummaryApi(),
       getUserInfoApi(),
-      getAuditLogDashboardApi({ maxResultCount: 100 }),
     ]);
+    summary.value =
+      summaryResult.status === 'fulfilled'
+        ? summaryResult.value
+        : {
+            attentionItems: [],
+            exceptionLogCount: 0,
+            fileCount: 0,
+            onlineUserCount: 0,
+            organizationCount: 0,
+            roleCount: 0,
+            tenantCount: 0,
+            updateLogCount: 0,
+            userCount: 0,
+          };
+    userInfo.value = currentUserResult.status === 'fulfilled'
+      ? (currentUserResult.value as any)
+      : null;
 
-    summary.value = {
-      exceptionLogs: logDashboard.exceptionLogs.length,
-      files: files.length,
-      onlineUsers: onlineUsers.length,
-      organizations: flattenOrganizationCount(organizations),
-      roles: roles.length,
-      tenants: tenants.length,
-      updateLogs: updateLogs.length,
-      users: users.length,
-    };
-    highlights.value = [
-      `待处理授权事项：${roles.filter((item) => item.apiBlacklist.length > 0).length} 个角色使用了接口黑名单`,
-      `系统告警摘要：最近聚合到 ${logDashboard.exceptionLogs.length} 条异常日志`,
-      `在线会话摘要：当前 ${onlineUsers.length} 个在线账号`,
-      `版本动态：已维护 ${updateLogs.length} 条更新记录`,
-    ];
-    userInfo.value = currentUser as any;
+    if (summaryResult.status === 'rejected' || currentUserResult.status === 'rejected') {
+      message.warning('工作台部分数据加载失败，已展示可用内容。');
+    }
   } finally {
     loading.value = false;
   }
@@ -131,16 +136,7 @@ onMounted(loadWorkspace);
         </Card>
 
         <Row :gutter="[16, 16]">
-          <Col v-for="item in [
-            ['组织节点', summary.organizations],
-            ['平台用户', summary.users],
-            ['角色数量', summary.roles],
-            ['租户数量', summary.tenants],
-            ['文件数量', summary.files],
-            ['在线会话', summary.onlineUsers],
-            ['异常日志', summary.exceptionLogs],
-            ['更新记录', summary.updateLogs],
-          ]" :key="item[0]" :lg="4" :md="8" :span="24">
+          <Col v-for="item in metricItems" :key="item[0]" :lg="4" :md="8" :span="24">
             <Card :bordered="false" class="platform-workspace__metric">
               <Statistic :title="item[0]" :value="item[1]" />
             </Card>
@@ -169,10 +165,31 @@ onMounted(loadWorkspace);
           <Col :lg="10" :span="24">
             <Card :bordered="false" title="治理摘要">
               <Timeline>
-                <Timeline.Item v-for="item in [...timelineItems, ...highlights]" :key="item">
+                <Timeline.Item v-for="item in timelineItems" :key="item">
                   {{ item }}
                 </Timeline.Item>
               </Timeline>
+              <div class="platform-workspace__attention">
+                <div
+                  v-for="item in summary.attentionItems"
+                  :key="item.key"
+                  class="platform-workspace__attention-item"
+                >
+                  <div class="platform-workspace__attention-head">
+                    <Tag :color="resolveAttentionColor(item.level)">{{ item.title }}</Tag>
+                    <Button
+                      v-if="item.link"
+                      size="small"
+                      type="link"
+                      @click="router.push(item.link)"
+                    >
+                      前往处理
+                    </Button>
+                  </div>
+                  <p>{{ item.detail }}</p>
+                </div>
+                <Empty v-if="summary.attentionItems.length === 0" description="当前暂无待处理治理事项" />
+              </div>
             </Card>
           </Col>
         </Row>
@@ -236,6 +253,33 @@ onMounted(loadWorkspace);
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.platform-workspace__attention {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.platform-workspace__attention-item {
+  padding: 12px 14px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 14px;
+  background: var(--ant-color-fill-quaternary);
+}
+
+.platform-workspace__attention-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.platform-workspace__attention-item p {
+  margin: 8px 0 0;
+  color: var(--ant-color-text-secondary);
+  line-height: 1.7;
 }
 
 .platform-workspace__entry {

@@ -12,3 +12,4 @@ export * from './system-monitor';
 export * from './tenant';
 export * from './update-log';
 export * from './user';
+export * from './workspace';

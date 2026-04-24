@@ -44,9 +44,7 @@
 - 目录：`General.Web`
 - 技术栈：Vue 3 + Vite + TypeScript + Vben Admin
 - 管理方式：`pnpm workspace` + `turbo`
-- 当前主要应用：
-  - `General.Web/apps/web-general`
-  - `General.Web/apps/web-general-platform`
+- 当前主要应用：`General.Web/apps/web-general`（同一套源码同时承载完整业务版与平台中心版）
 
 前端负责：
 
@@ -103,6 +101,13 @@ cd /Users/wong/Code/CsharpLang/General-admin/General.Admin
 ```bash
 dotnet run --project src/General.Admin.DbMigrator
 ```
+
+数据库说明：
+
+- 默认配置 SQLite，本地无需安装数据库服务
+- 切到 PostgreSQL：修改 `General.Admin.DbMigrator/appsettings/20-connection-strings.jsonc`，取消 PostgreSQL 行注释，注释 SQLite 行
+- PostgreSQL 模式下 EF Core 会**自动建库**，无需手动 `CREATE DATABASE`
+- 当前迁移文件为 PostgreSQL 专用（类型使用 `bytea`/`double precision` 等 PG 原生类型）
 
 然后启动后端主服务。  
 如果你使用 IDE，直接打开 `General.Admin` 解决方案并启动 Web 主项目即可。  
@@ -168,7 +173,7 @@ dotnet run
 
 1. 启动 `General.Admin.DbMigrator`，确保数据库结构和种子数据已准备完成
 2. 启动后端服务
-3. 启动前端 `web-general` 或 `web-general-platform`
+3. 启动前端 `web-general`（完整业务版）或 `web-general` 的 platform 模式（平台中心版）
 4. 如需桌面联调，再启动 `General.Desktop`
 
 ### 6. 入口说明
@@ -178,3 +183,113 @@ dotnet run
 - 桌面端说明文件：[General.Desktop/README.md](/Users/wong/Code/CsharpLang/General-admin/General.Desktop/README.md:1)
 
 如果后续需要，我可以继续把这个 README 再补成“开发版”和“部署版”两套说明。
+
+## 四、Linux 生产环境部署
+
+### 1. 部署架构
+
+```
+浏览器
+  ├─ http://server:8094/          → Nginx 服务前端静态文件
+  └─ http://server:8094/api/...   → Nginx 反向代理 → 后端 :5007
+```
+
+- 前端页面由 Nginx 静态服务（端口 8094）
+- API 请求以相对路径 `/api` 发出，Nginx 统一代理到后端（端口 5007）
+- 前端运行时配置 `_app.config.js` 由部署脚本注入，**无需重新构建前端**即可切换后端地址
+- 分布式部署时只需将 Nginx `proxy_pass` 指向新后端地址，其他不变
+
+### 2. 服务器前置条件
+
+```bash
+# .NET 10 运行时
+sudo apt install dotnet-runtime-10.0
+
+# PostgreSQL（已安装可跳过；数据库会在首次迁移时自动建库）
+
+# Nginx（已安装可跳过）
+sudo apt install nginx
+```
+
+### 3. Nginx 配置（一次性设置）
+
+将 `General.Web/scripts/deploy/nginx.conf` 中的 `server {}` 块加入服务器 Nginx 配置，核心内容：
+
+```nginx
+server {
+    listen 8094;
+
+    location / {
+        root /home/wong/Desktop/Code/CsharpLang/General-Project/web-general;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 后端代理 —— 若后端迁移到其他服务器，只改此处 proxy_pass
+    location /api/ {
+        proxy_pass http://127.0.0.1:5007/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### 4. 部署配置
+
+`Script/deploy-to-linux.py` 顶部配置区首次按实际情况修改一次：
+
+| 参数 | 说明 |
+|------|------|
+| `LAN_SERVER` / `WAN_SERVER` | SSH 连接信息（局域网 / 公网） |
+| `BACKEND_SERVER_DIR` | 服务器后端部署目录 |
+| `WEB_SERVER_DIR` | 服务器前端部署目录 |
+| `PG_CONNECTION_STRING` | PostgreSQL 连接串 |
+| `VITE_GLOB_API_URL` | 前端 API 基础路径，默认 `/api`（Nginx 代理） |
+
+### 5. 本机构建
+
+```bash
+sh Script/package-all.sh
+```
+
+构建输出到 `build/backend`（后端）和 `build/web-general`（前端）。
+
+### 6. 部署命令
+
+```bash
+# 首次部署：全量上传 + 自动建库 + 迁移 + 启动
+python Script/deploy-to-linux.py --init
+
+# 日常更新后端
+python Script/deploy-to-linux.py
+
+# 日常更新后端 + 前端
+python Script/deploy-to-linux.py --web
+
+# 仅更新前端（不重启后端）
+python Script/deploy-to-linux.py --web-only
+
+# 仅运行数据库迁移
+python Script/deploy-to-linux.py --migrate
+
+# 仅重启后端
+python Script/deploy-to-linux.py --restart
+
+# 使用公网 SSH 通道（在 LAN 外时用）
+python Script/deploy-to-linux.py wan --init
+python Script/deploy-to-linux.py wan
+```
+
+### 7. 服务器手动命令（直接在 Linux 上执行）
+
+```bash
+cd /home/wong/Desktop/Code/CsharpLang/General-Project/backend
+
+# 运行数据库迁移
+./migrate-db.sh
+
+# 前台启动后端（调试用）
+./start-backend.sh
+
+# 后台运行，日志写入 logs/
+nohup ./start-backend.sh > logs/backend.log 2>&1 &
+```

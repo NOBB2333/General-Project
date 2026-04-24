@@ -19,7 +19,10 @@
     "build": "pnpm vite build --mode production",
     "build:analyze": "pnpm vite build --mode analyze",
     "build:desktop": "pnpm vite build --mode desktop",
+    "build:platform": "cross-env VITE_APP_TITLE=\"General Platform Center\" VITE_APP_NAMESPACE=general-web-general-platform VITE_APP_STORE_SECURE_KEY=general-admin-web-general-platform-key VITE_APP_DEFAULT_HOME_PATH=/platform/workspace VITE_GLOB_APP_CODES=platform pnpm vite build --mode production",
+    "build:platform:desktop": "cross-env VITE_APP_TITLE=\"General Platform Center\" VITE_APP_NAMESPACE=general-web-general-platform VITE_APP_STORE_SECURE_KEY=general-admin-web-general-platform-key VITE_APP_DEFAULT_HOME_PATH=/platform/workspace VITE_GLOB_APP_CODES=platform pnpm vite build --mode desktop",
     "dev": "pnpm vite --mode development",
+    "dev:platform": "cross-env VITE_APP_TITLE=\"General Platform Center\" VITE_APP_NAMESPACE=general-web-general-platform VITE_APP_STORE_SECURE_KEY=general-admin-web-general-platform-key VITE_APP_DEFAULT_HOME_PATH=/platform/workspace VITE_GLOB_APP_CODES=platform VITE_PORT=5678 pnpm vite --mode development",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit --skipLibCheck"
   },

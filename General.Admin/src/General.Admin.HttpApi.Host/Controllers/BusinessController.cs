@@ -8,6 +8,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Business)]
 [Route("api/app/business")]
 public class BusinessController : ControllerBase
 {

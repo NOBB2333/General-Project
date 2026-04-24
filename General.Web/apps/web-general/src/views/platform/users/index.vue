@@ -31,6 +31,7 @@ import {
   getOrganizationTreeApi,
   getRoleListApi,
   getUserListApi,
+  resetUserPasswordApi,
   updateUserApi,
 } from '#/api/core';
 
@@ -71,6 +72,9 @@ interface TreeSelectNode {
 const keyword = ref('');
 const loading = ref(false);
 const modalVisible = ref(false);
+const resetPasswordSaving = ref(false);
+const resetPasswordValue = ref('1q2w3E*');
+const resetPasswordVisible = ref(false);
 const saving = ref(false);
 const editingUserId = ref<null | string>(null);
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
@@ -84,6 +88,7 @@ const onlineVisible = ref(false);
 const onlineLoading = ref(false);
 const mappingVisible = ref(false);
 const activeMappingUser = ref<null | UserApi.UserListItem>(null);
+const activeResetUser = ref<null | UserApi.UserListItem>(null);
 
 const formState = reactive<any>({
   displayName: '',
@@ -124,9 +129,19 @@ function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): TreeSelec
 }
 
 async function loadFilters() {
-  const [tree, roles] = await Promise.all([getOrganizationTreeApi(), getRoleListApi()]);
-  organizationTree.value = tree;
-  roleItems.value = roles;
+  const [treeResult, roleResult] = await Promise.allSettled([
+    getOrganizationTreeApi(),
+    getRoleListApi(),
+  ]);
+  if (treeResult.status === 'fulfilled') {
+    organizationTree.value = treeResult.value;
+  }
+  if (roleResult.status === 'fulfilled') {
+    roleItems.value = roleResult.value;
+  }
+  if (treeResult.status === 'rejected' || roleResult.status === 'rejected') {
+    message.warning('筛选条件部分加载失败，稍后可重试。');
+  }
 }
 
 async function loadUsers() {
@@ -141,6 +156,9 @@ async function loadUsers() {
       organizationUnitId: organizationUnitId.value || undefined,
       roleName: roleName.value || undefined,
     });
+  } catch {
+    users.value = [];
+    message.error('用户列表加载失败');
   } finally {
     loading.value = false;
   }
@@ -150,15 +168,22 @@ async function loadOnlineUsers() {
   onlineLoading.value = true;
   try {
     onlineUsers.value = await getOnlineUserListApi();
+  } catch {
+    onlineUsers.value = [];
+    message.error('在线会话加载失败');
   } finally {
     onlineLoading.value = false;
   }
 }
 
+async function refreshUserData() {
+  await Promise.allSettled([loadUsers(), loadOnlineUsers()]);
+}
+
 async function handleForceLogout(record: OnlineUserApi.OnlineUserItem) {
   await forceLogoutOnlineUserApi(record.userId);
   message.success(`已强制下线账号 ${record.userName}`);
-  await Promise.all([loadOnlineUsers(), loadUsers()]);
+  await refreshUserData();
 }
 
 function openOnlineDrawer() {
@@ -185,6 +210,12 @@ function openCreate() {
   formState.roleNames = [];
   formState.username = '';
   modalVisible.value = true;
+}
+
+function openResetPassword(record: UserApi.UserListItem) {
+  activeResetUser.value = record;
+  resetPasswordValue.value = '1q2w3E*';
+  resetPasswordVisible.value = true;
 }
 
 function openEdit(record: UserApi.UserListItem) {
@@ -242,7 +273,7 @@ async function handleSubmit() {
     }
 
     modalVisible.value = false;
-    await Promise.all([loadUsers(), loadOnlineUsers()]);
+    await refreshUserData();
   } finally {
     saving.value = false;
   }
@@ -251,7 +282,28 @@ async function handleSubmit() {
 async function handleDelete(id: string) {
   await deleteUserApi(id);
   message.success('用户已删除');
-  await Promise.all([loadUsers(), loadOnlineUsers()]);
+  await refreshUserData();
+}
+
+async function handleResetPassword() {
+  if (!activeResetUser.value) {
+    return;
+  }
+  if (!resetPasswordValue.value.trim()) {
+    message.warning('请输入新密码');
+    return;
+  }
+
+  resetPasswordSaving.value = true;
+  try {
+    await resetUserPasswordApi(activeResetUser.value.id, {
+      newPassword: resetPasswordValue.value.trim(),
+    });
+    message.success(`已重置账号 ${activeResetUser.value.username} 的密码`);
+    resetPasswordVisible.value = false;
+  } finally {
+    resetPasswordSaving.value = false;
+  }
 }
 
 async function handleToggleStatus(record: UserApi.UserListItem, checked: boolean) {
@@ -271,7 +323,7 @@ async function handleToggleStatus(record: UserApi.UserListItem, checked: boolean
 
   await updateUserApi(record.id, payload);
   message.success(`账号已${checked ? '启用' : '停用'}`);
-  await Promise.all([loadUsers(), loadOnlineUsers()]);
+  await refreshUserData();
 }
 
 async function resetFilters() {
@@ -283,7 +335,8 @@ async function resetFilters() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadFilters(), loadUsers(), loadOnlineUsers()]);
+  await loadFilters();
+  await refreshUserData();
 });
 </script>
 
@@ -405,6 +458,13 @@ onMounted(async () => {
                   @click="openMappingDrawer(record as UserApi.UserListItem)"
                 >
                   映射记录
+                </Button>
+                <Button
+                  size="small"
+                  type="link"
+                  @click="openResetPassword(record as UserApi.UserListItem)"
+                >
+                  重置密码
                 </Button>
                 <Button
                   size="small"
@@ -587,6 +647,26 @@ onMounted(async () => {
             />
           </Form.Item>
         </div>
+      </Form>
+    </Modal>
+
+    <Modal
+      v-model:open="resetPasswordVisible"
+      :confirm-loading="resetPasswordSaving"
+      title="重置用户密码"
+      @ok="handleResetPassword"
+    >
+      <Form layout="vertical">
+        <Form.Item label="目标账号">
+          <Input :value="activeResetUser?.username || '-'" disabled />
+        </Form.Item>
+        <Form.Item label="新密码" required>
+          <Input.Password
+            v-model:value="resetPasswordValue"
+            :maxlength="128"
+            placeholder="请输入新的初始化密码"
+          />
+        </Form.Item>
       </Form>
     </Modal>
   </Page>

@@ -100,7 +100,7 @@ const columns = [
   { dataIndex: 'adminUserName', key: 'adminUserName', title: '管理员账号', width: 140 },
   { dataIndex: 'adminEmail', key: 'adminEmail', title: '管理员邮箱', width: 220 },
   { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 90 },
-  { dataIndex: 'defaultConnectionString', key: 'defaultConnectionString', title: '默认连接串' },
+  { dataIndex: 'defaultConnectionStringDisplay', key: 'defaultConnectionStringDisplay', title: '连接配置', width: 220 },
   { dataIndex: 'remark', key: 'remark', title: '备注', width: 220 },
   { dataIndex: 'creationTime', key: 'creationTime', title: '创建时间', width: 180 },
   { key: 'actions', title: '操作', width: 420 },
@@ -160,17 +160,28 @@ function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): UiTree
 async function loadTenants() {
   loading.value = true;
   try {
-    const [tenants, menus] = await Promise.all([
+    const [tenantResult, menuResult, userResult] = await Promise.allSettled([
       getTenantListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
+      getUserListApi(),
     ]);
-    items.value = tenants;
-    treeData.value = normalizeMenuTree(menus);
-    const users = await getUserListApi();
-    userOptions.value = users.map((item) => ({
-      label: `${item.username} · ${item.displayName}`,
-      value: item.id,
-    }));
+    items.value = tenantResult.status === 'fulfilled' ? tenantResult.value : [];
+    treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
+    userOptions.value =
+      userResult.status === 'fulfilled'
+        ? userResult.value.map((item) => ({
+            label: `${item.username} · ${item.displayName}`,
+            value: item.id,
+          }))
+        : [];
+
+    if (
+      tenantResult.status === 'rejected' ||
+      menuResult.status === 'rejected' ||
+      userResult.status === 'rejected'
+    ) {
+      message.warning('租户页面部分数据加载失败，已展示可用内容。');
+    }
   } finally {
     loading.value = false;
   }
@@ -313,6 +324,14 @@ loadTenants();
               <template v-else-if="column.key === 'remark'">
                 {{ record.remark || '-' }}
               </template>
+              <template v-else-if="column.key === 'defaultConnectionStringDisplay'">
+                <Space size="small">
+                  <Tag :color="record.hasDefaultConnectionString ? 'success' : 'default'">
+                    {{ record.hasDefaultConnectionString ? '已配置' : '未配置' }}
+                  </Tag>
+                  <span>{{ record.defaultConnectionStringDisplay || '-' }}</span>
+                </Space>
+              </template>
               <template v-else-if="column.key === 'actions'">
                 <Space wrap>
                   <Popconfirm
@@ -350,7 +369,7 @@ loadTenants();
             <Input
               v-model:value="formState.defaultConnectionString"
               :maxlength="512"
-              placeholder="可选，不填则沿用默认数据库"
+              placeholder="仅创建时填写，列表页不会再展示原始连接串"
             />
           </Form.Item>
           <Form.Item label="管理员账号">

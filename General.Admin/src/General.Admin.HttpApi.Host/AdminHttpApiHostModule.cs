@@ -196,6 +196,8 @@ public class AdminHttpApiHostModule : AbpModule
         context.Services.AddScoped<PlatformEndpointBlacklistFilter>();
         context.Services.AddTransient<PhaseOneRequestAuditMiddleware>();
         context.Services.AddTransient<PhaseOneUserActivityMiddleware>();
+        context.Services.AddHostedService<PhaseOneRequestAuditFlushBackgroundService>();
+        context.Services.AddHostedService<PlatformSchedulerBackgroundService>();
         context.Services.AddAbpSwaggerGenWithOAuth(
             configuration["AuthServer:Authority"]!,
             new Dictionary<string, string>
@@ -204,8 +206,20 @@ public class AdminHttpApiHostModule : AbpModule
             },
             options =>
             {
-                options.SwaggerDoc("v1", new OpenApiInfo { Title = "Admin API", Version = "v1" });
-                options.DocInclusionPredicate((docName, description) => true);
+                options.SwaggerDoc(ApiDocGroups.Common, new OpenApiInfo { Title = "Admin API - Common", Version = "v1" });
+                options.SwaggerDoc(ApiDocGroups.Platform, new OpenApiInfo { Title = "Admin API - Platform", Version = "v1" });
+                options.SwaggerDoc(ApiDocGroups.Project, new OpenApiInfo { Title = "Admin API - Project", Version = "v1" });
+                options.SwaggerDoc(ApiDocGroups.Business, new OpenApiInfo { Title = "Admin API - Business", Version = "v1" });
+                options.DocInclusionPredicate((docName, description) =>
+                {
+                    var groupName = description.GroupName;
+                    if (string.IsNullOrWhiteSpace(groupName))
+                    {
+                        groupName = ApiDocGroups.Common;
+                    }
+
+                    return string.Equals(docName, groupName, StringComparison.OrdinalIgnoreCase);
+                });
                 options.CustomSchemaIds(type => type.FullName);
             });
     }
@@ -266,7 +280,10 @@ public class AdminHttpApiHostModule : AbpModule
         app.UseSwagger();
         app.UseAbpSwaggerUI(c =>
         {
-            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Admin API");
+            c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Common}/swagger.json", "Admin API - Common");
+            c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Platform}/swagger.json", "Admin API - Platform");
+            c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Project}/swagger.json", "Admin API - Project");
+            c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Business}/swagger.json", "Admin API - Business");
 
             var configuration = context.ServiceProvider.GetRequiredService<IConfiguration>();
             c.OAuthClientId(configuration["AuthServer:SwaggerClientId"]);

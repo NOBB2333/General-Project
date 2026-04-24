@@ -26,6 +26,7 @@ import {
   getOrganizationTreeApi,
   getUserListApi,
   moveOrganizationUnitApi,
+  transferOrganizationMembersApi,
   updateOrganizationUnitApi,
 } from '#/api/core';
 
@@ -41,6 +42,7 @@ const columns = [
   { dataIndex: 'roles', key: 'roles', title: '角色' },
   { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门' },
   { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
+  { key: 'actions', title: '操作', width: 120 },
 ];
 
 const keyword = ref('');
@@ -51,6 +53,10 @@ const modalMode = ref<'create' | 'edit' | 'move'>('create');
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const saving = ref(false);
 const selectedNodeKey = ref<string>('');
+const transferLoading = ref(false);
+const transferTargetOrganizationUnitId = ref<string>();
+const transferUser = ref<null | UserApi.UserListItem>(null);
+const transferVisible = ref(false);
 const users = ref<UserApi.UserListItem[]>([]);
 const formState = reactive({
   displayName: '',
@@ -207,6 +213,36 @@ async function handleDelete() {
   await loadMembers();
 }
 
+function openTransfer(record: UserApi.UserListItem) {
+  transferUser.value = record;
+  transferTargetOrganizationUnitId.value = undefined;
+  transferVisible.value = true;
+}
+
+async function handleTransfer() {
+  if (!selectedNode.value || !transferUser.value) {
+    return;
+  }
+  if (!transferTargetOrganizationUnitId.value) {
+    message.warning('请选择目标部门');
+    return;
+  }
+
+  transferLoading.value = true;
+  try {
+    await transferOrganizationMembersApi(selectedNode.value.id, {
+      targetOrganizationUnitId: transferTargetOrganizationUnitId.value,
+      userIds: [transferUser.value.id],
+    });
+    message.success(`已将 ${transferUser.value.displayName} 转移到新部门`);
+    transferVisible.value = false;
+    await loadTree();
+    await loadMembers();
+  } finally {
+    transferLoading.value = false;
+  }
+}
+
 watch(
   () => selectedNodeKey.value,
   async () => {
@@ -326,6 +362,11 @@ onMounted(async () => {
                     {{ record.isActive ? '启用' : '停用' }}
                   </Tag>
                 </template>
+                <template v-else-if="column.key === 'actions'">
+                  <Button size="small" type="link" @click="openTransfer(record as UserApi.UserListItem)">
+                    转移成员
+                  </Button>
+                </template>
               </template>
             </Table>
           </Card>
@@ -354,6 +395,27 @@ onMounted(async () => {
             v-model:value="formState.parentId"
             allow-clear
             placeholder="为空表示根节点"
+            :tree-data="normalizeTreeSelect(organizationTree)"
+            tree-default-expand-all
+          />
+        </Form.Item>
+      </Form>
+    </Modal>
+
+    <Modal
+      v-model:open="transferVisible"
+      :confirm-loading="transferLoading"
+      title="转移部门成员"
+      @ok="handleTransfer"
+    >
+      <Form layout="vertical">
+        <Form.Item label="当前成员">
+          <Input :value="transferUser?.displayName || '-'" disabled />
+        </Form.Item>
+        <Form.Item label="目标部门" required>
+          <TreeSelect
+            v-model:value="transferTargetOrganizationUnitId"
+            placeholder="选择转移后的部门"
             :tree-data="normalizeTreeSelect(organizationTree)"
             tree-default-expand-all
           />

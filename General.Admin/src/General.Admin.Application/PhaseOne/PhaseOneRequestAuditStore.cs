@@ -1,66 +1,114 @@
-using System.IO;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Hosting;
+using Volo.Abp.Domain.Repositories;
 using Volo.Abp.DependencyInjection;
+using Volo.Abp.Linq;
 
 namespace General.Admin.PhaseOne;
 
 public class PhaseOneRequestAuditStore : ITransientDependency
 {
-    private static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.Web);
-    private readonly IHostEnvironment _hostEnvironment;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
+    private readonly PhaseOneRequestAuditQueue _queue;
+    private readonly IRepository<AppRequestAuditLog, Guid> _requestAuditLogRepository;
 
-    public PhaseOneRequestAuditStore(IHostEnvironment hostEnvironment)
+    public PhaseOneRequestAuditStore(
+        IAsyncQueryableExecuter asyncQueryableExecuter,
+        PhaseOneRequestAuditQueue queue,
+        IRepository<AppRequestAuditLog, Guid> requestAuditLogRepository)
     {
-        _hostEnvironment = hostEnvironment;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
+        _queue = queue;
+        _requestAuditLogRepository = requestAuditLogRepository;
     }
 
-    public async Task AppendAsync(PhaseOneRequestAuditEntry entry)
+    public Task AppendAsync(PhaseOneRequestAuditEntry entry)
     {
-        var filePath = GetAuditFilePath();
-        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        var payload = JsonSerializer.Serialize(entry, JsonSerializerOptions);
-        await File.AppendAllTextAsync(filePath, payload + Environment.NewLine, Encoding.UTF8);
+        if (!_queue.TryEnqueue(entry))
+        {
+            throw new InvalidOperationException("Failed to enqueue request audit log.");
+        }
+
+        return Task.CompletedTask;
     }
 
-    public async Task<List<PhaseOneRequestAuditEntry>> ReadAsync()
+    public async Task<List<PhaseOneRequestAuditEntry>> QueryAsync(PhaseOneAuditLogQueryInput input)
     {
-        var filePath = GetAuditFilePath();
-        if (!File.Exists(filePath))
+        try
+        {
+            var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 500);
+            var category = input.Category?.Trim().ToLowerInvariant();
+            var keyword = input.Keyword?.Trim();
+
+            var queryable = await _requestAuditLogRepository.GetQueryableAsync();
+
+            if (input.StartTime.HasValue)
+            {
+                queryable = queryable.Where(x => x.ExecutionTime >= input.StartTime.Value);
+            }
+
+            if (input.EndTime.HasValue)
+            {
+                queryable = queryable.Where(x => x.ExecutionTime <= input.EndTime.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                queryable = queryable.Where(x =>
+                    (x.UserName != null && x.UserName.Contains(keyword)) ||
+                    (x.TenantName != null && x.TenantName.Contains(keyword)) ||
+                    (x.Url != null && x.Url.Contains(keyword)) ||
+                    (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
+                    (x.ActionSummary != null && x.ActionSummary.Contains(keyword)) ||
+                    (x.MenuTitle != null && x.MenuTitle.Contains(keyword)));
+            }
+
+            queryable = ApplyCategoryFilter(queryable, category)
+                .OrderByDescending(x => x.ExecutionTime)
+                .Take(maxResultCount);
+
+            var logs = await _asyncQueryableExecuter.ToListAsync(queryable);
+            return logs.Select(MapEntry).ToList();
+        }
+        catch (Exception ex) when (ex.ToString().Contains("no such table: AppRequestAuditLogs", StringComparison.OrdinalIgnoreCase))
         {
             return [];
         }
-
-        var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8);
-        var result = new List<PhaseOneRequestAuditEntry>();
-        foreach (var line in lines)
-        {
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
-
-            try
-            {
-                var item = JsonSerializer.Deserialize<PhaseOneRequestAuditEntry>(line, JsonSerializerOptions);
-                if (item != null)
-                {
-                    result.Add(item);
-                }
-            }
-            catch
-            {
-                // Skip malformed lines to keep the audit pipeline resilient.
-            }
-        }
-
-        return result;
     }
 
-    private string GetAuditFilePath()
+    private static IQueryable<AppRequestAuditLog> ApplyCategoryFilter(
+        IQueryable<AppRequestAuditLog> queryable,
+        string? category)
     {
-        return Path.Combine(_hostEnvironment.ContentRootPath, "Logs", "phase-one-audit.jsonl");
+        return category switch
+        {
+            "access" => queryable.Where(x => !x.HasException && x.HttpMethod == "GET" && x.Category != "pagevisit"),
+            "audit" => queryable.Where(x => x.ActionSummary != null && x.ActionSummary != string.Empty),
+            "exception" => queryable.Where(x => x.HasException || (x.HttpStatusCode ?? 200) >= 500),
+            "operation" => queryable.Where(x => x.HttpMethod != "GET" && x.Category != "pagevisit"),
+            "pagevisit" => queryable.Where(x => x.Category == "pagevisit"),
+            _ => queryable.Where(x => x.Category != "pagevisit")
+        };
+    }
+
+    private static PhaseOneRequestAuditEntry MapEntry(AppRequestAuditLog log)
+    {
+        return new PhaseOneRequestAuditEntry
+        {
+            ActionSummary = log.ActionSummary,
+            BrowserInfo = log.BrowserInfo,
+            Category = log.Category,
+            ClientIpAddress = log.ClientIpAddress,
+            ExecutionDuration = log.ExecutionDuration,
+            ExecutionTime = log.ExecutionTime,
+            ExceptionMessage = log.ExceptionMessage,
+            HasException = log.HasException,
+            HttpMethod = log.HttpMethod,
+            HttpStatusCode = log.HttpStatusCode,
+            Id = log.Id,
+            MenuTitle = log.MenuTitle,
+            TenantName = log.TenantName,
+            Url = log.Url,
+            UserName = log.UserName
+        };
     }
 }
 

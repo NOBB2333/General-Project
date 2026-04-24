@@ -9,6 +9,7 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [Authorize]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/user")]
 public class UserController : ControllerBase
 {
@@ -68,6 +69,17 @@ public class UserController : ControllerBase
     public async Task<ActionResult<ApiResponse<bool>>> ChangePasswordAsync([FromBody] PhaseOnePasswordChangeInput input)
     {
         await _userService.ChangePasswordAsync(input);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [PlatformEndpoint("Platform.User.Manage")]
+    [HttpPut("{id:guid}/reset-password")]
+    public async Task<ActionResult<ApiResponse<bool>>> ResetPasswordAsync(
+        Guid id,
+        [FromBody] PhaseOneAdminResetPasswordInput input)
+    {
+        await _userService.ResetPasswordAsync(id, input);
         return ApiResponse<bool>.Ok(true);
     }
 }

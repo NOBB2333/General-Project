@@ -1,11 +1,12 @@
 <script lang="ts" setup>
 import type { UploadProps, TreeProps } from 'ant-design-vue';
+import type { Dayjs } from 'dayjs';
 
 import { computed, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Tree, Upload, message } from 'ant-design-vue';
+import { Button, Card, DatePicker, Empty, Input, Popconfirm, Select, Space, Table, Tag, Tree, Upload, message } from 'ant-design-vue';
 
 import { deleteFileApi, downloadFileApi, getFileListApi, uploadFileApi, type FileApi } from '#/api/core';
 
@@ -32,7 +33,16 @@ const columns = [
 const items = ref<FileApi.FileItem[]>([]);
 const loading = ref(false);
 const selectedTreeKey = ref<string>('all');
+const categoryFilter = ref<string>();
 const keyword = ref('');
+const uploadedBy = ref('');
+const uploadedRange = ref<[Dayjs, Dayjs] | undefined>(undefined);
+
+const categoryOptions = computed(() =>
+  [...new Set(items.value.map((item) => normalizeCategory(item.category)))]
+    .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    .map((item) => ({ label: item, value: item })),
+);
 
 const directoryTree = computed<FileTreeNode[]>(() => {
   const categoryMap = new Map<string, Set<string>>();
@@ -66,7 +76,6 @@ const directoryTree = computed<FileTreeNode[]>(() => {
 });
 
 const filteredItems = computed(() => {
-  const term = keyword.value.trim().toLowerCase();
   return items.value.filter((item) => {
     const category = normalizeCategory(item.category);
     const pathValue = normalizePath(item.parentPath);
@@ -90,26 +99,20 @@ const filteredItems = computed(() => {
         return false;
       }
     }
-
-    if (!term) {
-      return true;
-    }
-
-    return [
-      item.fileName,
-      category,
-      item.contentType,
-      item.uploadedBy || '',
-      item.storageLocation,
-      item.parentPath || '',
-    ].some((value) => value.toLowerCase().includes(term));
+    return true;
   });
 });
 
 async function loadFiles() {
   loading.value = true;
   try {
-    items.value = await getFileListApi();
+    items.value = await getFileListApi({
+      category: categoryFilter.value || undefined,
+      keyword: keyword.value || undefined,
+      uploadedBy: uploadedBy.value || undefined,
+      uploadedFrom: uploadedRange.value?.[0]?.startOf('day').toISOString(),
+      uploadedTo: uploadedRange.value?.[1]?.endOf('day').toISOString(),
+    });
   } finally {
     loading.value = false;
   }
@@ -247,6 +250,14 @@ function resolveUploadPayload() {
   };
 }
 
+async function resetFilters() {
+  categoryFilter.value = undefined;
+  keyword.value = '';
+  uploadedBy.value = '';
+  uploadedRange.value = undefined;
+  await loadFiles();
+}
+
 loadFiles();
 </script>
 
@@ -277,8 +288,25 @@ loadFiles();
             <Input
               v-model:value="keyword"
               allow-clear
-              placeholder="按文件名/上传人/路径筛选"
+              placeholder="按文件名/类型/路径筛选"
+              @pressEnter="loadFiles"
             />
+            <Select
+              v-model:value="categoryFilter"
+              allow-clear
+              placeholder="按分类筛选"
+              style="width: 160px"
+              :options="categoryOptions"
+            />
+            <Input
+              v-model:value="uploadedBy"
+              allow-clear
+              placeholder="按上传人筛选"
+              @pressEnter="loadFiles"
+            />
+            <DatePicker.RangePicker v-model:value="uploadedRange" />
+            <Button type="primary" @click="loadFiles">查询</Button>
+            <Button @click="resetFilters">重置</Button>
             <Upload :custom-request="customRequest" :show-upload-list="false">
               <Button type="primary">上传文件</Button>
             </Upload>

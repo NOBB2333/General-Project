@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.Threading;
+using Quartz;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 
@@ -5,10 +8,16 @@ namespace General.Admin.PhaseOne;
 
 public class PlatformSchedulerService : ITransientDependency
 {
+    private static readonly ConcurrentDictionary<string, byte> RunningJobs = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly IEnumerable<IPlatformScheduledJobHandler> _jobHandlers;
     private readonly IRepository<PlatformScheduledJob, Guid> _jobRepository;
 
-    public PlatformSchedulerService(IRepository<PlatformScheduledJob, Guid> jobRepository)
+    public PlatformSchedulerService(
+        IEnumerable<IPlatformScheduledJobHandler> jobHandlers,
+        IRepository<PlatformScheduledJob, Guid> jobRepository)
     {
+        _jobHandlers = jobHandlers;
         _jobRepository = jobRepository;
     }
 
@@ -20,7 +29,7 @@ public class PlatformSchedulerService : ITransientDependency
             .ToList();
     }
 
-    public async Task RunAsync(string jobKey)
+    public async Task<string> RunAsync(string jobKey)
     {
         var normalizedKey = jobKey.Trim();
         var job = (await _jobRepository.GetListAsync())
@@ -31,9 +40,7 @@ public class PlatformSchedulerService : ITransientDependency
             throw new InvalidOperationException("定时任务不存在。");
         }
 
-        var now = DateTime.Now;
-        job.MarkRun(now, "手动执行成功", job.NextRunTime ?? now.AddDays(1));
-        await _jobRepository.UpdateAsync(job, autoSave: true);
+        return await ExecuteJobAsync(job, manualTrigger: true, CancellationToken.None);
     }
 
     public async Task ToggleAsync(string jobKey, bool isEnabled)
@@ -47,8 +54,23 @@ public class PlatformSchedulerService : ITransientDependency
             throw new InvalidOperationException("定时任务不存在。");
         }
 
-        job.Toggle(isEnabled);
+        job.UpdateSchedule(
+            isEnabled,
+            isEnabled ? CalculateNextRunTime(job.CronExpression, DateTime.Now) : null);
         await _jobRepository.UpdateAsync(job, autoSave: true);
+    }
+
+    public async Task ProcessDueJobsAsync(CancellationToken cancellationToken)
+    {
+        var dueJobs = (await _jobRepository.GetListAsync(cancellationToken: cancellationToken))
+            .Where(x => x.IsEnabled && x.NextRunTime.HasValue && x.NextRunTime.Value <= DateTime.Now)
+            .OrderBy(x => x.NextRunTime)
+            .ToList();
+
+        foreach (var job in dueJobs)
+        {
+            await ExecuteJobAsync(job, manualTrigger: false, cancellationToken);
+        }
     }
 
     private static PlatformScheduledJobDto MapJob(PlatformScheduledJob item)
@@ -58,11 +80,75 @@ public class PlatformSchedulerService : ITransientDependency
             CronExpression = item.CronExpression,
             Description = item.Description,
             IsEnabled = item.IsEnabled,
+            IsRunning = RunningJobs.ContainsKey(item.JobKey),
             JobKey = item.JobKey,
             LastRunResult = item.LastRunResult,
             LastRunTime = item.LastRunTime,
             NextRunTime = item.NextRunTime,
             Title = item.Title
         };
+    }
+
+    private async Task<string> ExecuteJobAsync(PlatformScheduledJob job, bool manualTrigger, CancellationToken cancellationToken)
+    {
+        if (!RunningJobs.TryAdd(job.JobKey, 0))
+        {
+            if (manualTrigger)
+            {
+                throw new InvalidOperationException("定时任务正在执行中，请稍后重试。");
+            }
+
+            return "定时任务正在执行中，已跳过本次触发。";
+        }
+
+        var executedAt = DateTime.Now;
+
+        try
+        {
+            var handler = _jobHandlers.FirstOrDefault(x =>
+                x.JobKey.Equals(job.JobKey, StringComparison.OrdinalIgnoreCase));
+            if (handler == null)
+            {
+                throw new InvalidOperationException("未找到对应的定时任务执行器。");
+            }
+
+            var result = await handler.ExecuteAsync(cancellationToken);
+            var message = $"{(manualTrigger ? "手动" : "自动")}执行成功：{result}";
+            job.MarkRun(
+                executedAt,
+                message,
+                job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
+            await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: cancellationToken);
+            return message;
+        }
+        catch (Exception ex)
+        {
+            var message = $"{(manualTrigger ? "手动" : "自动")}执行失败：{ex.GetBaseException().Message}";
+            job.MarkRun(
+                executedAt,
+                message,
+                job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
+            await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: cancellationToken);
+            return message;
+        }
+        finally
+        {
+            RunningJobs.TryRemove(job.JobKey, out _);
+        }
+    }
+
+    private static DateTime? CalculateNextRunTime(string cronExpression, DateTime baseTime)
+    {
+        if (!CronExpression.IsValidExpression(cronExpression))
+        {
+            return null;
+        }
+
+        var expression = new CronExpression(cronExpression)
+        {
+            TimeZone = TimeZoneInfo.Local
+        };
+
+        return expression.GetNextValidTimeAfter(new DateTimeOffset(baseTime))?.LocalDateTime;
     }
 }
