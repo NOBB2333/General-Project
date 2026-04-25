@@ -1,13 +1,12 @@
 ﻿using System;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Volo.Abp.Uow;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore;
-using Volo.Abp.EntityFrameworkCore.Sqlite;
+using Volo.Abp.EntityFrameworkCore.MySQL;
 using Volo.Abp.EntityFrameworkCore.PostgreSql;
+using Volo.Abp.EntityFrameworkCore.Sqlite;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Identity.EntityFrameworkCore;
 using Volo.Abp.Modularity;
@@ -26,6 +25,7 @@ namespace General.Admin.EntityFrameworkCore;
     typeof(AbpSettingManagementEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCoreSqliteModule),
     typeof(AbpEntityFrameworkCorePostgreSqlModule),
+    typeof(AbpEntityFrameworkCoreMySQLModule),
     typeof(AbpBackgroundJobsEntityFrameworkCoreModule),
     typeof(AbpAuditLoggingEntityFrameworkCoreModule),
     typeof(AbpTenantManagementEntityFrameworkCoreModule),
@@ -41,8 +41,8 @@ public class AdminEntityFrameworkCoreModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         var configuration = context.Services.GetConfiguration();
+        var provider = DatabaseProviderDetector.Detect(configuration);
         var rawConnectionString = configuration.GetConnectionString("Default");
-        var provider = DatabaseProviderDetector.Detect(rawConnectionString);
 
         context.Services.AddAbpDbContext<AdminDbContext>(options =>
         {
@@ -53,16 +53,10 @@ public class AdminEntityFrameworkCoreModule : AbpModule
         {
             options.Configure(dbContextOptions =>
             {
-                if (provider == DatabaseProvider.PostgreSql)
-                {
-                    dbContextOptions.DbContextOptions.UseNpgsql(rawConnectionString);
-                }
-                else
-                {
-                    var normalizedSqlite = SqliteConnectionStringHelper.Normalize(rawConnectionString);
-                    dbContextOptions.DbContextOptions.UseSqlite(normalizedSqlite);
-                    dbContextOptions.DbContextOptions.AddInterceptors(new SqlitePragmaConnectionInterceptor());
-                }
+                AdminDbContextOptionsConfigurer.Configure(
+                    dbContextOptions.DbContextOptions,
+                    provider,
+                    rawConnectionString);
             });
         });
     }

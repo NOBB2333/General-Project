@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Linq;
@@ -51,7 +50,7 @@ public class FileController : ControllerBase
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneFileItemDto>>>> GetListAsync([FromQuery] PhaseOneFileListInput input)
+    public async Task<ActionResult<ApiResponse<List<PlatformFileItemDto>>>> GetListAsync([FromQuery] PlatformFileListInput input)
     {
         var queryable = await _platformFileRepository.GetQueryableAsync();
         var keyword = input.Keyword?.Trim();
@@ -94,7 +93,7 @@ public class FileController : ControllerBase
 
             if (uploaderIds.Count == 0)
             {
-                return ApiResponse<List<PhaseOneFileItemDto>>.Ok([]);
+                return ApiResponse<List<PlatformFileItemDto>>.Ok([]);
             }
 
             queryable = queryable.Where(x => x.UploadedByUserId.HasValue && uploaderIds.Contains(x.UploadedByUserId.Value));
@@ -116,13 +115,14 @@ public class FileController : ControllerBase
         var result = files.Select(x =>
         {
             users.TryGetValue(x.UploadedByUserId ?? Guid.Empty, out var user);
-            return new PhaseOneFileItemDto
+            return new PlatformFileItemDto
             {
                 Category = x.Category,
                 ContentType = x.ContentType,
                 FileKey = x.FileKey,
                 FileName = x.FileName,
                 ParentPath = x.ParentPath,
+                RelativePath = BuildRelativePath(x.Category, x.ParentPath, x.FileName),
                 Size = x.Size,
                 StorageLocation = x.StorageLocation,
                 UploadedAt = x.CreationTime,
@@ -130,15 +130,15 @@ public class FileController : ControllerBase
             };
         }).ToList();
 
-        return ApiResponse<List<PhaseOneFileItemDto>>.Ok(result);
+        return ApiResponse<List<PlatformFileItemDto>>.Ok(result);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.FileManage)]
     [PlatformEndpoint("Platform.File.Manage")]
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(104_857_600)]
-    public async Task<ActionResult<ApiResponse<PhaseOneFileItemDto>>> UploadAsync([FromForm] FileUploadInput input)
+    public async Task<ActionResult<ApiResponse<PlatformFileItemDto>>> UploadAsync([FromForm] FileUploadInput input)
     {
         var file = input.File;
         if (file == null || file.Length == 0)
@@ -169,7 +169,7 @@ public class FileController : ControllerBase
             _currentUser.Id);
         await _platformFileRepository.InsertAsync(metadata, autoSave: true);
 
-        return ApiResponse<PhaseOneFileItemDto>.Ok(new PhaseOneFileItemDto
+        return ApiResponse<PlatformFileItemDto>.Ok(new PlatformFileItemDto
         {
             Category = metadata.Category,
             ContentType = string.IsNullOrWhiteSpace(file.ContentType)
@@ -178,6 +178,7 @@ public class FileController : ControllerBase
             FileKey = fileKey,
             FileName = originalName,
             ParentPath = metadata.ParentPath,
+            RelativePath = BuildRelativePath(metadata.Category, metadata.ParentPath, originalName),
             Size = file.Length,
             StorageLocation = filePath,
             UploadedBy = _currentUser.UserName,
@@ -199,7 +200,7 @@ public class FileController : ControllerBase
         return PhysicalFile(filePath, GetContentType(Path.GetExtension(filePath)), downloadName);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.FileManage)]
     [PlatformEndpoint("Platform.File.Manage")]
     [HttpDelete("{fileKey}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(string fileKey)
@@ -221,9 +222,18 @@ public class FileController : ControllerBase
 
     private DirectoryInfo GetStorageDirectory()
     {
-        var directoryPath = Path.Combine(_environment.ContentRootPath, "App_Data", "phase-one-files");
+        var directoryPath = Path.Combine(_environment.ContentRootPath, "App_Data", "upload-files");
         Directory.CreateDirectory(directoryPath);
         return new DirectoryInfo(directoryPath);
+    }
+
+    private static string BuildRelativePath(string category, string? parentPath, string fileName)
+    {
+        return string.Join(
+            '/',
+            new[] { category, parentPath, fileName }
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim().Replace('\\', '/').Trim('/')));
     }
 
     private static string GetContentType(string extension)

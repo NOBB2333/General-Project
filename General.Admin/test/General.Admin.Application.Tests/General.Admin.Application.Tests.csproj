@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\General.Admin.HttpApi.Host\General.Admin.HttpApi.Host.csproj" />
     <ProjectReference Include="..\..\src\General.Admin.Application\General.Admin.Application.csproj" />
     <ProjectReference Include="..\General.Admin.Domain.Tests\General.Admin.Domain.Tests.csproj" />
   </ItemGroup>

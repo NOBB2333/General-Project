@@ -1,6 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -13,9 +12,9 @@ namespace General.Admin.Controllers;
 [Route("api/app/user")]
 public class UserController : ControllerBase
 {
-    private readonly PhaseOneUserService _userService;
+    private readonly PlatformUserService _userService;
 
-    public UserController(PhaseOneUserService userService)
+    public UserController(PlatformUserService userService)
     {
         _userService = userService;
     }
@@ -33,30 +32,30 @@ public class UserController : ControllerBase
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneUserListItemDto>>>> GetListAsync([FromQuery] PhaseOneUserListInput input)
+    public async Task<ActionResult<ApiResponse<List<PlatformUserListItemDto>>>> GetListAsync([FromQuery] PlatformUserListInput input)
     {
-        return ApiResponse<List<PhaseOneUserListItemDto>>.Ok(await _userService.GetListAsync(input));
+        return ApiResponse<List<PlatformUserListItemDto>>.Ok(await _userService.GetListAsync(input));
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.UserManage)]
     [PlatformEndpoint("Platform.User.Manage")]
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneUserSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformUserSaveInput input)
     {
         await _userService.CreateAsync(input);
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.UserManage)]
     [PlatformEndpoint("Platform.User.Manage")]
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PhaseOneUserSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PlatformUserSaveInput input)
     {
         await _userService.UpdateAsync(id, input);
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.UserManage)]
     [PlatformEndpoint("Platform.User.Manage")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
@@ -66,18 +65,18 @@ public class UserController : ControllerBase
     }
 
     [HttpPut("password")]
-    public async Task<ActionResult<ApiResponse<bool>>> ChangePasswordAsync([FromBody] PhaseOnePasswordChangeInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> ChangePasswordAsync([FromBody] PlatformPasswordChangeInput input)
     {
         await _userService.ChangePasswordAsync(input);
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.UserManage)]
     [PlatformEndpoint("Platform.User.Manage")]
     [HttpPut("{id:guid}/reset-password")]
     public async Task<ActionResult<ApiResponse<bool>>> ResetPasswordAsync(
         Guid id,
-        [FromBody] PhaseOneAdminResetPasswordInput input)
+        [FromBody] PlatformAdminResetPasswordInput input)
     {
         await _userService.ResetPasswordAsync(id, input);
         return ApiResponse<bool>.Ok(true);

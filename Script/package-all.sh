@@ -76,14 +76,31 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DBMIGRATOR_DIR="$ROOT_DIR/dbmigrator"
 DATA_DIR="${GENERAL_ADMIN_DATA_DIR:-$ROOT_DIR/data}"
 DB_FILE="${GENERAL_ADMIN_DB_FILE:-$DATA_DIR/general-admin.db}"
+DB_PROVIDER="${GENERAL_ADMIN_DB_PROVIDER:-Sqlite}"
 
-# 优先使用外部传入的连接串（PostgreSQL 或自定义），否则退回 SQLite
-if [[ -n "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
-  export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
-else
-  mkdir -p "$DATA_DIR"
-  export ConnectionStrings__Default="Data Source=$DB_FILE"
-fi
+export Database__Provider="$DB_PROVIDER"
+
+case "$DB_PROVIDER" in
+  Sqlite|sqlite)
+    mkdir -p "$DATA_DIR"
+    if [[ -n "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
+      export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
+    else
+      export ConnectionStrings__Default="Data Source=$DB_FILE"
+    fi
+    ;;
+  PostgreSql|postgresql|Postgres|postgres|pgsql|MySql|mysql)
+    if [[ -z "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
+      echo "GENERAL_ADMIN_CONNECTION_STRING is required when GENERAL_ADMIN_DB_PROVIDER=$DB_PROVIDER" >&2
+      exit 1
+    fi
+    export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
+    ;;
+  *)
+    echo "Unsupported GENERAL_ADMIN_DB_PROVIDER: $DB_PROVIDER" >&2
+    exit 1
+    ;;
+esac
 
 cd "$DBMIGRATOR_DIR"
 exec dotnet General.Admin.DbMigrator.dll
@@ -98,18 +115,34 @@ APP_DIR="$ROOT_DIR/app"
 DATA_DIR="${GENERAL_ADMIN_DATA_DIR:-$ROOT_DIR/data}"
 LOG_DIR="${GENERAL_ADMIN_LOG_DIR:-$ROOT_DIR/logs}"
 DB_FILE="${GENERAL_ADMIN_DB_FILE:-$DATA_DIR/general-admin.db}"
+DB_PROVIDER="${GENERAL_ADMIN_DB_PROVIDER:-Sqlite}"
 
 mkdir -p "$LOG_DIR"
 
-export ASPNETCORE_URLS="${GENERAL_ADMIN_URLS:-http://0.0.0.0:8095}"
+export ASPNETCORE_URLS="${GENERAL_ADMIN_URLS:-http://0.0.0.0:5007}"
+export Database__Provider="$DB_PROVIDER"
 
-# 优先使用外部传入的连接串（PostgreSQL 或自定义），否则退回 SQLite
-if [[ -n "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
-  export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
-else
-  mkdir -p "$DATA_DIR"
-  export ConnectionStrings__Default="Data Source=$DB_FILE"
-fi
+case "$DB_PROVIDER" in
+  Sqlite|sqlite)
+    mkdir -p "$DATA_DIR"
+    if [[ -n "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
+      export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
+    else
+      export ConnectionStrings__Default="Data Source=$DB_FILE"
+    fi
+    ;;
+  PostgreSql|postgresql|Postgres|postgres|pgsql|MySql|mysql)
+    if [[ -z "${GENERAL_ADMIN_CONNECTION_STRING:-}" ]]; then
+      echo "GENERAL_ADMIN_CONNECTION_STRING is required when GENERAL_ADMIN_DB_PROVIDER=$DB_PROVIDER" >&2
+      exit 1
+    fi
+    export ConnectionStrings__Default="$GENERAL_ADMIN_CONNECTION_STRING"
+    ;;
+  *)
+    echo "Unsupported GENERAL_ADMIN_DB_PROVIDER: $DB_PROVIDER" >&2
+    exit 1
+    ;;
+esac
 
 if [[ -n "${GENERAL_ADMIN_SELF_URL:-}" ]]; then
   export App__SelfUrl="$GENERAL_ADMIN_SELF_URL"
@@ -145,27 +178,41 @@ cd backend
 
 ### 方案 A：PostgreSQL（推荐生产）
 
-先在 PostgreSQL 中建库（只需第一次）：
+设置环境变量（在后续所有命令中带上）：
 
 ```bash
-psql -U postgres -c "CREATE DATABASE general_admin;"
-```
-
-然后设置环境变量（在后续所有命令中带上）：
-
-```bash
+export GENERAL_ADMIN_DB_PROVIDER="PostgreSql"
 export GENERAL_ADMIN_CONNECTION_STRING="Host=localhost;Port=5432;Database=general_admin;Username=postgres;Password=你的密码"
 ```
 
-### 方案 B：SQLite（本地轻量）
+> 数据库不存在时，`General.Admin.DbMigrator` 会自动尝试建库。
 
-不设置 `GENERAL_ADMIN_CONNECTION_STRING`，默认使用 `backend/data/general-admin.db`。
+### 方案 B：MySQL
+
+```bash
+export GENERAL_ADMIN_DB_PROVIDER="MySql"
+export GENERAL_ADMIN_CONNECTION_STRING="Server=localhost;Port=3306;Database=general_admin;Uid=root;Pwd=你的密码"
+```
+
+### 方案 C：SQLite（本地轻量）
+
+```bash
+export GENERAL_ADMIN_DB_PROVIDER="Sqlite"
+```
+
+不设置 `GENERAL_ADMIN_CONNECTION_STRING` 时，默认使用 `backend/data/general-admin.db`。
 
 ## 三、初始化数据库（首次 / 有新迁移时）
 
 ```bash
 # PostgreSQL
+GENERAL_ADMIN_DB_PROVIDER="PostgreSql" \
 GENERAL_ADMIN_CONNECTION_STRING="Host=localhost;Port=5432;Database=general_admin;Username=postgres;Password=你的密码" \
+  bash ./migrate-db.sh
+
+# MySQL
+GENERAL_ADMIN_DB_PROVIDER="MySql" \
+GENERAL_ADMIN_CONNECTION_STRING="Server=localhost;Port=3306;Database=general_admin;Uid=root;Pwd=你的密码" \
   bash ./migrate-db.sh
 
 # SQLite（不带连接串，自动用默认路径）
@@ -176,7 +223,13 @@ bash ./migrate-db.sh
 
 ```bash
 # PostgreSQL + 后台运行
+GENERAL_ADMIN_DB_PROVIDER="PostgreSql" \
 GENERAL_ADMIN_CONNECTION_STRING="Host=localhost;Port=5432;Database=general_admin;Username=postgres;Password=你的密码" \
+  nohup bash ./start-backend.sh > logs/backend.log 2>&1 &
+
+# MySQL + 后台运行
+GENERAL_ADMIN_DB_PROVIDER="MySql" \
+GENERAL_ADMIN_CONNECTION_STRING="Server=localhost;Port=3306;Database=general_admin;Uid=root;Pwd=你的密码" \
   nohup bash ./start-backend.sh > logs/backend.log 2>&1 &
 
 # SQLite + 后台运行
@@ -199,10 +252,11 @@ pkill -f General.Admin.HttpApi.Host.dll
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
+| `GENERAL_ADMIN_DB_PROVIDER` | 数据库类型：`Sqlite` / `PostgreSql` / `MySql` | `Sqlite` |
 | `GENERAL_ADMIN_CONNECTION_STRING` | 完整连接串，PG 或自定义，不设则用 SQLite | - |
 | `GENERAL_ADMIN_DB_FILE` | SQLite 文件路径（仅 SQLite 模式） | `data/general-admin.db` |
 | `GENERAL_ADMIN_DATA_DIR` | SQLite 数据目录（仅 SQLite 模式） | `backend/data` |
-| `GENERAL_ADMIN_URLS` | 监听地址 | `http://0.0.0.0:8095` |
+| `GENERAL_ADMIN_URLS` | 监听地址 | `http://0.0.0.0:5007` |
 | `GENERAL_ADMIN_SELF_URL` | 后端对外公网地址 | - |
 | `GENERAL_ADMIN_CLIENT_URL` | 前端地址 | - |
 | `GENERAL_ADMIN_CORS_ORIGINS` | 允许跨域来源（逗号分隔） | - |

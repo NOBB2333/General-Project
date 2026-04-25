@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -18,13 +17,11 @@ public class PlatformEndpointBlacklistFilter : IAsyncActionFilter
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var endpointKey = context.ActionDescriptor.EndpointMetadata
-            .OfType<PlatformEndpointAttribute>()
-            .FirstOrDefault()
-            ?.Key
-            ?? $"{context.HttpContext.Request.Method}:{context.HttpContext.Request.Path.Value}".Trim();
+        var endpointKeys = PlatformEndpointKeyHelper.GetBlacklistKeys(
+            context.ActionDescriptor,
+            context.HttpContext.Request);
 
-        if (!string.IsNullOrWhiteSpace(endpointKey) && await _authorizationService.IsBlockedAsync(endpointKey))
+        if (endpointKeys.Count > 0 && await _authorizationService.IsBlockedAsync(endpointKeys))
         {
             context.Result = new ObjectResult(new ApiResponse<bool>
             {

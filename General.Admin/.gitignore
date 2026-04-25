@@ -266,5 +266,5 @@ src/General.Admin.Blazor.Server.Tiered/Logs/*
 
 
 # 忽略上传的附件
-src/General.Admin.HttpApi.Host/App_Data/phase-one-files
+src/General.Admin.HttpApi.Host/App_Data/upload-files/
 src/General.Admin.HttpApi.Host/App_Data/general-admin.db

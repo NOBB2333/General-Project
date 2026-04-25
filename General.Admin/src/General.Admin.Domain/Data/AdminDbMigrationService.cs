@@ -7,7 +7,6 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using General.Admin.PhaseOne;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.MultiTenancy;
@@ -20,20 +19,20 @@ public class AdminDbMigrationService : ITransientDependency
 {
     public ILogger<AdminDbMigrationService> Logger { get; set; }
 
-    private readonly PhaseOneDataSeedContributor _phaseOneDataSeedContributor;
+    private readonly PlatformDataSeedContributor _platformDataSeedContributor;
     private readonly IEnumerable<IAdminDbSchemaMigrator> _dbSchemaMigrators;
     private readonly ITenantRepository _tenantRepository;
     private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWorkManager _unitOfWorkManager;
 
     public AdminDbMigrationService(
-        PhaseOneDataSeedContributor phaseOneDataSeedContributor,
+        PlatformDataSeedContributor platformDataSeedContributor,
         IEnumerable<IAdminDbSchemaMigrator> dbSchemaMigrators,
         ITenantRepository tenantRepository,
         ICurrentTenant currentTenant,
         IUnitOfWorkManager unitOfWorkManager)
     {
-        _phaseOneDataSeedContributor = phaseOneDataSeedContributor;
+        _platformDataSeedContributor = platformDataSeedContributor;
         _dbSchemaMigrators = dbSchemaMigrators;
         _tenantRepository = tenantRepository;
         _currentTenant = currentTenant;
@@ -105,7 +104,7 @@ public class AdminDbMigrationService : ITransientDependency
         Logger.LogInformation($"Executing {(tenant == null ? "host" : tenant.Name + " tenant")} database seed...");
 
         using var unitOfWork = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
-        await _phaseOneDataSeedContributor.SeedAsync(new DataSeedContext(tenant?.Id));
+        await _platformDataSeedContributor.SeedAsync(new DataSeedContext(tenant?.Id));
         await unitOfWork.CompleteAsync();
     }
 

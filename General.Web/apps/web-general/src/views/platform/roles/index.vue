@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { MenuApi, OrganizationApi, RoleApi, UserApi } from '#/api/core';
+import type { MenuApi, OrganizationApi, PlatformEndpointApi, RoleApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -29,6 +29,7 @@ import {
   deleteRoleApi,
   getMenuPermissionTreeApi,
   getOrganizationTreeApi,
+  getPlatformEndpointOptionsApi,
   getRoleAuthorizationApi,
   getRoleListApi,
   getUserListApi,
@@ -46,60 +47,19 @@ interface UiTreeNode {
   title: string;
 }
 
-const API_GROUPS = [
-  {
-    controller: '认证与用户',
-    items: [
-      'GET:/api/app/auth/codes',
-      'GET:/api/app/user/info',
-      'GET:/api/app/user/list',
-      'PUT:/api/app/user/password',
-    ],
-  },
-  {
-    controller: '平台治理',
-    items: [
-      'GET:/api/app/audit-log/dashboard',
-      'GET:/api/app/audit-log/list',
-      'GET:/api/app/menu/all',
-      'GET:/api/app/organization-unit/tree',
-      'GET:/api/app/system-monitor',
-      'GET:/api/app/update-log/list',
-      'POST:/api/app/platform/scheduler/{jobKey}/run',
-      'POST:/api/app/platform/scheduler/{jobKey}/toggle',
-    ],
-  },
-  {
-    controller: '项目与经营',
-    items: [
-      'GET:/api/app/business/overview',
-      'GET:/api/app/business/projects',
-      'GET:/api/app/business/projects/{projectId}',
-      'GET:/api/app/business/reports',
-      'GET:/api/app/project/detail/{projectId}',
-      'GET:/api/app/project/list',
-      'GET:/api/app/project/my-related',
-      'GET:/api/app/project/raid/list',
-      'GET:/api/app/project/task/list',
-      'GET:/api/app/project/workspace',
-    ],
-  },
-  {
-    controller: '文件',
-    items: [
-      'GET:/api/app/file/list',
-      'POST:/api/app/file/upload',
-      'DELETE:/api/app/file/{fileKey}',
-    ],
-  },
-];
-
 const DATA_SCOPE_OPTIONS = [
   { label: '本组织及下级', value: 'current_org_and_descendants' },
   { label: '本组织', value: 'current_org' },
   { label: '仅本人相关', value: 'self' },
   { label: '自定义组织', value: 'custom' },
   { label: '全部数据', value: 'all' },
+];
+
+const ACCOUNT_SCOPE_OPTIONS = [
+  { label: '全部账号', value: 'all' },
+  { label: '数据范围账号', value: 'data' },
+  { label: '指定账号', value: 'only_users' },
+  { label: '数据范围 + 指定账号', value: 'data_and_users' },
 ];
 
 const columns = [
@@ -120,6 +80,7 @@ const drawerLoading = ref(false);
 const activeRole = ref<null | RoleApi.RoleItem>(null);
 const drawerType = ref<DrawerType>('menu');
 const treeData = ref<UiTreeNode[]>([]);
+const endpointGroups = ref<PlatformEndpointApi.EndpointGroup[]>([]);
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
 const accountKeyword = ref('');
@@ -157,6 +118,17 @@ const selectedAccountItems = computed(() => {
   return users.value.filter((item) => selectedIds.has(item.id));
 });
 
+const roleMemberItems = computed(() =>
+  users.value.filter((item) => item.roles.includes(activeRole.value?.name ?? '')),
+);
+
+const accountScopeSummary = computed(() => {
+  const scopeLabel = ACCOUNT_SCOPE_OPTIONS.find(
+    (item) => item.value === authorizationState.accountScopeMode,
+  )?.label ?? authorizationState.accountScopeMode;
+  return `${scopeLabel}，已指定 ${authorizationState.accountUserIds.length} 个额外账号`;
+});
+
 const metrics = computed(() => [
   { label: '平台角色', value: roles.value.length || 0 },
   {
@@ -189,25 +161,47 @@ function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]
   }));
 }
 
+function collectLeafKeys(nodes: UiTreeNode[]): Set<string> {
+  const keys = new Set<string>();
+  for (const node of nodes) {
+    if (node.children && node.children.length > 0) {
+      for (const key of collectLeafKeys(node.children)) {
+        keys.add(key);
+      }
+    } else {
+      keys.add(node.key);
+    }
+  }
+  return keys;
+}
+
+function filterLeafMenuIds(menuIds: string[]) {
+  const leafKeys = collectLeafKeys(treeData.value);
+  return menuIds.filter((id) => leafKeys.has(id));
+}
+
 async function loadBaseData() {
   roleLoading.value = true;
   try {
-    const [roleResult, menuResult, organizationResult, userResult] = await Promise.allSettled([
+    const [roleResult, menuResult, organizationResult, userResult, endpointResult] = await Promise.allSettled([
       getRoleListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
       getOrganizationTreeApi(),
       getUserListApi(),
+      getPlatformEndpointOptionsApi(),
     ]);
     roles.value = roleResult.status === 'fulfilled' ? roleResult.value : [];
     treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
     organizationTree.value = organizationResult.status === 'fulfilled' ? organizationResult.value : [];
     users.value = userResult.status === 'fulfilled' ? userResult.value : [];
+    endpointGroups.value = endpointResult.status === 'fulfilled' ? endpointResult.value : [];
 
     if (
       roleResult.status === 'rejected' ||
       menuResult.status === 'rejected' ||
       organizationResult.status === 'rejected' ||
-      userResult.status === 'rejected'
+      userResult.status === 'rejected' ||
+      endpointResult.status === 'rejected'
     ) {
       message.warning('角色页面部分数据加载失败，已展示可用内容。');
     }
@@ -217,15 +211,14 @@ async function loadBaseData() {
 }
 
 async function loadRoleAuthorization(role: RoleApi.RoleItem) {
-  drawerLoading.value = true;
   try {
     const authorization = await getRoleAuthorizationApi(role.id);
     authorizationState.apiBlacklist = [...authorization.apiBlacklist];
-    authorizationState.accountScopeMode = authorization.accountUserIds.length > 0 ? 'only_users' : 'data';
+    authorizationState.accountScopeMode = authorization.accountScopeMode;
     authorizationState.accountUserIds = [...authorization.accountUserIds];
     authorizationState.customOrganizationUnitIds = [...authorization.customOrganizationUnitIds];
     authorizationState.dataScopeMode = authorization.dataScopeMode;
-    authorizationState.menuIds = [...authorization.menuIds];
+    authorizationState.menuIds = filterLeafMenuIds(authorization.menuIds);
   } finally {
     drawerLoading.value = false;
   }
@@ -247,12 +240,12 @@ async function saveCurrentDrawer() {
   saving.value = true;
   try {
     if (drawerType.value === 'menu') {
-      await saveRoleMenusApi(activeRole.value.id, authorizationState.menuIds);
+      await saveRoleMenusApi(activeRole.value.id, filterLeafMenuIds(authorizationState.menuIds));
       message.success('菜单授权已保存');
     } else {
       await saveRoleAuthorizationApi(activeRole.value.id, {
         apiBlacklist: authorizationState.apiBlacklist,
-        accountScopeMode: authorizationState.accountUserIds.length > 0 ? 'only_users' : 'data',
+        accountScopeMode: authorizationState.accountScopeMode,
         accountUserIds: authorizationState.accountUserIds,
         customOrganizationUnitIds: authorizationState.customOrganizationUnitIds,
         dataScopeMode: authorizationState.dataScopeMode,
@@ -437,23 +430,37 @@ onMounted(loadBaseData);
             </template>
 
             <template v-else-if="drawerType === 'account'">
+              <Form layout="vertical">
+                <Form.Item label="账号范围模式">
+                  <Radio.Group v-model:value="authorizationState.accountScopeMode">
+                    <Space direction="vertical">
+                      <Radio
+                        v-for="item in ACCOUNT_SCOPE_OPTIONS"
+                        :key="item.value"
+                        :value="item.value"
+                      >
+                        {{ item.label }}
+                      </Radio>
+                    </Space>
+                  </Radio.Group>
+                </Form.Item>
+              </Form>
+
               <!-- 当前已分配该角色的成员 -->
               <div class="role-member-section">
                 <div class="role-member-section__header">
                   <strong>当前角色成员</strong>
-                  <Tag color="blue">
-                    {{ users.filter(u => u.roles.includes(activeRole?.name ?? '')).length }}
-                  </Tag>
+                  <Tag color="blue">{{ roleMemberItems.length }}</Tag>
                 </div>
                 <div
-                  v-if="users.filter(u => u.roles.includes(activeRole?.name ?? '')).length === 0"
+                  v-if="roleMemberItems.length === 0"
                   class="role-member-section__empty"
                 >
                   暂无成员分配此角色
                 </div>
                 <div v-else class="role-member-section__tags">
                   <Tag
-                    v-for="u in users.filter(u => u.roles.includes(activeRole?.name ?? ''))"
+                    v-for="u in roleMemberItems"
                     :key="u.id"
                   >
                     {{ u.displayName }} ({{ u.username }})
@@ -464,8 +471,11 @@ onMounted(loadBaseData);
               <div class="account-scope">
                 <div class="account-scope__panel">
                   <div class="account-scope__header">
-                    <strong>数据范围账号</strong>
+                    <strong>可指定账号</strong>
                     <Input v-model:value="accountKeyword" allow-clear placeholder="按账号/姓名/邮箱筛选" />
+                  </div>
+                  <div class="account-scope__hint">
+                    实际账号范围由上方模式决定；这里勾选的是“指定账号/额外放行账号”。
                   </div>
                   <div class="account-scope__list">
                     <label
@@ -487,9 +497,10 @@ onMounted(loadBaseData);
                 </div>
                 <div class="account-scope__panel">
                   <div class="account-scope__header">
-                    <strong>已授权账号</strong>
+                    <strong>已指定账号</strong>
                     <Tag color="blue">{{ authorizationState.accountUserIds.length }}</Tag>
                   </div>
+                  <div class="account-scope__hint">{{ accountScopeSummary }}</div>
                   <div v-if="selectedAccountItems.length === 0" class="account-scope__empty">
                     暂未指定账号
                   </div>
@@ -509,20 +520,21 @@ onMounted(loadBaseData);
 
             <template v-else>
               <Form layout="vertical">
-                <Form.Item label="接口黑名单">
+                <Form.Item label="接口黑名单（选中 = 禁止访问）">
                   <Collapse :bordered="false" ghost>
                     <Collapse.Panel
-                      v-for="group in API_GROUPS"
-                      :key="group.controller"
-                      :header="group.controller"
+                      v-for="group in endpointGroups"
+                      :key="group.groupName"
+                      :header="group.groupName"
                     >
                       <Checkbox.Group
                         v-model:value="authorizationState.apiBlacklist"
                         class="api-group"
-                        :options="group.items.map((item) => ({ label: item, value: item }))"
+                        :options="group.items.map((item) => ({ label: item.label, value: item.key }))"
                       />
                     </Collapse.Panel>
                   </Collapse>
+                  <Empty v-if="endpointGroups.length === 0" description="暂无可配置接口黑名单" />
                 </Form.Item>
               </Form>
             </template>
@@ -646,6 +658,12 @@ onMounted(loadBaseData);
 
 .account-scope__header :deep(.ant-input-affix-wrapper) {
   max-width: 280px;
+}
+
+.account-scope__hint {
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .account-scope__list {

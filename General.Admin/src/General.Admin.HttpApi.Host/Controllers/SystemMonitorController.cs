@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -7,21 +6,21 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PhaseOneRoleNames.Admin)]
+[Authorize(Roles = PlatformRoleNames.Admin)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/system-monitor")]
 public class SystemMonitorController : ControllerBase
 {
-    private readonly PhaseOneSystemMonitorService _systemMonitorService;
+    private readonly PlatformSystemMonitorService _systemMonitorService;
 
-    public SystemMonitorController(PhaseOneSystemMonitorService systemMonitorService)
+    public SystemMonitorController(PlatformSystemMonitorService systemMonitorService)
     {
         _systemMonitorService = systemMonitorService;
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<PhaseOneSystemMonitorDto>>> GetAsync()
+    public async Task<ActionResult<ApiResponse<PlatformSystemMonitorDto>>> GetAsync()
     {
-        return ApiResponse<PhaseOneSystemMonitorDto>.Ok(await _systemMonitorService.GetAsync());
+        return ApiResponse<PlatformSystemMonitorDto>.Ok(await _systemMonitorService.GetAsync());
     }
 }

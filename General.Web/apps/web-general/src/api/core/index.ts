@@ -5,6 +5,7 @@ export * from './file';
 export * from './menu';
 export * from './online-user';
 export * from './organization';
+export * from './platform-endpoint';
 export * from './project';
 export * from './role';
 export * from './scheduler';

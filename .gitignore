@@ -1,6 +1,7 @@
 # 项目本地工具 / 嵌套仓库
 .tools/
 General.Web/.git
+Script/deploy-to-linux.py
 
 # 操作系统 / 编辑器垃圾文件
 .DS_Store

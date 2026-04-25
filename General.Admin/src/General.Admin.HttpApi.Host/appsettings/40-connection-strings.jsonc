@@ -1,8 +1,14 @@
 {
+  "Database": {
+    // Sqlite | PostgreSql | MySql
+    "Provider": "Sqlite"
+    //    "Provider": "PostgreSql"
+  },
   "ConnectionStrings": {
-    // SQLite:
-    // "Default": "Data Source=build/data/general-admin.db"
-    // PostgreSQL 示例（当前仓库代码和 migrations 仍按 SQLite 实现，这里仅作连接串格式参考）：
-    "Default": "Host=nucbox-g3;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
+    "Default": "Data Source=build/data/general-admin.db"
+    //          PostgreSQL:
+    //    "Default": "HOST=127.0.0.1;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
+    // MySQL:
+    // "Default": "Server=127.0.0.1;Port=3306;Database=general_admin;Uid=root;Pwd=123456;AllowPublicKeyRetrieval=true"
   }
 }

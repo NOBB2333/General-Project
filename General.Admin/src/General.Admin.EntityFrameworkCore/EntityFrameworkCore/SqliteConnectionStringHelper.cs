@@ -22,8 +22,8 @@ public static class SqliteConnectionStringHelper
         }
         else
         {
-            var solutionRoot = FindSolutionRoot(Directory.GetCurrentDirectory());
-            var absolutePath = Path.GetFullPath(Path.Combine(solutionRoot, rawPath));
+            var baseDirectory = ResolveRelativeBaseDirectory(Directory.GetCurrentDirectory());
+            var absolutePath = Path.GetFullPath(Path.Combine(baseDirectory, rawPath));
             Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
             builder.DataSource = absolutePath;
         }
@@ -57,5 +57,38 @@ public static class SqliteConnectionStringHelper
         }
 
         return startDirectory;
+    }
+
+    /// <summary>
+    /// 解析 SQLite 相对路径的基准目录。
+    /// </summary>
+    private static string ResolveRelativeBaseDirectory(string startDirectory)
+    {
+        var solutionRoot = FindSolutionRoot(startDirectory);
+        if (!string.Equals(solutionRoot, startDirectory, StringComparison.Ordinal))
+        {
+            return solutionRoot;
+        }
+
+        // 发布后 Host 在 backend/app 启动，Migrator 在 backend/dbmigrator 启动。
+        // 如果仍按当前目录解析 build/data/general-admin.db，会生成两个 SQLite 文件。
+        // 这里统一按父目录 backend 解析，让 JSON/JSONC 继续优先，同时两边共用同一个库。
+        var currentDirectory = new DirectoryInfo(startDirectory);
+        var parentDirectory = currentDirectory.Parent;
+        if (parentDirectory != null &&
+            IsPublishedAppDirectory(currentDirectory) &&
+            Directory.Exists(Path.Combine(parentDirectory.FullName, "app")) &&
+            Directory.Exists(Path.Combine(parentDirectory.FullName, "dbmigrator")))
+        {
+            return parentDirectory.FullName;
+        }
+
+        return startDirectory;
+    }
+
+    private static bool IsPublishedAppDirectory(DirectoryInfo directory)
+    {
+        return string.Equals(directory.Name, "app", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(directory.Name, "dbmigrator", StringComparison.OrdinalIgnoreCase);
     }
 }

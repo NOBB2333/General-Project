@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -12,34 +11,34 @@ namespace General.Admin.Controllers;
 [Route("api/app/business")]
 public class BusinessController : ControllerBase
 {
-    private readonly PhaseOneBusinessService _businessService;
+    private readonly BusinessService _businessService;
 
-    public BusinessController(PhaseOneBusinessService businessService)
+    public BusinessController(BusinessService businessService)
     {
         _businessService = businessService;
     }
 
     [HttpGet("overview")]
-    public async Task<ActionResult<ApiResponse<PhaseOneBusinessOverviewDto>>> GetOverviewAsync()
+    public async Task<ActionResult<ApiResponse<BusinessOverviewDto>>> GetOverviewAsync()
     {
-        return ApiResponse<PhaseOneBusinessOverviewDto>.Ok(await _businessService.GetOverviewAsync());
+        return ApiResponse<BusinessOverviewDto>.Ok(await _businessService.GetOverviewAsync());
     }
 
     [HttpGet("projects")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneBusinessProjectSummaryDto>>>> GetProjectsAsync([FromQuery] PhaseOneBusinessProjectListInput input)
+    public async Task<ActionResult<ApiResponse<List<BusinessProjectSummaryDto>>>> GetProjectsAsync([FromQuery] BusinessProjectListInput input)
     {
-        return ApiResponse<List<PhaseOneBusinessProjectSummaryDto>>.Ok(await _businessService.GetProjectListAsync(input));
+        return ApiResponse<List<BusinessProjectSummaryDto>>.Ok(await _businessService.GetProjectListAsync(input));
     }
 
     [HttpGet("projects/{projectId:guid}")]
-    public async Task<ActionResult<ApiResponse<PhaseOneBusinessProjectDetailDto>>> GetProjectDetailAsync(Guid projectId)
+    public async Task<ActionResult<ApiResponse<BusinessProjectDetailDto>>> GetProjectDetailAsync(Guid projectId)
     {
-        return ApiResponse<PhaseOneBusinessProjectDetailDto>.Ok(await _businessService.GetProjectDetailAsync(projectId));
+        return ApiResponse<BusinessProjectDetailDto>.Ok(await _businessService.GetProjectDetailAsync(projectId));
     }
 
     [HttpGet("reports")]
-    public async Task<ActionResult<ApiResponse<PhaseOneBusinessReportDto>>> GetReportsAsync([FromQuery] PhaseOneBusinessReportQueryInput input)
+    public async Task<ActionResult<ApiResponse<BusinessReportDto>>> GetReportsAsync([FromQuery] BusinessReportQueryInput input)
     {
-        return ApiResponse<PhaseOneBusinessReportDto>.Ok(await _businessService.GetReportAsync(input));
+        return ApiResponse<BusinessReportDto>.Ok(await _businessService.GetReportAsync(input));
     }
 }

@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -7,35 +6,35 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PhaseOneRoleNames.Admin)]
+[Authorize(AdminPermissions.Platform.TenantManage)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/tenant")]
 public class TenantController : ControllerBase
 {
-    private readonly PhaseOneTenantService _tenantService;
+    private readonly PlatformTenantService _tenantService;
 
-    public TenantController(PhaseOneTenantService tenantService)
+    public TenantController(PlatformTenantService tenantService)
     {
         _tenantService = tenantService;
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneTenantListItemDto>>>> GetListAsync()
+    public async Task<ActionResult<ApiResponse<List<PlatformTenantListItemDto>>>> GetListAsync()
     {
-        return ApiResponse<List<PhaseOneTenantListItemDto>>.Ok(await _tenantService.GetListAsync());
+        return ApiResponse<List<PlatformTenantListItemDto>>.Ok(await _tenantService.GetListAsync());
     }
 
     [HttpGet("{id:guid}/authorization")]
-    public async Task<ActionResult<ApiResponse<PhaseOneTenantAuthorizationDto>>> GetAuthorizationAsync(Guid id)
+    public async Task<ActionResult<ApiResponse<PlatformTenantAuthorizationDto>>> GetAuthorizationAsync(Guid id)
     {
-        return ApiResponse<PhaseOneTenantAuthorizationDto>.Ok(await _tenantService.GetAuthorizationAsync(id));
+        return ApiResponse<PlatformTenantAuthorizationDto>.Ok(await _tenantService.GetAuthorizationAsync(id));
     }
 
     [HttpPut("{id:guid}/authorization")]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(
         Guid id,
-        [FromBody] PhaseOneTenantAuthorizationSaveInput input)
+        [FromBody] PlatformTenantAuthorizationSaveInput input)
     {
         await _tenantService.SaveAuthorizationAsync(id, input);
         return ApiResponse<bool>.Ok(true);
@@ -51,7 +50,7 @@ public class TenantController : ControllerBase
 
     [HttpPost]
     [PlatformEndpoint("Platform.Tenant.Manage")]
-    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneTenantSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformTenantSaveInput input)
     {
         await _tenantService.CreateAsync(input);
         return ApiResponse<bool>.Ok(true);
@@ -66,8 +65,8 @@ public class TenantController : ControllerBase
     }
 
     [HttpGet("{id:guid}/users")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneTenantUserDto>>>> GetUsersAsync(Guid id)
+    public async Task<ActionResult<ApiResponse<List<PlatformTenantUserDto>>>> GetUsersAsync(Guid id)
     {
-        return ApiResponse<List<PhaseOneTenantUserDto>>.Ok(await _tenantService.GetUsersAsync(id));
+        return ApiResponse<List<PlatformTenantUserDto>>.Ok(await _tenantService.GetUsersAsync(id));
     }
 }

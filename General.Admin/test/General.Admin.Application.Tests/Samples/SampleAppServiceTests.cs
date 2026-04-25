@@ -25,10 +25,13 @@ public abstract class SampleAppServiceTests<TStartupModule> : AdminApplicationTe
     public async Task Initial_Data_Should_Contain_Admin_User()
     {
         //Act
-        var result = await _userAppService.GetListAsync(new GetIdentityUsersInput());
+        var result = await _userAppService.GetListAsync(new GetIdentityUsersInput
+        {
+            MaxResultCount = 100
+        });
 
         //Assert
         result.TotalCount.ShouldBeGreaterThan(0);
-        result.Items.ShouldContain(u => u.UserName == "admin");
+        result.Items.ShouldContain(u => u.UserName == "admin.demo");
     }
 }

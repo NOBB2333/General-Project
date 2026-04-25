@@ -44,12 +44,9 @@ class Program
             {
                 var configuration = configurationBuilder.Build();
                 var rawConnectionString = configuration.GetConnectionString("Default");
-                var provider = DatabaseProviderDetector.Detect(rawConnectionString);
+                var provider = DatabaseProviderDetector.Detect(configuration);
 
-                // 仅 SQLite 模式需要规范化路径；PostgreSQL 连接串直接透传
-                var resolvedConnectionString = provider == DatabaseProvider.PostgreSql
-                    ? rawConnectionString
-                    : SqliteConnectionStringHelper.Normalize(rawConnectionString);
+                var resolvedConnectionString = AdminDbContextOptionsConfigurer.NormalizeConnectionString(provider, rawConnectionString);
 
                 configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {

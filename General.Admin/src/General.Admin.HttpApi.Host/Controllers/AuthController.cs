@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -11,17 +10,17 @@ namespace General.Admin.Controllers;
 
 [ApiController]
 [DisableAuditing]
-[ApiExplorerSettings(GroupName = ApiDocGroups.Common)]
+[ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/auth")]
 public class AuthController : ControllerBase
 {
     private readonly JwtTokenService _jwtTokenService;
-    private readonly PhaseOneUserActivityService _userActivityService;
+    private readonly PlatformUserActivityService _userActivityService;
     private readonly IdentityUserManager _userManager;
 
     public AuthController(
         JwtTokenService jwtTokenService,
-        PhaseOneUserActivityService userActivityService,
+        PlatformUserActivityService userActivityService,
         IdentityUserManager userManager)
     {
         _jwtTokenService = jwtTokenService;
@@ -53,7 +52,7 @@ public class AuthController : ControllerBase
         return ApiResponse<LoginResultDto>.Ok(new LoginResultDto
         {
             AccessToken = token,
-            HomePath = PhaseOneUserService.ResolveHomePath(roles),
+            HomePath = PlatformUserService.ResolveHomePath(roles),
             RealName = string.IsNullOrWhiteSpace($"{user.Name}{user.Surname}".Trim())
                 ? user.UserName ?? string.Empty
                 : $"{user.Name}{user.Surname}".Trim(),
@@ -71,7 +70,7 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpGet("codes")]
-    public async Task<ActionResult<ApiResponse<List<string>>>> GetCodesAsync([FromServices] PhaseOneMenuService menuService)
+    public async Task<ActionResult<ApiResponse<List<string>>>> GetCodesAsync([FromServices] PlatformMenuService menuService)
     {
         return ApiResponse<List<string>>.Ok(await menuService.GetCurrentAccessCodesAsync());
     }

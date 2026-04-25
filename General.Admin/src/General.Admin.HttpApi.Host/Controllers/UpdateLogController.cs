@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -12,36 +11,36 @@ namespace General.Admin.Controllers;
 [Route("api/app/update-log")]
 public class UpdateLogController : ControllerBase
 {
-    private readonly PhaseOneUpdateLogService _updateLogService;
+    private readonly PlatformUpdateLogService _updateLogService;
 
-    public UpdateLogController(PhaseOneUpdateLogService updateLogService)
+    public UpdateLogController(PlatformUpdateLogService updateLogService)
     {
         _updateLogService = updateLogService;
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneUpdateLogDto>>>> GetListAsync()
+    public async Task<ActionResult<ApiResponse<List<PlatformUpdateLogDto>>>> GetListAsync()
     {
-        return ApiResponse<List<PhaseOneUpdateLogDto>>.Ok(await _updateLogService.GetListAsync());
+        return ApiResponse<List<PlatformUpdateLogDto>>.Ok(await _updateLogService.GetListAsync());
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(Roles = PlatformRoleNames.Admin)]
     [HttpPost]
-    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneUpdateLogSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformUpdateLogSaveInput input)
     {
         await _updateLogService.CreateAsync(input);
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(Roles = PlatformRoleNames.Admin)]
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PhaseOneUpdateLogSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PlatformUpdateLogSaveInput input)
     {
         await _updateLogService.UpdateAsync(id, input);
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(Roles = PlatformRoleNames.Admin)]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {

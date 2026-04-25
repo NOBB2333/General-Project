@@ -265,7 +265,7 @@ onMounted(async () => {
       <div class="platform-page__grid">
         <Card class="platform-page__card" title="组织树">
           <template #extra>
-            <Button type="primary" @click="openCreateRoot">新增根节点</Button>
+            <Button type="primary" @click="openCreateRoot">新增节点</Button>
           </template>
 
           <Skeleton :loading="loadingTree" active>
@@ -287,7 +287,7 @@ onMounted(async () => {
           <Card class="platform-page__card" title="节点概览">
             <template #extra>
               <div class="toolbar">
-                <Button type="primary" @click="openCreateChild">新增子节点</Button>
+                <Button type="primary" @click="openCreateChild">新增节点</Button>
                 <Button :disabled="!selectedNode" @click="openEdit">编辑</Button>
                 <Button :disabled="!selectedNode" @click="openMove">移动</Button>
                 <Button danger :disabled="!selectedNode" @click="handleDelete">删除</Button>
@@ -304,7 +304,11 @@ onMounted(async () => {
                 <strong>{{ selectedNode.code }}</strong>
               </article>
               <article class="summary-panel__metric">
-                <span>成员数</span>
+                <span>直属成员</span>
+                <strong>{{ selectedNode.directMemberCount }}</strong>
+              </article>
+              <article class="summary-panel__metric">
+                <span>成员总数</span>
                 <strong>{{ selectedNode.memberCount }}</strong>
               </article>
               <article class="summary-panel__metric">

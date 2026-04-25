@@ -14,6 +14,7 @@ export namespace OrganizationApi {
   export interface OrganizationTreeItem {
     children: OrganizationTreeItem[];
     code: string;
+    directMemberCount: number;
     disabled: boolean;
     displayName: string;
     id: string;

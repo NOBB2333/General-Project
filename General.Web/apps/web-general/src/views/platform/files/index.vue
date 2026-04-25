@@ -25,7 +25,7 @@ const columns = [
   { dataIndex: 'contentType', key: 'contentType', title: '类型', width: 220 },
   { dataIndex: 'size', key: 'size', title: '大小', width: 120 },
   { dataIndex: 'uploadedBy', key: 'uploadedBy', title: '上传人', width: 140 },
-  { dataIndex: 'storageLocation', key: 'storageLocation', title: '存储位置' },
+  { dataIndex: 'relativePath', key: 'relativePath', title: '存储位置' },
   { dataIndex: 'uploadedAt', key: 'uploadedAt', title: '上传时间', width: 220 },
   { key: 'actions', title: '操作', width: 160 },
 ];
@@ -177,6 +177,16 @@ function normalizeCategory(category?: null | string) {
   }
 
   return normalized;
+}
+
+function resolveDisplayPath(item: FileApi.FileItem) {
+  if (item.relativePath) {
+    return item.relativePath;
+  }
+
+  return [normalizeCategory(item.category), normalizePath(item.parentPath), item.fileName]
+    .filter(Boolean)
+    .join('/');
 }
 
 function createCategoryNode(category: string, paths: Set<string>): FileTreeNode {
@@ -332,8 +342,10 @@ loadFiles();
             <template v-else-if="column.key === 'uploadedBy'">
               {{ record.uploadedBy || '-' }}
             </template>
-            <template v-else-if="column.key === 'storageLocation'">
-              <span class="platform-file__path">{{ record.storageLocation }}</span>
+            <template v-else-if="column.key === 'relativePath'">
+              <span class="platform-file__path" :title="record.storageLocation">
+                {{ resolveDisplayPath(record as FileApi.FileItem) }}
+              </span>
             </template>
             <template v-else-if="column.key === 'uploadedAt'">
               {{ new Date(record.uploadedAt).toLocaleString() }}

@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -12,9 +11,9 @@ namespace General.Admin.Controllers;
 [Route("api/app/organization-unit")]
 public class OrganizationUnitController : ControllerBase
 {
-    private readonly PhaseOneOrganizationUnitService _organizationUnitService;
+    private readonly PlatformOrganizationUnitService _organizationUnitService;
 
-    public OrganizationUnitController(PhaseOneOrganizationUnitService organizationUnitService)
+    public OrganizationUnitController(PlatformOrganizationUnitService organizationUnitService)
     {
         _organizationUnitService = organizationUnitService;
     }
@@ -25,7 +24,7 @@ public class OrganizationUnitController : ControllerBase
         return ApiResponse<List<OrganizationUnitTreeDto>>.Ok(await _organizationUnitService.GetTreeAsync());
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.OrganizationManage)]
     [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPost]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] OrganizationUnitSaveInput input)
@@ -34,7 +33,7 @@ public class OrganizationUnitController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.OrganizationManage)]
     [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] OrganizationUnitSaveInput input)
@@ -43,7 +42,7 @@ public class OrganizationUnitController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.OrganizationManage)]
     [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPut("{id:guid}/move")]
     public async Task<ActionResult<ApiResponse<bool>>> MoveAsync(Guid id, [FromBody] OrganizationUnitMoveInput input)
@@ -52,7 +51,7 @@ public class OrganizationUnitController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.OrganizationManage)]
     [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpPut("{id:guid}/members/transfer")]
     public async Task<ActionResult<ApiResponse<bool>>> TransferMembersAsync(
@@ -63,7 +62,7 @@ public class OrganizationUnitController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
-    [Authorize(Roles = PhaseOneRoleNames.Admin)]
+    [Authorize(AdminPermissions.Platform.OrganizationManage)]
     [PlatformEndpoint("Platform.Organization.Manage")]
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)

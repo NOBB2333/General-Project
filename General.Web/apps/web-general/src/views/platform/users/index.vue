@@ -49,7 +49,7 @@ const columns = [
   { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门', width: 200 },
   { dataIndex: 'isOnline', key: 'isOnline', title: '在线', width: 90 },
   { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 240 },
+  { key: 'actions', title: '操作', width: 210 },
 ];
 
 const onlineColumns = [
@@ -89,6 +89,8 @@ const onlineLoading = ref(false);
 const mappingVisible = ref(false);
 const activeMappingUser = ref<null | UserApi.UserListItem>(null);
 const activeResetUser = ref<null | UserApi.UserListItem>(null);
+const phoneNumberPattern = /^1[3-9]\d{9}$/;
+const usernamePattern = /^[A-Za-z][A-Za-z0-9._-]{2,63}$/;
 
 const formState = reactive<any>({
   displayName: '',
@@ -253,6 +255,18 @@ function findOrganizationUnitIdByName(displayName: string): null | string {
 async function handleSubmit() {
   if (!formState.username.trim() || !formState.displayName.trim()) {
     message.warning('请填写用户名和显示名');
+    return;
+  }
+  if (!usernamePattern.test(formState.username.trim())) {
+    message.warning('账号必须以英文字母开头，只能包含英文、数字、点、下划线或中划线，长度 3-64 位');
+    return;
+  }
+  if (formState.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email.trim())) {
+    message.warning('邮箱格式不正确');
+    return;
+  }
+  if (formState.phoneNumber?.trim() && !phoneNumberPattern.test(formState.phoneNumber.trim())) {
+    message.warning('手机号格式不正确，请输入 11 位中国大陆手机号');
     return;
   }
 
@@ -466,13 +480,6 @@ onMounted(async () => {
                 >
                   重置密码
                 </Button>
-                <Button
-                  size="small"
-                  type="link"
-                  @click="handleToggleStatus(record as UserApi.UserListItem, !(record as UserApi.UserListItem).isActive)"
-                >
-                  {{ (record as UserApi.UserListItem).isActive ? '停用' : '启用' }}
-                </Button>
                 <Popconfirm title="确认删除该用户？" @confirm="handleDelete(record.id)">
                   <Button danger size="small" type="link">删除</Button>
                 </Popconfirm>
@@ -599,7 +606,11 @@ onMounted(async () => {
       <Form layout="vertical">
         <div class="form-grid">
           <Form.Item label="用户名" required>
-            <Input v-model:value="formState.username" :maxlength="64" />
+            <Input
+              v-model:value="formState.username"
+              :maxlength="64"
+              placeholder="英文账号，例如 zhangsan 或 zhang.san"
+            />
           </Form.Item>
           <Form.Item label="显示名" required>
             <Input v-model:value="formState.displayName" :maxlength="64" />
@@ -608,7 +619,11 @@ onMounted(async () => {
             <Input v-model:value="formState.email" :maxlength="256" />
           </Form.Item>
           <Form.Item label="工号">
-            <Input v-model:value="formState.employeeNo" :maxlength="64" />
+            <Input
+              v-model:value="formState.employeeNo"
+              :maxlength="64"
+              placeholder="留空自动生成，也可手动录入已有工号"
+            />
           </Form.Item>
           <Form.Item label="手机号">
             <Input v-model:value="formState.phoneNumber" :maxlength="32" />

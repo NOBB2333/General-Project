@@ -15,6 +15,7 @@ export namespace FileApi {
     fileKey: string;
     fileName: string;
     parentPath?: null | string;
+    relativePath: string;
     size: number;
     storageLocation: string;
     uploadedAt: string;

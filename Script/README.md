@@ -12,39 +12,26 @@
   - `sh Script/start-desktop.sh dist`：桌面端直接加载本地 `dist`
 - `start-all.sh`：同时启动前后端
 - `package-all.sh`：统一构建前端，并发布后端和桌面端
-- `deploy-to-linux.py`：后端部署脚本（Mac → Linux SSH，差量上传 + PG 迁移）
+- `deploy-to-linux.py`：Linux 部署总入口（`rsync` 增量同步 + 数据库迁移 + 服务重启）
 
 打包后产物：
 
 - `build/backend/app`：后端主服务发布目录
 - `build/backend/dbmigrator`：ABP 数据库迁移器发布目录
 - `build/backend-linux.zip`：可直接上传到 Linux 的后端压缩包（内含 `backend/` 目录，解压即用）
-- `build/backend/migrate-db.sh`：Linux 上执行数据库迁移（支持 PG / SQLite，见下方说明）
+- `build/backend/migrate-db.sh`：Linux 上执行数据库迁移（支持 SQLite / PostgreSQL / MySQL）
 - `build/backend/start-backend.sh`：Linux 启动后端，是否 `nohup` 由你自己控制
 - `build/backend/DEPLOY-LINUX.md`：Linux 完整部署说明
 
-## Linux 部署（PostgreSQL）
+## Linux 部署
 
-### 首次手动部署
+### 改哪里
 
-```bash
-# 1. 服务器上解压
-unzip backend-linux.zip && cd backend
+部署配置直接写在 `Script/deploy-to-linux.py` 顶部：
 
-# 2. 建库（只需一次）
-psql -U postgres -c "CREATE DATABASE general_admin;"
-
-# 3. 初始化迁移
-GENERAL_ADMIN_CONNECTION_STRING="Host=localhost;Port=5432;Database=general_admin;Username=postgres;Password=你的密码" \
-  bash ./migrate-db.sh
-
-# 4. 后台启动
-GENERAL_ADMIN_CONNECTION_STRING="Host=localhost;Port=5432;Database=general_admin;Username=postgres;Password=你的密码" \
-  nohup bash ./start-backend.sh > logs/backend.log 2>&1 &
-
-# 查看日志
-tail -f logs/backend.log
-```
+- 局域网 / 公网服务器：`Script/deploy-to-linux.py:31`
+- 本地与远端同步目录：`Script/deploy-to-linux.py:47`
+- 同步排除规则：`Script/deploy-to-linux.py:53`
 
 ### 用脚本从 Mac 自动部署
 
@@ -52,20 +39,46 @@ tail -f logs/backend.log
 # 安装依赖（首次）
 pip install fabric
 
-# 首次部署（建库 + 迁移 + 启动）
+# 首次部署（全量同步后端 + 前端 + 迁移 + 启动）
 python Script/deploy-to-linux.py --init
 
-# 后续差量上传 + 重启（文件大小比对）
+# 后续增量发布后端 + 重启（优先使用 rsync）
 python Script/deploy-to-linux.py
 
-# 仅运行迁移（有新版本时）
+# 增量发布后端 + 执行迁移 + 重启
 python Script/deploy-to-linux.py --migrate
+
+# 仅发布前端
+python Script/deploy-to-linux.py --web-only
+
+# 发布后端 + 前端 + 重启
+python Script/deploy-to-linux.py --web
+
+# 仅运行迁移
+python Script/deploy-to-linux.py --migrate-only
+
+# 仅重启后端
+python Script/deploy-to-linux.py --restart
 
 # 公网模式
 python Script/deploy-to-linux.py wan
 ```
 
-> 使用前请修改 `Script/deploy-to-linux.py` 顶部配置区的服务器地址、密码和 `PG_CONNECTION_STRING`。
+### 什么不在部署脚本里管
+
+应用运行时配置继续由项目自身决定，不放在部署脚本里：
+
+- 数据库配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/40-connection-strings.jsonc`
+- Migrator 数据库配置：`General.Admin/src/General.Admin.DbMigrator/appsettings/20-connection-strings.jsonc`
+- 后端 `App` 配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/10-app.jsonc`
+- 前端 `_app.config.js` / Nginx：继续按你现有方案处理
+
+## 同步策略
+
+- 主路径：`rsync` 增量同步，只传变更文件，并删除远端已不存在的旧文件
+- 兜底路径：若本机或服务器缺少 `rsync`，自动回退到 Fabric 差量上传
+- 默认排除：`logs/`、`data/`、临时文件，不覆盖服务器上的持久化数据
+- 如果服务器上的数据库连接配置和仓库内不同，直接把对应 `appsettings/...jsonc` 加进脚本顶部排除规则即可
 
 ## 桌面端跨平台打包
 

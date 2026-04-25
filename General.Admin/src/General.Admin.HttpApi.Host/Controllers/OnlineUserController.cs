@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -7,22 +6,22 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PhaseOneRoleNames.Admin)]
+[Authorize(AdminPermissions.Platform.UserManage)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/online-user")]
 public class OnlineUserController : ControllerBase
 {
-    private readonly PhaseOneOnlineUserService _onlineUserService;
+    private readonly PlatformOnlineUserService _onlineUserService;
 
-    public OnlineUserController(PhaseOneOnlineUserService onlineUserService)
+    public OnlineUserController(PlatformOnlineUserService onlineUserService)
     {
         _onlineUserService = onlineUserService;
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneOnlineUserDto>>>> GetListAsync()
+    public async Task<ActionResult<ApiResponse<List<PlatformOnlineUserDto>>>> GetListAsync()
     {
-        return ApiResponse<List<PhaseOneOnlineUserDto>>.Ok(await _onlineUserService.GetListAsync());
+        return ApiResponse<List<PlatformOnlineUserDto>>.Ok(await _onlineUserService.GetListAsync());
     }
 
     [HttpPost("{userId:guid}/force-logout")]

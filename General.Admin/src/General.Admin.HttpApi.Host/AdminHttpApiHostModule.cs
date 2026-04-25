@@ -14,6 +14,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using General.Admin.EntityFrameworkCore;
 using General.Admin.Infrastructure;
+using General.Admin.Logging;
 using General.Admin.MultiTenancy;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite.Bundling;
@@ -67,6 +68,7 @@ public class AdminHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem(context);
         ConfigureCors(context, configuration);
         ConfigureSwaggerServices(context, configuration);
+        ConfigureLoggingServices(context);
     }
 
     private void ConfigureAuditing()
@@ -194,9 +196,9 @@ public class AdminHttpApiHostModule : AbpModule
     private static void ConfigureSwaggerServices(ServiceConfigurationContext context, IConfiguration configuration)
     {
         context.Services.AddScoped<PlatformEndpointBlacklistFilter>();
-        context.Services.AddTransient<PhaseOneRequestAuditMiddleware>();
-        context.Services.AddTransient<PhaseOneUserActivityMiddleware>();
-        context.Services.AddHostedService<PhaseOneRequestAuditFlushBackgroundService>();
+        context.Services.AddTransient<PlatformRequestAuditMiddleware>();
+        context.Services.AddTransient<PlatformUserActivityMiddleware>();
+        context.Services.AddHostedService<PlatformRequestAuditFlushBackgroundService>();
         context.Services.AddHostedService<PlatformSchedulerBackgroundService>();
         context.Services.AddAbpSwaggerGenWithOAuth(
             configuration["AuthServer:Authority"]!,
@@ -206,7 +208,6 @@ public class AdminHttpApiHostModule : AbpModule
             },
             options =>
             {
-                options.SwaggerDoc(ApiDocGroups.Common, new OpenApiInfo { Title = "Admin API - Common", Version = "v1" });
                 options.SwaggerDoc(ApiDocGroups.Platform, new OpenApiInfo { Title = "Admin API - Platform", Version = "v1" });
                 options.SwaggerDoc(ApiDocGroups.Project, new OpenApiInfo { Title = "Admin API - Project", Version = "v1" });
                 options.SwaggerDoc(ApiDocGroups.Business, new OpenApiInfo { Title = "Admin API - Business", Version = "v1" });
@@ -215,13 +216,19 @@ public class AdminHttpApiHostModule : AbpModule
                     var groupName = description.GroupName;
                     if (string.IsNullOrWhiteSpace(groupName))
                     {
-                        groupName = ApiDocGroups.Common;
+                        groupName = ApiDocGroups.Platform;
                     }
 
                     return string.Equals(docName, groupName, StringComparison.OrdinalIgnoreCase);
                 });
                 options.CustomSchemaIds(type => type.FullName);
             });
+    }
+
+    private static void ConfigureLoggingServices(ServiceConfigurationContext context)
+    {
+        context.Services.AddSingleton<SwaggerGroupLogChannelMapper>();
+        context.Services.AddTransient<LogChannelMiddleware>();
     }
 
     private void ConfigureCors(ServiceConfigurationContext context, IConfiguration configuration)
@@ -264,6 +271,7 @@ public class AdminHttpApiHostModule : AbpModule
         app.UseCorrelationId();
         app.MapAbpStaticAssets();
         app.UseRouting();
+        app.UseMiddleware<LogChannelMiddleware>();
         app.UseCors();
         app.UseAuthentication();
 
@@ -274,13 +282,12 @@ public class AdminHttpApiHostModule : AbpModule
         app.UseUnitOfWork();
         app.UseDynamicClaims();
         app.UseAuthorization();
-        app.UseMiddleware<PhaseOneRequestAuditMiddleware>();
-        app.UseMiddleware<PhaseOneUserActivityMiddleware>();
+        app.UseMiddleware<PlatformRequestAuditMiddleware>();
+        app.UseMiddleware<PlatformUserActivityMiddleware>();
 
         app.UseSwagger();
         app.UseAbpSwaggerUI(c =>
         {
-            c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Common}/swagger.json", "Admin API - Common");
             c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Platform}/swagger.json", "Admin API - Platform");
             c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Project}/swagger.json", "Admin API - Project");
             c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Business}/swagger.json", "Admin API - Business");

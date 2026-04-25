@@ -1,5 +1,4 @@
 using General.Admin.Infrastructure;
-using General.Admin.PhaseOne;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
@@ -7,33 +6,33 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PhaseOneRoleNames.Admin)]
+[Authorize(AdminPermissions.Platform.RoleManage)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/role")]
 public class RoleController : ControllerBase
 {
-    private readonly PhaseOneRoleService _roleService;
+    private readonly PlatformRoleService _roleService;
 
-    public RoleController(PhaseOneRoleService roleService)
+    public RoleController(PlatformRoleService roleService)
     {
         _roleService = roleService;
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PhaseOneRoleDto>>>> GetListAsync()
+    public async Task<ActionResult<ApiResponse<List<PlatformRoleDto>>>> GetListAsync()
     {
-        return ApiResponse<List<PhaseOneRoleDto>>.Ok(await _roleService.GetListAsync());
+        return ApiResponse<List<PlatformRoleDto>>.Ok(await _roleService.GetListAsync());
     }
 
     [HttpGet("{id:guid}/authorization")]
-    public async Task<ActionResult<ApiResponse<PhaseOneRoleAuthorizationDto>>> GetAuthorizationAsync(Guid id)
+    public async Task<ActionResult<ApiResponse<PlatformRoleAuthorizationDto>>> GetAuthorizationAsync(Guid id)
     {
-        return ApiResponse<PhaseOneRoleAuthorizationDto>.Ok(await _roleService.GetAuthorizationAsync(id));
+        return ApiResponse<PlatformRoleAuthorizationDto>.Ok(await _roleService.GetAuthorizationAsync(id));
     }
 
     [HttpPut("{id:guid}/authorization")]
     [PlatformEndpoint("Platform.Role.Manage")]
-    public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(Guid id, [FromBody] PhaseOneRoleAuthorizationSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(Guid id, [FromBody] PlatformRoleAuthorizationSaveInput input)
     {
         await _roleService.SaveAuthorizationAsync(id, input);
         return ApiResponse<bool>.Ok(true);
@@ -41,7 +40,7 @@ public class RoleController : ControllerBase
 
     [HttpPost]
     [PlatformEndpoint("Platform.Role.Manage")]
-    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PhaseOneRoleSaveInput input)
+    public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformRoleSaveInput input)
     {
         await _roleService.CreateAsync(input);
         return ApiResponse<bool>.Ok(true);

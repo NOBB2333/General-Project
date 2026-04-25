@@ -293,3 +293,18 @@ cd /home/wong/Desktop/Code/CsharpLang/General-Project/backend
 # 后台运行，日志写入 logs/
 nohup ./start-backend.sh > logs/backend.log 2>&1 &
 ```
+
+## 五、授权协议
+
+General Admin 采用双重授权模式：
+
+- 开源协议：GNU Affero General Public License v3.0（AGPL-3.0），详见 [LICENSE](LICENSE)
+- 商业授权：如需闭源修改、SaaS/托管服务、白标分发、二次销售、嵌入商业产品，或企业内部生产使用中无法接受 AGPL-3.0 义务，需要获取单独商业授权，详见 [COMMERCIAL.md](COMMERCIAL.md)
+
+AGPL-3.0 允许个人、团队和公司免费使用、复制、修改、分发和通过网络提供服务，但必须遵守 AGPL-3.0 的源代码开放义务。简单说，如果你修改本项目，或基于本项目向用户提供网络服务，你需要按 AGPL-3.0 向这些用户提供对应源代码。
+
+如果你的组织不希望公开修改后的代码，或希望将本项目作为闭源商业产品、托管服务、交付项目的一部分使用，请联系项目所有者获取商业授权。
+
+## 社区
+
+[LINUX DO](https://linux.do/)

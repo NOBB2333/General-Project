@@ -1,4 +1,5 @@
-﻿using Volo.Abp.Account;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Volo.Abp.Account;
 using Volo.Abp.Mapperly;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
@@ -6,8 +7,6 @@ using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement;
 using Volo.Abp.SettingManagement;
 using Volo.Abp.TenantManagement;
-using Microsoft.Extensions.DependencyInjection;
-using General.Admin.PhaseOne;
 
 namespace General.Admin;
 
@@ -32,7 +31,7 @@ public class AdminApplicationModule : AbpModule
     {
         context.Services.AddMapperlyObjectMapper<AdminApplicationModule>();
         context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformLogCleanupJobHandler>();
-        context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformWeeklyReportReminderJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, ProjectWeeklyReportReminderJobHandler>();
         context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformTenantHealthCheckJobHandler>();
     }
 }

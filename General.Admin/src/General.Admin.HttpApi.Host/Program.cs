@@ -6,8 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using General.Admin.EntityFrameworkCore;
+using General.Admin.Logging;
 using Serilog;
-using Serilog.Events;
 
 namespace General.Admin;
 
@@ -19,21 +19,12 @@ public class Program
         AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
         Log.Logger = new LoggerConfiguration()
-#if DEBUG
-            .MinimumLevel.Debug()
-#else
             .MinimumLevel.Information()
-#endif
-            .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
-            .Enrich.FromLogContext()
-            .WriteTo.Async(c => c.File("Logs/logs.txt"))
-            .WriteTo.Async(c => c.Console())
-            .CreateLogger();
+            .WriteTo.Console()
+            .CreateBootstrapLogger();
 
         try
         {
-            Log.Information("Starting General.Admin.HttpApi.Host.");
             var builder = WebApplication.CreateBuilder(args);
             builder.Host.AddAppSettingsSecretsJson()
                 .AddJsoncAppSettingsDirectory()
@@ -41,11 +32,9 @@ public class Program
                 {
                     var configuration = configurationBuilder.Build();
                     var rawConnectionString = configuration.GetConnectionString("Default");
-                    var provider = DatabaseProviderDetector.Detect(rawConnectionString);
+                    var provider = DatabaseProviderDetector.Detect(configuration);
 
-                    var resolvedConnectionString = provider == DatabaseProvider.PostgreSql
-                        ? rawConnectionString
-                        : SqliteConnectionStringHelper.Normalize(rawConnectionString);
+                    var resolvedConnectionString = AdminDbContextOptionsConfigurer.NormalizeConnectionString(provider, rawConnectionString);
 
                     configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                     {
@@ -53,7 +42,11 @@ public class Program
                     });
                 })
                 .UseAutofac()
-                .UseSerilog();
+                .UseSerilog((context, _, loggerConfiguration) =>
+                {
+                    LoggingChannelLoggerConfigurator.Configure(loggerConfiguration, context.Configuration);
+                });
+            Log.Information("Starting General.Admin.HttpApi.Host.");
             await builder.AddApplicationAsync<AdminHttpApiHostModule>();
             var app = builder.Build();
             await app.InitializeApplicationAsync();
