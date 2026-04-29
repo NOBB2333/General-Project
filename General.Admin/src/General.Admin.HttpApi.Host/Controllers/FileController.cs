@@ -1,11 +1,12 @@
 using System.Net.Mime;
 using System.IO;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Hosting;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 using General.Admin.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Volo.Abp.Linq;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Auditing;
@@ -29,22 +30,25 @@ public class FileUploadInput
 [Route("api/app/file")]
 public class FileController : ControllerBase
 {
-    private readonly IWebHostEnvironment _environment;
     private readonly ICurrentUser _currentUser;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
+    private readonly IPlatformFileStorageProviderResolver _fileStorageProviderResolver;
+    private readonly PlatformFileStorageOptions _fileStorageOptions;
     private readonly IRepository<AppPlatformFile, Guid> _platformFileRepository;
     private readonly IRepository<Volo.Abp.Identity.IdentityUser, Guid> _userRepository;
 
     public FileController(
-        IWebHostEnvironment environment,
         ICurrentUser currentUser,
         IAsyncQueryableExecuter asyncQueryableExecuter,
+        IPlatformFileStorageProviderResolver fileStorageProviderResolver,
+        IOptions<PlatformFileStorageOptions> fileStorageOptions,
         IRepository<AppPlatformFile, Guid> platformFileRepository,
         IRepository<Volo.Abp.Identity.IdentityUser, Guid> userRepository)
     {
-        _environment = environment;
         _currentUser = currentUser;
         _asyncQueryableExecuter = asyncQueryableExecuter;
+        _fileStorageProviderResolver = fileStorageProviderResolver;
+        _fileStorageOptions = fileStorageOptions.Value;
         _platformFileRepository = platformFileRepository;
         _userRepository = userRepository;
     }
@@ -125,6 +129,7 @@ public class FileController : ControllerBase
                 RelativePath = BuildRelativePath(x.Category, x.ParentPath, x.FileName),
                 Size = x.Size,
                 StorageLocation = x.StorageLocation,
+                StorageProvider = x.StorageProvider,
                 UploadedAt = x.CreationTime,
                 UploadedBy = user?.UserName
             };
@@ -146,58 +151,92 @@ public class FileController : ControllerBase
             throw new InvalidOperationException("上传文件不能为空。");
         }
 
-        var originalName = Path.GetFileName(file.FileName);
-        var fileKey = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{Path.GetExtension(originalName)}";
-        var filePath = Path.Combine(GetStorageDirectory().FullName, fileKey);
-
-        await using (var stream = System.IO.File.Create(filePath))
+        if (_fileStorageOptions.MaxFileSizeBytes > 0 && file.Length > _fileStorageOptions.MaxFileSizeBytes)
         {
-            await file.CopyToAsync(stream);
+            throw new InvalidOperationException("上传文件超过大小限制。");
         }
 
-        var metadata = new AppPlatformFile(
-            Guid.NewGuid(),
-            fileKey,
+        var originalName = Path.GetFileName(file.FileName);
+        var contentType = NormalizeContentType(string.IsNullOrWhiteSpace(file.ContentType)
+            ? GetContentType(Path.GetExtension(originalName))
+            : file.ContentType);
+        if (_fileStorageOptions.AllowedContentTypes.Length > 0 &&
+            !_fileStorageOptions.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("上传文件类型不允许。");
+        }
+
+        var storageProvider = _fileStorageProviderResolver.Resolve();
+        await using (var validationStream = file.OpenReadStream())
+        {
+            await ValidateFileSignatureAsync(validationStream, contentType, HttpContext.RequestAborted);
+        }
+
+        await using var inputStream = file.OpenReadStream();
+        var storageResult = await storageProvider.SaveAsync(
+            inputStream,
             originalName,
-            string.IsNullOrWhiteSpace(file.ContentType)
-                ? GetContentType(Path.GetExtension(originalName))
-                : file.ContentType,
-            file.Length,
+            contentType,
             string.IsNullOrWhiteSpace(input.Category) ? "default" : input.Category,
             input.ParentPath,
-            filePath,
-            _currentUser.Id);
-        await _platformFileRepository.InsertAsync(metadata, autoSave: true);
+            HttpContext.RequestAborted);
+
+        AppPlatformFile metadata;
+        try
+        {
+            metadata = new AppPlatformFile(
+                Guid.NewGuid(),
+                storageResult.FileKey,
+                originalName,
+                contentType,
+                file.Length,
+                string.IsNullOrWhiteSpace(input.Category) ? "default" : input.Category,
+                input.ParentPath,
+                storageResult.StorageLocation,
+                storageResult.Provider,
+                _currentUser.Id);
+            await _platformFileRepository.InsertAsync(metadata, autoSave: true);
+        }
+        catch
+        {
+            await storageProvider.DeleteAsync(
+                storageResult.FileKey,
+                storageResult.StorageLocation,
+                HttpContext.RequestAborted);
+            throw;
+        }
 
         return ApiResponse<PlatformFileItemDto>.Ok(new PlatformFileItemDto
         {
             Category = metadata.Category,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType)
-                ? GetContentType(Path.GetExtension(originalName))
-                : file.ContentType,
-            FileKey = fileKey,
+            ContentType = contentType,
+            FileKey = storageResult.FileKey,
             FileName = originalName,
             ParentPath = metadata.ParentPath,
             RelativePath = BuildRelativePath(metadata.Category, metadata.ParentPath, originalName),
             Size = file.Length,
-            StorageLocation = filePath,
+            StorageLocation = storageResult.StorageLocation,
+            StorageProvider = storageResult.Provider,
             UploadedBy = _currentUser.UserName,
             UploadedAt = DateTime.UtcNow
         });
     }
 
     [HttpGet("download/{fileKey}")]
-    public IActionResult DownloadAsync(string fileKey)
+    public async Task<IActionResult> DownloadAsync(string fileKey)
     {
-        var filePath = Path.Combine(GetStorageDirectory().FullName, Path.GetFileName(fileKey));
-        if (!System.IO.File.Exists(filePath))
+        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
+        if (metadata == null)
         {
             return NotFound();
         }
 
-        var originalName = Path.GetFileName(filePath);
-        var downloadName = originalName[(originalName.IndexOf('_') + 1)..];
-        return PhysicalFile(filePath, GetContentType(Path.GetExtension(filePath)), downloadName);
+        var storageProvider = _fileStorageProviderResolver.Resolve(metadata.StorageProvider);
+        var stream = await storageProvider.OpenReadAsync(
+            metadata.FileKey,
+            metadata.StorageLocation,
+            HttpContext.RequestAborted);
+        return File(stream, metadata.ContentType, metadata.FileName);
     }
 
     [Authorize(AdminPermissions.Platform.FileManage)]
@@ -205,26 +244,18 @@ public class FileController : ControllerBase
     [HttpDelete("{fileKey}")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(string fileKey)
     {
-        var filePath = Path.Combine(GetStorageDirectory().FullName, Path.GetFileName(fileKey));
-        if (System.IO.File.Exists(filePath))
-        {
-            System.IO.File.Delete(filePath);
-        }
-
         var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
         if (metadata != null)
         {
+            var storageProvider = _fileStorageProviderResolver.Resolve(metadata.StorageProvider);
+            await storageProvider.DeleteAsync(
+                metadata.FileKey,
+                metadata.StorageLocation,
+                HttpContext.RequestAborted);
             await _platformFileRepository.DeleteAsync(metadata, autoSave: true);
         }
 
         return ApiResponse<bool>.Ok(true);
-    }
-
-    private DirectoryInfo GetStorageDirectory()
-    {
-        var directoryPath = Path.Combine(_environment.ContentRootPath, "App_Data", "upload-files");
-        Directory.CreateDirectory(directoryPath);
-        return new DirectoryInfo(directoryPath);
     }
 
     private static string BuildRelativePath(string category, string? parentPath, string fileName)
@@ -249,5 +280,70 @@ public class FileController : ControllerBase
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             _ => MediaTypeNames.Application.Octet
         };
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        var normalized = contentType.Split(';', 2)[0].Trim();
+        return string.IsNullOrWhiteSpace(normalized)
+            ? MediaTypeNames.Application.Octet
+            : normalized;
+    }
+
+    private static async Task ValidateFileSignatureAsync(
+        Stream stream,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[512];
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+        if (!IsAllowedSignature(buffer.AsSpan(0, read), contentType))
+        {
+            throw new InvalidOperationException("上传文件内容与文件类型不匹配。");
+        }
+    }
+
+    private static bool IsAllowedSignature(ReadOnlySpan<byte> header, string contentType)
+    {
+        return contentType.ToLowerInvariant() switch
+        {
+            MediaTypeNames.Image.Jpeg => HasPrefix(header, [0xFF, 0xD8, 0xFF]),
+            "image/png" => HasPrefix(header, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+            MediaTypeNames.Application.Pdf => HasPrefix(header, [0x25, 0x50, 0x44, 0x46]),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => IsZipHeader(header),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => IsZipHeader(header),
+            MediaTypeNames.Text.Plain => IsPlainTextHeader(header),
+            _ => true
+        };
+    }
+
+    private static bool HasPrefix(ReadOnlySpan<byte> header, ReadOnlySpan<byte> prefix)
+    {
+        return header.Length >= prefix.Length && header[..prefix.Length].SequenceEqual(prefix);
+    }
+
+    private static bool IsZipHeader(ReadOnlySpan<byte> header)
+    {
+        return HasPrefix(header, [0x50, 0x4B, 0x03, 0x04]) ||
+               HasPrefix(header, [0x50, 0x4B, 0x05, 0x06]) ||
+               HasPrefix(header, [0x50, 0x4B, 0x07, 0x08]);
+    }
+
+    private static bool IsPlainTextHeader(ReadOnlySpan<byte> header)
+    {
+        if (header.IsEmpty)
+        {
+            return false;
+        }
+
+        foreach (var value in header)
+        {
+            if (value == 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -40,6 +40,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     private readonly IRepository<BusinessProcurement, Guid> _businessProcurementRepository;
     private readonly IRepository<BusinessReceivable, Guid> _businessReceivableRepository;
     private readonly IRepository<PlatformScheduledJob, Guid> _platformScheduledJobRepository;
+    private readonly IRepository<PlatformScheduledJobTrigger, Guid> _platformScheduledJobTriggerRepository;
     private readonly IRepository<PermissionGrant, Guid> _permissionGrantRepository;
     private readonly IdentityRoleManager _roleManager;
     private readonly IdentityUserManager _userManager;
@@ -73,6 +74,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IRepository<BusinessProcurement, Guid> businessProcurementRepository,
         IRepository<BusinessReceivable, Guid> businessReceivableRepository,
         IRepository<PlatformScheduledJob, Guid> platformScheduledJobRepository,
+        IRepository<PlatformScheduledJobTrigger, Guid> platformScheduledJobTriggerRepository,
         IRepository<PermissionGrant, Guid> permissionGrantRepository,
         IdentityRoleManager roleManager,
         IdentityUserManager userManager,
@@ -105,6 +107,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         _businessProcurementRepository = businessProcurementRepository;
         _businessReceivableRepository = businessReceivableRepository;
         _platformScheduledJobRepository = platformScheduledJobRepository;
+        _platformScheduledJobTriggerRepository = platformScheduledJobTriggerRepository;
         _permissionGrantRepository = permissionGrantRepository;
         _roleManager = roleManager;
         _userManager = userManager;
@@ -556,17 +559,37 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
 
     private async Task SeedPlatformScheduledJobsAsync()
     {
-        if (await _platformScheduledJobRepository.AnyAsync())
+        if (!await _platformScheduledJobRepository.AnyAsync())
+        {
+            await _platformScheduledJobRepository.InsertManyAsync(
+            [
+                new(Guid.Parse("59000000-0000-0000-0000-000000000001"), "log-cleanup", "清理老旧日志", "0 0 2 * * ?", "每日凌晨清理过期系统日志、操作日志与临时文件。", true, DateTime.Today.AddDays(1).AddHours(2), DateTime.Today.AddHours(-6), "最近一次执行成功"),
+                new(Guid.Parse("59000000-0000-0000-0000-000000000002"), "weekly-report-reminder", "周报填写通知", "0 0 17 ? * FRI", "每周五下午提醒项目成员回填周报与工时。", true, DateTime.Today.AddDays(4).AddHours(17), DateTime.Today.AddDays(-3).AddHours(17), "最近一次发送 18 条提醒"),
+                new(Guid.Parse("59000000-0000-0000-0000-000000000003"), "tenant-health-check", "租户健康巡检", "0 0/30 * * * ?", "巡检数据库连通性、后台任务积压和磁盘占用。", false, DateTime.Today.AddMinutes(30), DateTime.Today.AddHours(-1), "当前暂停")
+            ], autoSave: true);
+        }
+
+        if (await _platformScheduledJobTriggerRepository.AnyAsync())
         {
             return;
         }
 
-        await _platformScheduledJobRepository.InsertManyAsync(
-        [
-            new(Guid.Parse("59000000-0000-0000-0000-000000000001"), "log-cleanup", "清理老旧日志", "0 0 2 * * ?", "每日凌晨清理过期系统日志、操作日志与临时文件。", true, DateTime.Today.AddDays(1).AddHours(2), DateTime.Today.AddHours(-6), "最近一次执行成功"),
-            new(Guid.Parse("59000000-0000-0000-0000-000000000002"), "weekly-report-reminder", "周报填写通知", "0 0 17 ? * FRI", "每周五下午提醒项目成员回填周报与工时。", true, DateTime.Today.AddDays(4).AddHours(17), DateTime.Today.AddDays(-3).AddHours(17), "最近一次发送 18 条提醒"),
-            new(Guid.Parse("59000000-0000-0000-0000-000000000003"), "tenant-health-check", "租户健康巡检", "0 0/30 * * * ?", "巡检数据库连通性、后台任务积压和磁盘占用。", false, DateTime.Today.AddMinutes(30), DateTime.Today.AddHours(-1), "当前暂停")
-        ], autoSave: true);
+        var jobs = (await _platformScheduledJobRepository.GetListAsync())
+            .OrderBy(x => x.JobKey)
+            .ToList();
+        await _platformScheduledJobTriggerRepository.InsertManyAsync(
+            jobs.Select(x => new PlatformScheduledJobTrigger(
+                Guid.NewGuid(),
+                x.Id,
+                "default",
+                "默认触发器",
+                x.CronExpression,
+                x.Description,
+                x.IsEnabled,
+                x.NextRunTime,
+                x.LastRunTime,
+                x.LastRunResult)).ToList(),
+            autoSave: true);
     }
 
     private async Task SeedBusinessManagementDataAsync()

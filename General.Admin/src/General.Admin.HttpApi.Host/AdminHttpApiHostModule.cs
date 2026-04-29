@@ -103,6 +103,7 @@ public class AdminHttpApiHostModule : AbpModule
     {
         var configuration = context.Services.GetConfiguration();
         Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        Configure<PlatformFileStorageOptions>(configuration.GetSection(PlatformFileStorageOptions.SectionName));
 
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey));

@@ -1,6 +1,6 @@
 namespace General.Admin.Platform;
 
-public class PlatformScheduledJobDto
+public class PlatformScheduledJobTriggerDto
 {
     public string CronExpression { get; set; } = string.Empty;
 
@@ -8,23 +8,13 @@ public class PlatformScheduledJobDto
 
     public bool IsEnabled { get; set; }
 
-    public bool IsRunning { get; set; }
-
-    public string HandlerKey { get; set; } = string.Empty;
-
-    public string JobKey { get; set; } = string.Empty;
-
     public DateTime? LastRunTime { get; set; }
 
     public string LastRunResult { get; set; } = string.Empty;
 
-    public DateTime? LockExpirationTime { get; set; }
-
     public DateTime? NextRunTime { get; set; }
 
-    public string? RunningInstanceId { get; set; }
+    public string TriggerKey { get; set; } = string.Empty;
 
     public string Title { get; set; } = string.Empty;
-
-    public int TriggerCount { get; set; }
 }

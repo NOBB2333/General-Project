@@ -1,0 +1,44 @@
+{
+  "FileStorage": {
+    // Provider: Local | AliyunOSS | MinIO
+    // 企业私有化优先用 MinIO；公有云上阿里云 OSS 可直接切换 AliyunOSS。
+    "Provider": "Local",
+    "MaxFileSizeBytes": 104857600, // 100MB
+    // 生产环境建议保持白名单；如确需放开，设置为空数组。
+    "AllowedContentTypes": [
+      "image/jpeg",
+      "image/png",
+      "application/pdf",
+      "text/plain",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ],
+    "Local": {
+      "RootPath": "App_Data/upload-files",
+      "PathTemplate": ""
+      // Example: "{yyyy}/{MM}/{dd}"
+    },
+    "AliyunOSS": {
+      // Provider = "AliyunOSS" 时启用。
+      "Endpoint": "oss-cn-hangzhou.aliyuncs.com",
+      "Region": "cn-hangzhou",
+      "BucketName": "general-admin",
+      "AccessKeyId": "",
+      "AccessKeySecret": "",
+      "UseHttps": true,
+      "CustomDomain": "",
+      "PathTemplate": "{yyyy}/{MM}/{dd}"
+    },
+    "MinIO": {
+      // Provider = "MinIO" 时启用。
+      "Endpoint": "127.0.0.1:9000",
+      "Region": "",
+      "BucketName": "general-admin",
+      "AccessKey": "",
+      "SecretKey": "",
+      "UseSSL": false,
+      "CustomDomain": "",
+      "PathTemplate": "{yyyy}/{MM}/{dd}"
+    }
+  }
+}

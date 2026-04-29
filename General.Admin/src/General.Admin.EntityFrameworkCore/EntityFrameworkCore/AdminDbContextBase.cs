@@ -67,6 +67,7 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<AppRequestAuditLog> AppRequestAuditLogs { get; set; }
     public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
     public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
+    public DbSet<AppScheduledJobRecord> AppScheduledJobRecords { get; set; }
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
     public DbSet<ProjectEntity> Projects { get; set; }
     public DbSet<ProjectCycle> ProjectCycles { get; set; }
@@ -78,6 +79,8 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<ProjectRaidItem> ProjectRaidItems { get; set; }
     public DbSet<ProjectWorklog> ProjectWorklogs { get; set; }
     public DbSet<PlatformScheduledJob> PlatformScheduledJobs { get; set; }
+    public DbSet<PlatformScheduledJobClusterNode> PlatformScheduledJobClusterNodes { get; set; }
+    public DbSet<PlatformScheduledJobTrigger> PlatformScheduledJobTriggers { get; set; }
     public DbSet<BusinessBudgetExecution> BusinessBudgetExecutions { get; set; }
     public DbSet<BusinessChain> BusinessChains { get; set; }
     public DbSet<BusinessContract> BusinessContracts { get; set; }
@@ -213,8 +216,30 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.Category).IsRequired().HasMaxLength(64);
             b.Property(x => x.ParentPath).HasMaxLength(256);
             b.Property(x => x.StorageLocation).IsRequired().HasMaxLength(512);
+            b.Property(x => x.StorageProvider)
+                .IsRequired()
+                .HasMaxLength(32)
+                .HasDefaultValue(PlatformFileStorageNames.Local);
             b.HasIndex(x => x.FileKey).IsUnique();
+            b.HasIndex(x => x.StorageProvider);
             b.HasIndex(x => new { x.Category, x.ParentPath });
+        });
+
+        builder.Entity<AppScheduledJobRecord>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ScheduledJobRecords", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.JobKey).IsRequired().HasMaxLength(64);
+            b.Property(x => x.JobTitle).IsRequired().HasMaxLength(128);
+            b.Property(x => x.TriggerKey).IsRequired().HasMaxLength(64);
+            b.Property(x => x.TriggerMode).IsRequired().HasMaxLength(16);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(16);
+            b.Property(x => x.Result).HasMaxLength(512);
+            b.Property(x => x.ErrorMessage).HasMaxLength(2048);
+            b.Property(x => x.InstanceId).IsRequired().HasMaxLength(128);
+            b.HasIndex(x => new { x.JobKey, x.StartTime });
+            b.HasIndex(x => new { x.JobKey, x.TriggerKey, x.StartTime });
+            b.HasIndex(x => new { x.JobKey, x.Status, x.StartTime });
         });
 
         builder.Entity<AppUpdateLog>(b =>
@@ -351,11 +376,42 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.ToTable($"{AdminConsts.DbTablePrefix}PlatformScheduledJobs", AdminConsts.DbSchema);
             b.ConfigureByConvention();
             b.Property(x => x.JobKey).IsRequired().HasMaxLength(64);
+            b.Property(x => x.HandlerKey).IsRequired().HasMaxLength(64);
             b.Property(x => x.Title).IsRequired().HasMaxLength(128);
             b.Property(x => x.CronExpression).IsRequired().HasMaxLength(64);
             b.Property(x => x.Description).HasMaxLength(512);
             b.Property(x => x.LastRunResult).HasMaxLength(256);
+            b.Property(x => x.RunningInstanceId).HasMaxLength(128);
             b.HasIndex(x => x.JobKey).IsUnique();
+            b.HasIndex(x => new { x.IsEnabled, x.NextRunTime });
+            b.HasIndex(x => x.LockExpirationTime);
+        });
+
+        builder.Entity<PlatformScheduledJobTrigger>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}PlatformScheduledJobTriggers", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.TriggerKey).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Title).IsRequired().HasMaxLength(128);
+            b.Property(x => x.CronExpression).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Description).HasMaxLength(512);
+            b.Property(x => x.LastRunResult).HasMaxLength(256);
+            b.HasIndex(x => new { x.JobId, x.TriggerKey }).IsUnique();
+            b.HasIndex(x => new { x.IsEnabled, x.NextRunTime });
+        });
+
+        builder.Entity<PlatformScheduledJobClusterNode>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}PlatformScheduledJobClusterNodes", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.InstanceId).IsRequired().HasMaxLength(128);
+            b.Property(x => x.HostName).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ProcessId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Description).HasMaxLength(256);
+            b.HasIndex(x => x.InstanceId).IsUnique();
+            b.HasIndex(x => x.LastHeartbeatTime);
+            b.HasIndex(x => x.Status);
         });
 
         builder.Entity<BusinessBudgetExecution>(b =>

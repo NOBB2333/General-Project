@@ -2,85 +2,73 @@ using Volo.Abp.Domain.Entities.Auditing;
 
 namespace General.Admin.Platform;
 
-public class PlatformScheduledJob : FullAuditedAggregateRoot<Guid>
+public class PlatformScheduledJobTrigger : FullAuditedAggregateRoot<Guid>
 {
     public string CronExpression { get; private set; }
 
     public string Description { get; private set; }
 
-    public string HandlerKey { get; private set; }
-
     public bool IsEnabled { get; private set; }
 
-    public string JobKey { get; private set; }
+    public Guid JobId { get; private set; }
 
     public DateTime? LastRunTime { get; private set; }
 
     public string LastRunResult { get; private set; }
 
-    public DateTime? LockExpirationTime { get; private set; }
-
     public DateTime? NextRunTime { get; private set; }
 
-    public string? RunningInstanceId { get; private set; }
+    public string TriggerKey { get; private set; }
 
     public string Title { get; private set; }
 
-    protected PlatformScheduledJob()
+    protected PlatformScheduledJobTrigger()
     {
         CronExpression = string.Empty;
         Description = string.Empty;
-        HandlerKey = string.Empty;
-        JobKey = string.Empty;
         LastRunResult = string.Empty;
         Title = string.Empty;
+        TriggerKey = string.Empty;
     }
 
-    public PlatformScheduledJob(
+    public PlatformScheduledJobTrigger(
         Guid id,
-        string jobKey,
+        Guid jobId,
+        string triggerKey,
         string title,
         string cronExpression,
         string description,
         bool isEnabled,
         DateTime? nextRunTime = null,
         DateTime? lastRunTime = null,
-        string? lastRunResult = null,
-        string? handlerKey = null) : base(id)
+        string? lastRunResult = null) : base(id)
     {
-        JobKey = Check.NotNullOrWhiteSpace(jobKey, nameof(jobKey), 64);
+        JobId = jobId;
+        TriggerKey = Check.NotNullOrWhiteSpace(triggerKey, nameof(triggerKey), 64);
         Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
-        HandlerKey = Check.NotNullOrWhiteSpace(handlerKey ?? jobKey, nameof(handlerKey), 64);
         CronExpression = Check.NotNullOrWhiteSpace(cronExpression, nameof(cronExpression), 64);
         Description = description?.Trim() ?? string.Empty;
         IsEnabled = isEnabled;
         NextRunTime = nextRunTime;
         LastRunTime = lastRunTime;
-        LastRunResult = lastRunResult?.Trim() ?? string.Empty;
+        LastRunResult = NormalizeResult(lastRunResult);
     }
 
-    public void UpdateDefinition(
+    public void Update(
         string title,
-        string handlerKey,
         string cronExpression,
         string description,
         bool isEnabled,
         DateTime? nextRunTime)
     {
         Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
-        HandlerKey = Check.NotNullOrWhiteSpace(handlerKey, nameof(handlerKey), 64);
         CronExpression = Check.NotNullOrWhiteSpace(cronExpression, nameof(cronExpression), 64);
         Description = description?.Trim() ?? string.Empty;
         IsEnabled = isEnabled;
         NextRunTime = nextRunTime;
     }
 
-    public void Toggle(bool isEnabled)
-    {
-        IsEnabled = isEnabled;
-    }
-
-    public void UpdateSchedule(bool isEnabled, DateTime? nextRunTime)
+    public void Toggle(bool isEnabled, DateTime? nextRunTime)
     {
         IsEnabled = isEnabled;
         NextRunTime = nextRunTime;
@@ -91,31 +79,6 @@ public class PlatformScheduledJob : FullAuditedAggregateRoot<Guid>
         LastRunTime = runTime;
         LastRunResult = NormalizeResult(result);
         NextRunTime = nextRunTime;
-    }
-
-    public bool TryAcquireExecutionLock(string instanceId, DateTime now, TimeSpan leaseDuration)
-    {
-        if (!string.IsNullOrWhiteSpace(RunningInstanceId) &&
-            LockExpirationTime.HasValue &&
-            LockExpirationTime.Value > now &&
-            !RunningInstanceId.Equals(instanceId, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        RunningInstanceId = Check.NotNullOrWhiteSpace(instanceId, nameof(instanceId), 128);
-        LockExpirationTime = now.Add(leaseDuration);
-        return true;
-    }
-
-    public void ReleaseExecutionLock(string instanceId)
-    {
-        if (string.IsNullOrWhiteSpace(RunningInstanceId) ||
-            RunningInstanceId.Equals(instanceId, StringComparison.OrdinalIgnoreCase))
-        {
-            RunningInstanceId = null;
-            LockExpirationTime = null;
-        }
     }
 
     private static string NormalizeResult(string? value)

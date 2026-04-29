@@ -18,6 +18,8 @@ public class PlatformFileItemDto
 
     public string StorageLocation { get; set; } = string.Empty;
 
+    public string StorageProvider { get; set; } = string.Empty;
+
     public string? UploadedBy { get; set; }
 
     public DateTime UploadedAt { get; set; }

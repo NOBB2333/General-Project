@@ -18,6 +18,8 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
 
     public string StorageLocation { get; private set; }
 
+    public string StorageProvider { get; private set; }
+
     public Guid? UploadedByUserId { get; private set; }
 
     protected AppPlatformFile()
@@ -27,6 +29,7 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         FileKey = string.Empty;
         FileName = string.Empty;
         StorageLocation = string.Empty;
+        StorageProvider = PlatformFileStorageNames.Local;
     }
 
     public AppPlatformFile(
@@ -38,6 +41,7 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         string category,
         string? parentPath,
         string storageLocation,
+        string storageProvider,
         Guid? uploadedByUserId) : base(id)
     {
         FileKey = Check.NotNullOrWhiteSpace(fileKey, nameof(fileKey), 256);
@@ -47,6 +51,7 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         Category = Normalize(category, 64) ?? "default";
         ParentPath = Normalize(parentPath, 256);
         StorageLocation = Check.NotNullOrWhiteSpace(storageLocation, nameof(storageLocation), 512);
+        StorageProvider = Check.NotNullOrWhiteSpace(storageProvider, nameof(storageProvider), 32);
         UploadedByUserId = uploadedByUserId;
     }
 
