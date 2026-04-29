@@ -121,6 +121,26 @@ export namespace ProjectApi {
     status?: string;
   }
 
+  export interface ProjectSaveInput {
+    budgetTotalAmount?: null | number;
+    contractTotalAmount?: null | number;
+    description?: null | string;
+    isKeyProject: boolean;
+    managerUserId: string;
+    name: string;
+    organizationUnitId: string;
+    plannedEndDate?: null | string;
+    plannedStartDate?: null | string;
+    priority: string;
+    projectCode: string;
+    projectSource?: null | string;
+    projectType?: null | string;
+    receivedAmount?: null | number;
+    shortName?: null | string;
+    sponsorUserId: string;
+    status: string;
+  }
+
   export interface ProjectListItem {
     blockedTaskCount: number;
     completedTaskCount: number;
@@ -239,6 +259,10 @@ export async function getProjectListApi(params?: ProjectApi.ProjectListInput) {
 
 export async function getProjectDetailApi(projectId: string) {
   return requestClient.get<ProjectApi.ProjectDetail>(`/app/project/detail/${projectId}`);
+}
+
+export async function createProjectApi(data: ProjectApi.ProjectSaveInput) {
+  return requestClient.post<string>('/app/project', data);
 }
 
 export async function getProjectMyRelatedApi() {

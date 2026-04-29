@@ -35,13 +35,14 @@ import {
   getTenantUsersApi,
   saveTenantAuthorizationApi,
   setTenantStatusApi,
+  updateTenantApi,
   getUserListApi,
   type MenuApi as MenuApiNamespace,
 } from '#/api/core';
 
 defineOptions({ name: 'PlatformTenantPage' });
 
-type DrawerType = 'api' | 'menu' | 'users';
+type DrawerType = 'api' | 'edit' | 'menu' | 'users';
 
 interface UiTreeNode {
   children?: UiTreeNode[];
@@ -172,6 +173,13 @@ function openCreate() {
   modalVisible.value = true;
 }
 
+function fillEditForm(tenant: TenantApi.TenantItem) {
+  formState.adminUserId = tenant.adminUserId || undefined;
+  formState.name = tenant.name;
+  formState.defaultConnectionString = '';
+  formState.remark = tenant.remark || '';
+}
+
 async function handleSubmit() {
   if (!formState.name.trim()) {
     message.warning('请输入租户名称');
@@ -212,7 +220,9 @@ async function openDrawer(type: DrawerType, tenant: TenantApi.TenantItem) {
   drawerVisible.value = true;
   drawerLoading.value = true;
   try {
-    if (type === 'users') {
+    if (type === 'edit') {
+      fillEditForm(tenant);
+    } else if (type === 'users') {
       tenantUsers.value = await getTenantUsersApi(tenant.id);
     } else {
       const authorization = await getTenantAuthorizationApi(tenant.id);
@@ -234,14 +244,28 @@ async function saveDrawer() {
 
   saving.value = true;
   try {
-    await saveTenantAuthorizationApi(activeTenant.value.id, {
-      adminUserId: authorizationState.adminUserId || null,
-      apiBlacklist: authorizationState.apiBlacklist,
-      isActive: authorizationState.isActive,
-      menuIds: filterLeafMenuIds(authorizationState.menuIds),
-      remark: authorizationState.remark || null,
-    });
-    message.success('租户授权已保存');
+    if (drawerType.value === 'edit') {
+      if (!formState.name.trim()) {
+        message.warning('请输入租户名称');
+        return;
+      }
+      await updateTenantApi(activeTenant.value.id, {
+        adminUserId: formState.adminUserId || null,
+        defaultConnectionString: formState.defaultConnectionString.trim() || null,
+        name: formState.name.trim(),
+        remark: formState.remark || null,
+      });
+      message.success('租户信息已保存');
+    } else {
+      await saveTenantAuthorizationApi(activeTenant.value.id, {
+        adminUserId: authorizationState.adminUserId || null,
+        apiBlacklist: authorizationState.apiBlacklist,
+        isActive: authorizationState.isActive,
+        menuIds: filterLeafMenuIds(authorizationState.menuIds),
+        remark: authorizationState.remark || null,
+      });
+      message.success('租户授权已保存');
+    }
     drawerVisible.value = false;
     await loadTenants();
   } finally {
@@ -319,6 +343,7 @@ loadTenants();
                       {{ record.isActive ? '停用' : '启用' }}
                     </Button>
                   </Popconfirm>
+                  <Button size="small" @click="openDrawer('edit', record as TenantApi.TenantItem)">编辑信息</Button>
                   <Button size="small" @click="openDrawer('users', record as TenantApi.TenantItem)">查看账号</Button>
                   <Button size="small" @click="openDrawer('menu', record as TenantApi.TenantItem)">菜单授权</Button>
                   <Button size="small" @click="openDrawer('api', record as TenantApi.TenantItem)">接口黑名单</Button>
@@ -368,11 +393,37 @@ loadTenants();
         destroy-on-close
         placement="right"
         width="680"
-        :title="activeTenant ? `${activeTenant.name} · ${drawerType === 'menu' ? '菜单授权' : drawerType === 'api' ? '接口黑名单' : '账号列表'}` : ''"
+        :title="activeTenant ? `${activeTenant.name} · ${drawerType === 'edit' ? '编辑信息' : drawerType === 'menu' ? '菜单授权' : drawerType === 'api' ? '接口黑名单' : '账号列表'}` : ''"
       >
         <Skeleton :loading="drawerLoading" active>
           <div v-if="activeTenant" class="tenant-drawer">
-            <template v-if="drawerType === 'users'">
+            <template v-if="drawerType === 'edit'">
+              <Form layout="vertical">
+                <Form.Item label="租户名称" required>
+                  <Input v-model:value="formState.name" :maxlength="64" placeholder="例如：demo-tenant" />
+                </Form.Item>
+                <Form.Item label="默认连接串">
+                  <Input
+                    v-model:value="formState.defaultConnectionString"
+                    :maxlength="512"
+                    placeholder="留空表示保持原配置不变"
+                  />
+                </Form.Item>
+                <Form.Item label="管理员账号">
+                  <Select
+                    v-model:value="formState.adminUserId"
+                    allow-clear
+                    placeholder="选择该租户管理员"
+                    :options="userOptions"
+                  />
+                </Form.Item>
+                <Form.Item label="备注">
+                  <Input.TextArea v-model:value="formState.remark" :maxlength="256" :rows="3" />
+                </Form.Item>
+              </Form>
+            </template>
+
+            <template v-else-if="drawerType === 'users'">
               <Table
                 :columns="tenantUserColumns"
                 :data-source="tenantUsers"

@@ -6,7 +6,7 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PlatformRoleNames.Admin)]
+[Authorize(AdminPermissions.Platform.SystemMonitorView)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/system-monitor")]
 public class SystemMonitorController : ControllerBase

@@ -295,28 +295,25 @@ onMounted(async () => {
             </template>
 
             <div v-if="selectedNode" class="summary-panel">
-              <article class="summary-panel__metric">
-                <span>部门名称</span>
+              <div class="summary-panel__main">
+                <span>当前节点</span>
                 <strong>{{ selectedNode.displayName }}</strong>
-              </article>
-              <article class="summary-panel__metric">
-                <span>层级编码</span>
-                <strong>{{ selectedNode.code }}</strong>
-              </article>
-              <article class="summary-panel__metric">
-                <span>直属成员</span>
-                <strong>{{ selectedNode.directMemberCount }}</strong>
-              </article>
-              <article class="summary-panel__metric">
-                <span>成员总数</span>
-                <strong>{{ selectedNode.memberCount }}</strong>
-              </article>
-              <article class="summary-panel__metric">
-                <span>权限状态</span>
-                <strong>
-                  {{ selectedNode.disabled ? '仅可见祖先节点' : '当前角色可操作范围' }}
-                </strong>
-              </article>
+                <p>{{ selectedNode.disabled ? '仅可见祖先节点' : '当前角色可操作范围' }}</p>
+              </div>
+              <div class="summary-panel__facts">
+                <article>
+                  <span>层级编码</span>
+                  <strong>{{ selectedNode.code }}</strong>
+                </article>
+                <article>
+                  <span>直属成员</span>
+                  <strong>{{ selectedNode.directMemberCount }}</strong>
+                </article>
+                <article>
+                  <span>成员总数</span>
+                  <strong>{{ selectedNode.memberCount }}</strong>
+                </article>
+              </div>
             </div>
             <div v-else class="platform-page__empty platform-page__empty--small">
               <Empty description="请选择组织节点" />
@@ -489,12 +486,12 @@ onMounted(async () => {
 
 .summary-panel {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.6fr);
 }
 
-.summary-panel__metric {
-  padding: 16px;
+.summary-panel__main,
+.summary-panel__facts article {
   border: 1px solid var(--platform-border);
   border-radius: 16px;
   background: linear-gradient(
@@ -504,17 +501,46 @@ onMounted(async () => {
   );
 }
 
-.summary-panel__metric span {
+.summary-panel__main {
+  padding: 16px;
+}
+
+.summary-panel__main span,
+.summary-panel__facts span {
   display: block;
   margin-bottom: 8px;
   color: var(--platform-text-secondary);
   font-size: 12px;
 }
 
-.summary-panel__metric strong {
+.summary-panel__main strong {
+  color: var(--platform-text);
+  font-size: 22px;
+  line-height: 1.6;
+}
+
+.summary-panel__main p {
+  margin: 8px 0 0;
+  color: var(--platform-text-secondary);
+}
+
+.summary-panel__facts {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summary-panel__facts article {
+  padding: 14px;
+}
+
+.summary-panel__facts strong {
+  display: block;
+  overflow: hidden;
   color: var(--platform-text);
   font-size: 18px;
-  line-height: 1.6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .toolbar,
@@ -526,7 +552,8 @@ onMounted(async () => {
 
 @media (max-width: 1080px) {
   .platform-page__grid,
-  .summary-panel {
+  .summary-panel,
+  .summary-panel__facts {
     grid-template-columns: 1fr;
   }
 }

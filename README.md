@@ -294,7 +294,7 @@ cd /home/wong/Desktop/Code/CsharpLang/General-Project/backend
 nohup ./start-backend.sh > logs/backend.log 2>&1 &
 ```
 
-## 五、授权协议
+## 授权协议
 
 General Admin 采用双重授权模式：
 

@@ -37,7 +37,7 @@ const loading = ref(false);
 const loadingProjects = ref(false);
 const projectOptions = ref<ProjectApi.ProjectListItem[]>([]);
 const selectedProjectId = ref<string | undefined>(undefined);
-const taskScope = ref<'all' | 'related'>('related');
+const taskScope = ref<'all' | 'related'>('all');
 const taskView = ref<'board' | 'calendar' | 'gantt' | 'list'>('list');
 const taskCalendarAnchorDate = ref<Date | null>(null);
 const tabContentElement = ref<HTMLElement | null>(null);
@@ -118,8 +118,8 @@ const tabItems = [
   { key: 'resources', label: '人员与资源' },
 ];
 const taskScopeOptions = [
-  { key: 'related', label: '与我相关' },
   { key: 'all', label: '全部' },
+  { key: 'related', label: '与我相关' },
 ] as const;
 const taskViewOptions = [
   { key: 'list', label: '列表' },

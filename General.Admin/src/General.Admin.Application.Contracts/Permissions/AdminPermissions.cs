@@ -12,6 +12,8 @@ public static class AdminPermissions
         Platform.TenantManage,
         Platform.MenuManage,
         Platform.FileManage,
+        Platform.AuditLogView,
+        Platform.SystemMonitorView,
         Project.Create,
         Project.TaskManage,
         Business.BudgetSensitive
@@ -25,6 +27,8 @@ public static class AdminPermissions
         public const string TenantManage = "Platform.Tenant.Manage";
         public const string MenuManage = "Platform.Menu.Manage";
         public const string FileManage = "Platform.File.Manage";
+        public const string AuditLogView = "Platform.AuditLog.View";
+        public const string SystemMonitorView = "Platform.SystemMonitor.View";
     }
 
     public static class Project

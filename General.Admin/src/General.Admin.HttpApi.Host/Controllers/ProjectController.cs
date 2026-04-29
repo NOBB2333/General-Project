@@ -30,6 +30,14 @@ public class ProjectController : ControllerBase
         return ApiResponse<List<ProjectListItemDto>>.Ok(await _projectService.GetProjectListAsync(input));
     }
 
+    [Authorize(AdminPermissions.Project.Create)]
+    [PlatformEndpoint("Project.Project.Create")]
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<Guid>>> CreateAsync([FromBody] ProjectSaveInput input)
+    {
+        return ApiResponse<Guid>.Ok(await _projectService.CreateAsync(input));
+    }
+
     [HttpGet("detail/{projectId:guid}")]
     public async Task<ActionResult<ApiResponse<ProjectDetailDto>>> GetDetailAsync(Guid projectId)
     {

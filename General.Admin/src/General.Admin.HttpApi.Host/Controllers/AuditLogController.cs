@@ -7,7 +7,6 @@ using Volo.Abp.Users;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(Roles = PlatformRoleNames.Admin)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/audit-log")]
 public class AuditLogController : ControllerBase
@@ -22,19 +21,20 @@ public class AuditLogController : ControllerBase
     }
 
     [HttpGet("list")]
+    [Authorize(AdminPermissions.Platform.AuditLogView)]
     public async Task<ActionResult<ApiResponse<List<PlatformAuditLogItemDto>>>> GetListAsync([FromQuery] PlatformAuditLogQueryInput input)
     {
         return ApiResponse<List<PlatformAuditLogItemDto>>.Ok(await _auditLogService.GetListAsync(input));
     }
 
     [HttpGet("dashboard")]
+    [Authorize(AdminPermissions.Platform.AuditLogView)]
     public async Task<ActionResult<ApiResponse<PlatformLogDashboardDto>>> GetDashboardAsync([FromQuery] PlatformAuditLogQueryInput input)
     {
         return ApiResponse<PlatformLogDashboardDto>.Ok(await _auditLogService.GetDashboardAsync(input));
     }
 
     [AllowAnonymous]
-    [Authorize]
     [DisableAuditing]
     [HttpPost("page-visit")]
     public async Task<ActionResult<ApiResponse<bool>>> RecordPageVisitAsync([FromBody] PlatformPageVisitInput input)

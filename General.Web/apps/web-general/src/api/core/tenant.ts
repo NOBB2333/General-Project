@@ -48,6 +48,10 @@ export async function createTenantApi(data: TenantApi.TenantSaveInput) {
   return requestClient.post<boolean>('/app/tenant', data);
 }
 
+export async function updateTenantApi(id: string, data: TenantApi.TenantSaveInput) {
+  return requestClient.put<boolean>(`/app/tenant/${id}`, data);
+}
+
 export async function deleteTenantApi(id: string) {
   return requestClient.delete<boolean>(`/app/tenant/${id}`);
 }

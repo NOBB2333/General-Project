@@ -118,6 +118,28 @@ public class PlatformTenantService : ITransientDependency
         }
     }
 
+    public async Task UpdateAsync(Guid id, PlatformTenantSaveInput input)
+    {
+        var tenant = await _tenantRepository.GetAsync(id);
+        await _tenantManager.ChangeNameAsync(tenant, input.Name.Trim());
+        if (!string.IsNullOrWhiteSpace(input.DefaultConnectionString))
+        {
+            tenant.SetDefaultConnectionString(input.DefaultConnectionString.Trim());
+        }
+
+        await _tenantRepository.UpdateAsync(tenant, autoSave: true);
+
+        var authorization = await GetAuthorizationAsync(id);
+        await SaveAuthorizationAsync(id, new PlatformTenantAuthorizationSaveInput
+        {
+            AdminUserId = input.AdminUserId,
+            ApiBlacklist = authorization.ApiBlacklist,
+            IsActive = authorization.IsActive,
+            MenuIds = authorization.MenuIds,
+            Remark = input.Remark
+        });
+    }
+
     public async Task DeleteAsync(Guid id)
     {
         var tenant = await _tenantRepository.GetAsync(id);

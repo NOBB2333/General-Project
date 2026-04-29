@@ -814,7 +814,12 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             }
 
             var role = await _roleRepository.GetAsync(roleId);
-            await GrantRolePermissionsForMenusAsync(role, allMenus, menuIds);
+            var effectiveMenuIds = (await _roleMenuRepository.GetListAsync())
+                .Where(x => x.RoleId == roleId)
+                .Select(x => x.MenuId)
+                .Distinct()
+                .ToList();
+            await GrantRolePermissionsForMenusAsync(role, allMenus, effectiveMenuIds);
         }
     }
 
@@ -861,9 +866,9 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRoles, PlatformSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenus, PlatformSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFiles, PlatformSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSystemMonitor, PlatformSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSystemMonitor, PlatformSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90, permissionCode: "Platform.SystemMonitor.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformScheduler, PlatformSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformAuditLogs, PlatformSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "日志中心", "lucide:shield-check", 75),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformAuditLogs, PlatformSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "日志中心", "lucide:shield-check", 75, permissionCode: "Platform.AuditLog.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUpdateLogs, PlatformSeedIds.PlatformRoot, "PlatformUpdateLogs", "/platform/update-logs", "/platform/update-logs/index", "更新日志", "lucide:scroll-text", 110),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformProfile, PlatformSeedIds.PlatformRoot, "PlatformProfile", "/platform/profile", "/platform/profile/index", "个人中心", "lucide:user-circle-2", 120),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOrganizationManage, PlatformSeedIds.PlatformOrganization, "PlatformOrganizationManage", "Platform.Organization.Manage"),
@@ -1014,7 +1019,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         string title,
         string icon,
         int order,
-        bool affixTab = false)
+        bool affixTab = false,
+        string? permissionCode = null)
     {
         return new AppMenu(
             id,
@@ -1027,7 +1033,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             PlatformMenuType.Menu,
             title,
             icon,
-            null,
+            permissionCode,
             null,
             affixTab,
             true,

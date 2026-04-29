@@ -56,6 +56,14 @@ public class TenantController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
+    [HttpPut("{id:guid}")]
+    [PlatformEndpoint("Platform.Tenant.Manage")]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PlatformTenantSaveInput input)
+    {
+        await _tenantService.UpdateAsync(id, input);
+        return ApiResponse<bool>.Ok(true);
+    }
+
     [HttpDelete("{id:guid}")]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
