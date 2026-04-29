@@ -924,6 +924,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigs, PlatformSeedIds.PlatformRoot, "PlatformConfigs", "/platform/configs", "/platform/configs/index", "配置参数", "lucide:sliders-horizontal", 65, permissionCode: "Platform.Config.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDicts, PlatformSeedIds.PlatformRoot, "PlatformDicts", "/platform/dicts", "/platform/dicts/index", "字典管理", "lucide:list-tree", 68, permissionCode: "Platform.Dict.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFiles, PlatformSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApi, PlatformSeedIds.PlatformRoot, "PlatformOpenApi", "/platform/open-api", "/platform/open-api/index", "开放接口", "lucide:plug-zap", 72, permissionCode: "Platform.OpenApi.Manage"),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRecycleBin, PlatformSeedIds.PlatformRoot, "PlatformRecycleBin", "/platform/recycle-bin", "/platform/recycle-bin/index", "回收站", "lucide:archive-restore", 73, permissionCode: "Platform.RecycleBin.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSystemMonitor, PlatformSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90, permissionCode: "Platform.SystemMonitor.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformScheduler, PlatformSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformAuditLogs, PlatformSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "日志中心", "lucide:shield-check", 75, permissionCode: "Platform.AuditLog.View"),
@@ -936,6 +938,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenusManage, PlatformSeedIds.PlatformMenus, "PlatformMenuManage", "Platform.Menu.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigsManage, PlatformSeedIds.PlatformConfigs, "PlatformConfigManage", "Platform.Config.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDictsManage, PlatformSeedIds.PlatformDicts, "PlatformDictManage", "Platform.Dict.Manage"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApiManage, PlatformSeedIds.PlatformOpenApi, "PlatformOpenApiManage", "Platform.OpenApi.Manage"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRecycleBinManage, PlatformSeedIds.PlatformRecycleBin, "PlatformRecycleBinManage", "Platform.RecycleBin.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFilesManage, PlatformSeedIds.PlatformFiles, "PlatformFileManage", "Platform.File.Manage"),
 
             Catalog(PlatformAppCodes.Project, PlatformSeedIds.ProjectRoot, null, "ProjectCenter", "/project", "项目执行", "lucide:folder-kanban", 20),

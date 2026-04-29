@@ -5,5 +5,41 @@
     "ClientUrl": "http://localhost:5677",
     "CorsOrigins": "http://localhost:5677,https://localhost:5677,http://localhost:5666,https://localhost:5666,https://*.Admin.com",
     "RedirectAllowedUrls": ""
+  },
+  // API 文档配置：
+  // 1. Ui 控制“页面入口”：
+  //    - Scalar：只启用新版文档页面，访问 /scalar
+  //    - Swagger：只启用传统 Swagger UI，访问 /swagger
+  //    - Both：同时启用 /scalar 和 /swagger
+  //    - None：不启用文档页面
+  // 2. OpenApiRoutePattern 是 Scalar 读取 OpenAPI JSON 的地址，不代表启用 Swagger UI。
+  //    当前仍由 Swashbuckle 生成 JSON：/swagger/platform/swagger.json、/swagger/project/swagger.json、/swagger/business/swagger.json。
+  "ApiDocumentation": {
+    "Ui": "Scalar",
+    "Title": "General Admin 接口文档",
+    // ScalarRoutePrefix: Scalar 文档页面入口，默认 https://localhost:44392/scalar。
+    "ScalarRoutePrefix": "/scalar",
+    // SwaggerRoutePrefix: 仅当 Ui 为 Swagger 或 Both 时生效。
+    "SwaggerRoutePrefix": "swagger",
+    // OpenApiRoutePattern: OpenAPI JSON 数据源，Scalar 会按 Documents.Name 替换 {documentName}。
+    "OpenApiRoutePattern": "/swagger/{documentName}/swagger.json",
+    // Documents: 文档分组，对应 AdminHttpApiHostModule 中的 SwaggerDoc 分组。
+    "Documents": [
+      {
+        "Name": "platform",
+        "Title": "平台 API",
+        "IsDefault": true
+      },
+      {
+        "Name": "project",
+        "Title": "项目 API",
+        "IsDefault": false
+      },
+      {
+        "Name": "business",
+        "Title": "业务 API",
+        "IsDefault": false
+      }
+    ]
   }
 }

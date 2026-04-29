@@ -129,7 +129,9 @@ public static class JsoncAppSettingsExtensions
                     return;
                 }
                 case JsonValue jsonValue:
-                    values[parentPath ?? string.Empty] = jsonValue.ToJsonString().Trim('"');
+                    values[parentPath ?? string.Empty] = jsonValue.TryGetValue<string>(out var stringValue)
+                        ? stringValue
+                        : jsonValue.ToJsonString();
                     return;
                 default:
                     values[parentPath ?? string.Empty] = node.ToJsonString().Trim('"');

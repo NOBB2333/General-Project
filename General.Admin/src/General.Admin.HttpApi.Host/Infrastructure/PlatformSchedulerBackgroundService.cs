@@ -2,6 +2,7 @@ using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Volo.Abp.Uow;
 
 namespace General.Admin.Infrastructure;
 
@@ -38,8 +39,12 @@ public sealed class PlatformSchedulerBackgroundService : BackgroundService
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
+            var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
             var schedulerService = scope.ServiceProvider.GetRequiredService<PlatformSchedulerService>();
+
+            using var unitOfWork = unitOfWorkManager.Begin(requiresNew: true, isTransactional: false);
             await schedulerService.ProcessDueJobsAsync(cancellationToken);
+            await unitOfWork.CompleteAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

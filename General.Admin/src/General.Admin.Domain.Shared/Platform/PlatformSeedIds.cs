@@ -30,6 +30,8 @@ public static class PlatformSeedIds
     public static readonly Guid PlatformProfile = Guid.Parse("20000000-0000-0000-0000-000000000011");
     public static readonly Guid PlatformConfigs = Guid.Parse("20000000-0000-0000-0000-000000000023");
     public static readonly Guid PlatformDicts = Guid.Parse("20000000-0000-0000-0000-000000000024");
+    public static readonly Guid PlatformOpenApi = Guid.Parse("20000000-0000-0000-0000-000000000027");
+    public static readonly Guid PlatformRecycleBin = Guid.Parse("20000000-0000-0000-0000-000000000028");
     public static readonly Guid PlatformStats = Guid.Parse("20000000-0000-0000-0000-000000000022");
     public static readonly Guid PlatformOnlineUsers = Guid.Parse("20000000-0000-0000-0000-000000000020");
     public static readonly Guid PlatformUpdateLogs = Guid.Parse("20000000-0000-0000-0000-000000000021");
@@ -43,6 +45,8 @@ public static class PlatformSeedIds
     public static readonly Guid PlatformFilesManage = Guid.Parse("20000000-0000-0000-0000-000000000017");
     public static readonly Guid PlatformConfigsManage = Guid.Parse("20000000-0000-0000-0000-000000000025");
     public static readonly Guid PlatformDictsManage = Guid.Parse("20000000-0000-0000-0000-000000000026");
+    public static readonly Guid PlatformOpenApiManage = Guid.Parse("20000000-0000-0000-0000-000000000029");
+    public static readonly Guid PlatformRecycleBinManage = Guid.Parse("20000000-0000-0000-0000-000000000030");
 
     public static readonly Guid ProjectRoot = Guid.Parse("30000000-0000-0000-0000-000000000001");
     public static readonly Guid ProjectWorkspace = Guid.Parse("30000000-0000-0000-0000-000000000002");

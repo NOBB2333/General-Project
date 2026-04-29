@@ -17,6 +17,8 @@ public class AdminPermissionDefinitionProvider : PermissionDefinitionProvider
         adminGroup.AddPermission(AdminPermissions.Platform.MenuManage, L("Permission:Platform.Menu.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.ConfigManage, L("Permission:Platform.Config.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.DictManage, L("Permission:Platform.Dict.Manage"));
+        adminGroup.AddPermission(AdminPermissions.Platform.OpenApiManage, L("Permission:Platform.OpenApi.Manage"));
+        adminGroup.AddPermission(AdminPermissions.Platform.RecycleBinManage, L("Permission:Platform.RecycleBin.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.FileManage, L("Permission:Platform.File.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.AuditLogView, L("Permission:Platform.AuditLog.View"));
         adminGroup.AddPermission(AdminPermissions.Platform.SystemMonitorView, L("Permission:Platform.SystemMonitor.View"));

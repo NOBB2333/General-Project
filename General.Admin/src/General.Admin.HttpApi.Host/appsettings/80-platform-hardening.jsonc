@@ -1,0 +1,28 @@
+{
+  "RateLimiting": {
+    // ForwardedForHeader: 只在请求来源为 loopback 或 TrustedProxies 时读取，避免客户端伪造真实 IP。
+    "ForwardedForHeader": "X-Forwarded-For",
+    // TrustedProxies: 部署在 Nginx / LB / Ingress 后面时填写可信代理 IP，例如 ["10.0.0.10"]。
+    "TrustedProxies": [],
+    // General: 后台普通 API 的兜底限流，按登录用户或 IP 分桶。
+    "General": {
+      "PermitLimit": 600,
+      "WindowMinutes": 1
+    },
+    // Login: 登录/认证接口限流，按 IP 分桶，降低撞库和爆破风险。
+    "Login": {
+      "PermitLimit": 20,
+      "WindowMinutes": 1
+    },
+    // FileUpload: 文件上传限流，按登录用户或 IP 分桶。
+    "FileUpload": {
+      "PermitLimit": 60,
+      "WindowMinutes": 1
+    },
+    // OpenApi: /api/open/* 开放接口限流，按可信客户端 IP 分桶，避免 X-GA-AppId 被伪造绕过。
+    "OpenApi": {
+      "PermitLimit": 120,
+      "WindowMinutes": 1
+    }
+  }
+}

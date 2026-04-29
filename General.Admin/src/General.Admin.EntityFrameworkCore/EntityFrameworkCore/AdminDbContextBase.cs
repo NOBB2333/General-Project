@@ -68,6 +68,7 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
     public DbSet<AppDictData> AppDictData { get; set; }
     public DbSet<AppDictType> AppDictTypes { get; set; }
+    public DbSet<AppOpenApiApplication> AppOpenApiApplications { get; set; }
     public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
     public DbSet<AppScheduledJobRecord> AppScheduledJobRecords { get; set; }
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
@@ -229,6 +230,19 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.Remark).HasMaxLength(256);
             b.HasIndex(x => new { x.DictTypeId, x.Value }).IsUnique();
             b.HasIndex(x => new { x.DictTypeId, x.IsEnabled, x.Sort });
+        });
+
+        builder.Entity<AppOpenApiApplication>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}OpenApiApplications", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.AppId).IsRequired().HasMaxLength(64);
+            b.Property(x => x.EncryptedSecret).IsRequired().HasMaxLength(2048);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.Property(x => x.Scopes).IsRequired().HasColumnType("TEXT");
+            b.HasIndex(x => x.AppId).IsUnique();
+            b.HasIndex(x => x.IsEnabled);
         });
 
         builder.Entity<AppPlatformFile>(b =>
