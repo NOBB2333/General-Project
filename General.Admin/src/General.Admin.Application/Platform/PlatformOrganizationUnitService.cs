@@ -1,33 +1,57 @@
+using System.Text.Json;
+using Microsoft.Extensions.Caching.Distributed;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.Users;
 
 namespace General.Admin.Platform;
 
 public class PlatformOrganizationUnitService : ITransientDependency
 {
+    private static readonly DistributedCacheEntryOptions OrganizationCacheOptions = new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+    };
+
     private readonly CurrentUserDataScopeService _dataScopeService;
+    private readonly ICurrentUser _currentUser;
+    private readonly IDistributedCache _distributedCache;
     private readonly IdentityUserManager _identityUserManager;
     private readonly OrganizationUnitManager _organizationUnitManager;
+    private readonly PlatformCacheService _platformCacheService;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
 
     public PlatformOrganizationUnitService(
         CurrentUserDataScopeService dataScopeService,
+        ICurrentUser currentUser,
+        IDistributedCache distributedCache,
         IdentityUserManager identityUserManager,
         OrganizationUnitManager organizationUnitManager,
+        PlatformCacheService platformCacheService,
         IRepository<OrganizationUnit, Guid> organizationUnitRepository,
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository)
     {
         _dataScopeService = dataScopeService;
+        _currentUser = currentUser;
+        _distributedCache = distributedCache;
         _identityUserManager = identityUserManager;
         _organizationUnitManager = organizationUnitManager;
+        _platformCacheService = platformCacheService;
         _organizationUnitRepository = organizationUnitRepository;
         _userOrganizationUnitRepository = userOrganizationUnitRepository;
     }
 
     public async Task<List<OrganizationUnitTreeDto>> GetTreeAsync()
     {
+        var cacheKey = await _platformCacheService.BuildVersionedKeyAsync("organization", $"tree:{BuildCurrentUserCachePart()}");
+        var cached = await _distributedCache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrWhiteSpace(cached))
+        {
+            return JsonSerializer.Deserialize<List<OrganizationUnitTreeDto>>(cached) ?? [];
+        }
+
         var accessibleIds = await _dataScopeService.GetAccessibleOrganizationUnitIdsAsync();
         var visibleIds = await _dataScopeService.GetVisibleOrganizationUnitIdsAsync();
 
@@ -49,7 +73,9 @@ public class PlatformOrganizationUnitService : ITransientDependency
             .Where(x => visibleIds.Contains(x.Id))
             .ToList();
 
-        return BuildTree(visibleUnits, memberCountMap, accessibleIds, null);
+        var result = BuildTree(visibleUnits, memberCountMap, accessibleIds, null);
+        await _distributedCache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), OrganizationCacheOptions);
+        return result;
     }
 
     public async Task CreateAsync(OrganizationUnitSaveInput input)
@@ -57,6 +83,7 @@ public class PlatformOrganizationUnitService : ITransientDependency
         await EnsureParentAccessibleAsync(input.ParentId);
         var organizationUnit = new OrganizationUnit(Guid.NewGuid(), input.DisplayName.Trim(), input.ParentId);
         await _organizationUnitManager.CreateAsync(organizationUnit);
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     public async Task UpdateAsync(Guid id, OrganizationUnitSaveInput input)
@@ -72,6 +99,7 @@ public class PlatformOrganizationUnitService : ITransientDependency
         {
             await _organizationUnitManager.MoveAsync(id, input.ParentId);
         }
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     public async Task MoveAsync(Guid id, Guid? parentId)
@@ -80,12 +108,14 @@ public class PlatformOrganizationUnitService : ITransientDependency
         await EnsureParentAccessibleAsync(parentId);
 
         await _organizationUnitManager.MoveAsync(id, parentId);
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     public async Task DeleteAsync(Guid id)
     {
         await EnsureAccessibleAsync(id);
         await _organizationUnitManager.DeleteAsync(id);
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     public async Task TransferMembersAsync(Guid sourceOrganizationUnitId, OrganizationUnitMemberTransferInput input)
@@ -155,6 +185,16 @@ public class PlatformOrganizationUnitService : ITransientDependency
                 await _identityUserManager.AddToOrganizationUnitAsync(userId, input.TargetOrganizationUnitId);
             }
         }
+        await _platformCacheService.InvalidateAsync("organization");
+    }
+
+    private string BuildCurrentUserCachePart()
+    {
+        var userId = _currentUser.Id?.ToString("N") ?? "anonymous";
+        var roles = _currentUser.Roles == null
+            ? "no-role"
+            : string.Join('-', _currentUser.Roles.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        return $"{userId}:{roles}";
     }
 
     private static List<OrganizationUnitTreeDto> BuildTree(

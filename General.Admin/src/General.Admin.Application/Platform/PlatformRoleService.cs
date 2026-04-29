@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.Extensions.Caching.Distributed;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
@@ -6,6 +8,11 @@ namespace General.Admin.Platform;
 
 public class PlatformRoleService : ITransientDependency
 {
+    private static readonly DistributedCacheEntryOptions RoleCacheOptions = new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+    };
+
     private static readonly IReadOnlyList<string> BuiltInRoleNames =
     [
         PlatformRoleNames.Admin,
@@ -16,6 +23,8 @@ public class PlatformRoleService : ITransientDependency
     ];
 
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
+    private readonly IDistributedCache _distributedCache;
+    private readonly PlatformCacheService _platformCacheService;
     private readonly IdentityUserManager _userManager;
     private readonly IdentityRoleManager _roleManager;
     private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
@@ -24,12 +33,16 @@ public class PlatformRoleService : ITransientDependency
     public PlatformRoleService(
         IdentityUserManager userManager,
         IdentityRoleManager roleManager,
+        IDistributedCache distributedCache,
+        PlatformCacheService platformCacheService,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<IdentityRole, Guid> roleRepository)
     {
         _userManager = userManager;
         _roleManager = roleManager;
+        _distributedCache = distributedCache;
+        _platformCacheService = platformCacheService;
         _roleAuthorizationRepository = roleAuthorizationRepository;
         _roleMenuRepository = roleMenuRepository;
         _roleRepository = roleRepository;
@@ -100,6 +113,7 @@ public class PlatformRoleService : ITransientDependency
 
         var role = new IdentityRole(Guid.NewGuid(), roleName);
         EnsureSucceeded(await _roleManager.CreateAsync(role));
+        await _platformCacheService.InvalidateAsync("role");
     }
 
     public async Task DeleteAsync(Guid id)
@@ -131,10 +145,19 @@ public class PlatformRoleService : ITransientDependency
         }
 
         EnsureSucceeded(await _roleManager.DeleteAsync(role));
+        await _platformCacheService.InvalidateAsync("role");
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task<PlatformRoleAuthorizationDto> GetAuthorizationAsync(Guid roleId)
     {
+        var cacheKey = await _platformCacheService.BuildVersionedKeyAsync("role", $"authorization:{roleId:N}");
+        var cached = await _distributedCache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrWhiteSpace(cached))
+        {
+            return JsonSerializer.Deserialize<PlatformRoleAuthorizationDto>(cached) ?? new PlatformRoleAuthorizationDto();
+        }
+
         var role = await _roleManager.GetByIdAsync(roleId);
         var authorization = await _roleAuthorizationRepository.FindAsync(x => x.RoleId == role.Id);
         var allRoleMenus = await _roleMenuRepository.GetListAsync();
@@ -153,7 +176,7 @@ public class PlatformRoleService : ITransientDependency
                 .ToList();
         }
 
-        return new PlatformRoleAuthorizationDto
+        var result = new PlatformRoleAuthorizationDto
         {
             ApiBlacklist = authorization == null
                 ? []
@@ -168,6 +191,8 @@ public class PlatformRoleService : ITransientDependency
             DataScopeMode = authorization?.DataScopeMode ?? PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants,
             MenuIds = menuIds
         };
+        await _distributedCache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), RoleCacheOptions);
+        return result;
     }
 
     private static IReadOnlyCollection<Guid> GetDefaultMenuIds(string roleName, IReadOnlyCollection<AppRoleMenu> allRoleMenus)
@@ -256,6 +281,7 @@ public class PlatformRoleService : ITransientDependency
                 accountUserIds,
                 apiBlacklist);
             await _roleAuthorizationRepository.InsertAsync(authorization, autoSave: true);
+            await _platformCacheService.InvalidateAsync("role");
             return;
         }
 
@@ -266,6 +292,7 @@ public class PlatformRoleService : ITransientDependency
             accountUserIds,
             apiBlacklist);
         await _roleAuthorizationRepository.UpdateAsync(authorization, autoSave: true);
+        await _platformCacheService.InvalidateAsync("role");
     }
 
     private static string GetDescription(string roleName)

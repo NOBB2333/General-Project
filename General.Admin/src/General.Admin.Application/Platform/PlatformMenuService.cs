@@ -1,4 +1,6 @@
 using General.Admin.Permissions;
+using System.Text.Json;
+using Microsoft.Extensions.Caching.Distributed;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
@@ -10,39 +12,69 @@ namespace General.Admin.Platform;
 
 public class PlatformMenuService : ITransientDependency
 {
+    private static readonly DistributedCacheEntryOptions AccessCacheOptions = new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
+    };
+
     private readonly ICurrentUser _currentUser;
+    private readonly IDistributedCache _distributedCache;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
     private readonly IPermissionManager _permissionManager;
+    private readonly PlatformCacheService _platformCacheService;
     private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
 
     public PlatformMenuService(
         ICurrentUser currentUser,
+        IDistributedCache distributedCache,
         IRepository<AppMenu, Guid> menuRepository,
         IPermissionManager permissionManager,
+        PlatformCacheService platformCacheService,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<IdentityRole, Guid> roleRepository)
     {
         _currentUser = currentUser;
+        _distributedCache = distributedCache;
         _menuRepository = menuRepository;
         _permissionManager = permissionManager;
+        _platformCacheService = platformCacheService;
         _roleMenuRepository = roleMenuRepository;
         _roleRepository = roleRepository;
     }
 
     public async Task<List<string>> GetCurrentAccessCodesAsync()
     {
+        var cacheKey = await _platformCacheService.BuildVersionedKeyAsync("menu", $"access:{BuildCurrentUserCachePart()}");
+        var cached = await _distributedCache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrWhiteSpace(cached))
+        {
+            return JsonSerializer.Deserialize<List<string>>(cached) ?? [];
+        }
+
         var menus = await GetGrantedMenusForCurrentUserAsync();
-        return menus
+        var result = menus
             .Where(x => x.IsEnabled && !string.IsNullOrWhiteSpace(x.PermissionCode))
             .Select(x => x.PermissionCode!)
             .Distinct()
             .OrderBy(x => x)
             .ToList();
+        await _distributedCache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), AccessCacheOptions);
+        return result;
     }
 
     public async Task<List<BackendRouteDto>> GetCurrentMenusAsync(IReadOnlyCollection<string>? appCodes = null)
     {
+        var appCodePart = appCodes == null || appCodes.Count == 0
+            ? "all"
+            : string.Join('-', appCodes.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        var cacheKey = await _platformCacheService.BuildVersionedKeyAsync("menu", $"routes:{BuildCurrentUserCachePart()}:{appCodePart}");
+        var cached = await _distributedCache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrWhiteSpace(cached))
+        {
+            return JsonSerializer.Deserialize<List<BackendRouteDto>>(cached) ?? [];
+        }
+
         var grantedMenus = FilterMenusByAppCodes(await GetGrantedMenusForCurrentUserAsync(), appCodes);
         var visibleMenus = grantedMenus
             .Where(x => x.IsEnabled && x.Type != PlatformMenuType.Button)
@@ -50,7 +82,9 @@ public class PlatformMenuService : ITransientDependency
             .ThenBy(x => x.CreationTime)
             .ToList();
 
-        return BuildRouteTree(visibleMenus, null);
+        var result = BuildRouteTree(visibleMenus, null);
+        await _distributedCache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), AccessCacheOptions);
+        return result;
     }
 
     public async Task<List<Guid>> GetRoleMenuIdsAsync(Guid roleId)
@@ -76,6 +110,7 @@ public class PlatformMenuService : ITransientDependency
         await ValidateMenuParentAsync(null, input);
         var menu = CreateMenu(Guid.NewGuid(), input);
         await _menuRepository.InsertAsync(menu, autoSave: true);
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task UpdateAsync(Guid id, PlatformMenuSaveInput input)
@@ -103,6 +138,7 @@ public class PlatformMenuService : ITransientDependency
             input.Order,
             input.IsEnabled);
         await _menuRepository.UpdateAsync(menu, autoSave: true);
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task SetEnabledAsync(Guid id, bool isEnabled)
@@ -129,6 +165,7 @@ public class PlatformMenuService : ITransientDependency
             menu.Order,
             isEnabled);
         await _menuRepository.UpdateAsync(menu, autoSave: true);
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task DeleteAsync(Guid id)
@@ -150,6 +187,8 @@ public class PlatformMenuService : ITransientDependency
         {
             await _menuRepository.DeleteManyAsync(menusToDelete, autoSave: true);
         }
+
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task GrantRoleMenusAsync(Guid roleId, IReadOnlyCollection<Guid> menuIds)
@@ -180,6 +219,17 @@ public class PlatformMenuService : ITransientDependency
 
         var role = await _roleRepository.GetAsync(roleId);
         await SyncRolePermissionGrantsAsync(role, allMenus, normalizedMenuIds);
+        await _platformCacheService.InvalidateAsync("menu");
+        await _platformCacheService.InvalidateAsync("role");
+    }
+
+    private string BuildCurrentUserCachePart()
+    {
+        var userId = _currentUser.Id?.ToString("N") ?? "anonymous";
+        var roles = _currentUser.Roles == null
+            ? "no-role"
+            : string.Join('-', _currentUser.Roles.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+        return $"{userId}:{roles}";
     }
 
     private async Task SyncRolePermissionGrantsAsync(

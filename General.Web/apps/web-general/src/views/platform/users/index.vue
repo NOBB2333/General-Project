@@ -73,7 +73,7 @@ const keyword = ref('');
 const loading = ref(false);
 const modalVisible = ref(false);
 const resetPasswordSaving = ref(false);
-const resetPasswordValue = ref('1q2w3E*');
+const resetPasswordValue = ref('');
 const resetPasswordVisible = ref(false);
 const saving = ref(false);
 const editingUserId = ref<null | string>(null);
@@ -207,7 +207,7 @@ function openCreate() {
   formState.externalUserId = '';
   formState.isActive = true;
   formState.organizationUnitId = undefined;
-  formState.password = '1q2w3E*';
+  formState.password = '';
   formState.phoneNumber = '';
   formState.roleNames = [];
   formState.username = '';
@@ -216,7 +216,7 @@ function openCreate() {
 
 function openResetPassword(record: UserApi.UserListItem) {
   activeResetUser.value = record;
-  resetPasswordValue.value = '1q2w3E*';
+  resetPasswordValue.value = '';
   resetPasswordVisible.value = true;
 }
 
@@ -267,6 +267,10 @@ async function handleSubmit() {
   }
   if (formState.phoneNumber?.trim() && !phoneNumberPattern.test(formState.phoneNumber.trim())) {
     message.warning('手机号格式不正确，请输入 11 位中国大陆手机号');
+    return;
+  }
+  if (!editingUserId.value && !formState.password.trim()) {
+    message.warning('创建用户时请输入初始密码');
     return;
   }
 
@@ -634,11 +638,11 @@ onMounted(async () => {
           <Form.Item label="外部账号标识">
             <Input v-model:value="formState.externalUserId" :maxlength="128" />
           </Form.Item>
-          <Form.Item label="密码">
+          <Form.Item label="密码" :required="!editingUserId">
             <Input.Password
               v-model:value="formState.password"
               :maxlength="128"
-              :placeholder="editingUserId ? '留空则不修改密码' : '默认密码 1q2w3E*'"
+              :placeholder="editingUserId ? '留空则不修改密码' : '请输入初始密码'"
             />
           </Form.Item>
           <Form.Item label="状态">

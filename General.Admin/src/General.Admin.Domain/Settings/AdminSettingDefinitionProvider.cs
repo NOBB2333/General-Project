@@ -6,7 +6,11 @@ public class AdminSettingDefinitionProvider : SettingDefinitionProvider
 {
     public override void Define(ISettingDefinitionContext context)
     {
-        //Define your own settings here. Example:
-        //context.Add(new SettingDefinition(AdminSettings.MySetting1));
+        context.Add(
+            new SettingDefinition(AdminSettings.SystemName, "General Admin"),
+            new SettingDefinition(AdminSettings.LoginPageTitle, "General Admin"),
+            new SettingDefinition(AdminSettings.DefaultPageSize, "20"),
+            new SettingDefinition(AdminSettings.SchedulerRecordKeepLastN, "100"),
+            new SettingDefinition(AdminSettings.AuditLogRetentionDays, "30"));
     }
 }

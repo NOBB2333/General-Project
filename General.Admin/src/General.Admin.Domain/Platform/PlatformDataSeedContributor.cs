@@ -39,6 +39,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     private readonly IRepository<BusinessForecastHistory, Guid> _businessForecastHistoryRepository;
     private readonly IRepository<BusinessProcurement, Guid> _businessProcurementRepository;
     private readonly IRepository<BusinessReceivable, Guid> _businessReceivableRepository;
+    private readonly IRepository<AppDictData, Guid> _dictDataRepository;
+    private readonly IRepository<AppDictType, Guid> _dictTypeRepository;
     private readonly IRepository<PlatformScheduledJob, Guid> _platformScheduledJobRepository;
     private readonly IRepository<PlatformScheduledJobTrigger, Guid> _platformScheduledJobTriggerRepository;
     private readonly IRepository<PermissionGrant, Guid> _permissionGrantRepository;
@@ -73,6 +75,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IRepository<BusinessForecastHistory, Guid> businessForecastHistoryRepository,
         IRepository<BusinessProcurement, Guid> businessProcurementRepository,
         IRepository<BusinessReceivable, Guid> businessReceivableRepository,
+        IRepository<AppDictData, Guid> dictDataRepository,
+        IRepository<AppDictType, Guid> dictTypeRepository,
         IRepository<PlatformScheduledJob, Guid> platformScheduledJobRepository,
         IRepository<PlatformScheduledJobTrigger, Guid> platformScheduledJobTriggerRepository,
         IRepository<PermissionGrant, Guid> permissionGrantRepository,
@@ -106,6 +110,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         _businessForecastHistoryRepository = businessForecastHistoryRepository;
         _businessProcurementRepository = businessProcurementRepository;
         _businessReceivableRepository = businessReceivableRepository;
+        _dictDataRepository = dictDataRepository;
+        _dictTypeRepository = dictTypeRepository;
         _platformScheduledJobRepository = platformScheduledJobRepository;
         _platformScheduledJobTriggerRepository = platformScheduledJobTriggerRepository;
         _permissionGrantRepository = permissionGrantRepository;
@@ -133,6 +139,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         var defaultTenantAdminId = await SeedDefaultTenantUserAsync(defaultTenant);
         await SeedProjectExecutionDataAsync();
         await SeedBusinessManagementDataAsync();
+        await SeedDictionariesAsync();
         await SeedPlatformScheduledJobsAsync();
         await SeedMenusAsync();
         await SeedDefaultTenantAuthorizationAsync(defaultTenant, defaultTenantAdminId);
@@ -592,6 +599,32 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             autoSave: true);
     }
 
+    private async Task SeedDictionariesAsync()
+    {
+        if (await _dictTypeRepository.AnyAsync())
+        {
+            return;
+        }
+
+        var projectStatus = new AppDictType(Guid.Parse("67000000-0000-0000-0000-000000000001"), "project_status", "项目状态", 10, "项目执行状态下拉。");
+        var taskPriority = new AppDictType(Guid.Parse("67000000-0000-0000-0000-000000000002"), "task_priority", "任务优先级", 20, "任务优先级标签。");
+        var fileCategory = new AppDictType(Guid.Parse("67000000-0000-0000-0000-000000000003"), "file_category", "文件分类", 30, "平台文件分类。");
+        await _dictTypeRepository.InsertManyAsync([projectStatus, taskPriority, fileCategory], autoSave: true);
+
+        await _dictDataRepository.InsertManyAsync(
+        [
+            new(Guid.Parse("68000000-0000-0000-0000-000000000001"), projectStatus.Id, "未开始", "not_started", 10, tagColor: "default"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000002"), projectStatus.Id, "进行中", "in_progress", 20, tagColor: "processing"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000003"), projectStatus.Id, "已完成", "completed", 30, tagColor: "success"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000004"), taskPriority.Id, "低", "low", 10, tagColor: "default"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000005"), taskPriority.Id, "中", "medium", 20, tagColor: "processing"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000006"), taskPriority.Id, "高", "high", 30, tagColor: "error"),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000007"), fileCategory.Id, "默认", "default", 10),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000008"), fileCategory.Id, "合同", "contract", 20),
+            new(Guid.Parse("68000000-0000-0000-0000-000000000009"), fileCategory.Id, "交付", "delivery", 30)
+        ], autoSave: true);
+    }
+
     private async Task SeedBusinessManagementDataAsync()
     {
         var pmoUser = await _userManager.FindByNameAsync("pmo.demo");
@@ -888,6 +921,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUsers, PlatformSeedIds.PlatformRoot, "PlatformUsers", "/platform/users", "/platform/users/index", "用户管理", "lucide:users", 30),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRoles, PlatformSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenus, PlatformSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigs, PlatformSeedIds.PlatformRoot, "PlatformConfigs", "/platform/configs", "/platform/configs/index", "配置参数", "lucide:sliders-horizontal", 65, permissionCode: "Platform.Config.Manage"),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDicts, PlatformSeedIds.PlatformRoot, "PlatformDicts", "/platform/dicts", "/platform/dicts/index", "字典管理", "lucide:list-tree", 68, permissionCode: "Platform.Dict.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFiles, PlatformSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSystemMonitor, PlatformSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90, permissionCode: "Platform.SystemMonitor.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformScheduler, PlatformSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
@@ -899,6 +934,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRolesManage, PlatformSeedIds.PlatformRoles, "PlatformRoleManage", "Platform.Role.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformTenantsManage, PlatformSeedIds.PlatformTenants, "PlatformTenantManage", "Platform.Tenant.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenusManage, PlatformSeedIds.PlatformMenus, "PlatformMenuManage", "Platform.Menu.Manage"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigsManage, PlatformSeedIds.PlatformConfigs, "PlatformConfigManage", "Platform.Config.Manage"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDictsManage, PlatformSeedIds.PlatformDicts, "PlatformDictManage", "Platform.Dict.Manage"),
             Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFilesManage, PlatformSeedIds.PlatformFiles, "PlatformFileManage", "Platform.File.Manage"),
 
             Catalog(PlatformAppCodes.Project, PlatformSeedIds.ProjectRoot, null, "ProjectCenter", "/project", "项目执行", "lucide:folder-kanban", 20),

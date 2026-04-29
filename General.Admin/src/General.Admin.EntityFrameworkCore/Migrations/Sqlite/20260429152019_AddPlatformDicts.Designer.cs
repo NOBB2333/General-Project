@@ -3,98 +3,97 @@ using System;
 using General.Admin.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
 
 #nullable disable
 
-namespace General.Admin.Migrations.PostgreSql
+namespace General.Admin.Migrations.Sqlite
 {
-    [DbContext(typeof(AdminPostgreSqlMigrationsDbContext))]
-    partial class AdminPostgreSqlMigrationsDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(AdminDbContext))]
+    [Migration("20260429152019_AddPlatformDicts")]
+    partial class AddPlatformDicts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("_Abp_DatabaseProvider", EfCoreDatabaseProvider.PostgreSql)
-                .HasAnnotation("ProductVersion", "10.0.2")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+                .HasAnnotation("_Abp_DatabaseProvider", EfCoreDatabaseProvider.Sqlite)
+                .HasAnnotation("ProductVersion", "10.0.2");
 
             modelBuilder.Entity("General.Admin.Business.BusinessBudgetExecution", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("AdjustedAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BudgetCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<decimal>("ExecutedAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal>("VarianceAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -109,95 +108,95 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Business.BusinessChain", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ChainCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LinkedContractCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceChangeCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Stage")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -212,96 +211,96 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Business.BusinessContract", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("ContractCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("CounterpartyName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsRevenueContract")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("ParentContractCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("SignDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceChangeCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -316,85 +315,85 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Business.BusinessForecastHistory", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ChangeType")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ChangedByUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Metric")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NewValue")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("OldValue")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RelatedCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -406,93 +405,93 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Business.BusinessProcurement", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LinkedContractCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProcurementCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("SignDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SourceChangeCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Stage")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SupplierName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -507,86 +506,86 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Business.BusinessReceivable", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("InvoiceCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LinkedContractCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("PlannedDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReceivableCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("ReceivedAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -601,78 +600,78 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppDictData", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<Guid>("DictTypeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Label")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Remark")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Sort")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TagColor")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -687,67 +686,67 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppDictType", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Remark")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Sort")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -762,77 +761,77 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppExternalAccountMapping", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("BoundAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExternalSource")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExternalUserId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<DateTime?>("LastSyncedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Remark")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -845,119 +844,119 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppMenu", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("AffixTab")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AppCode")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Component")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("HideInBreadcrumb")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("HideInMenu")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("HideInTab")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Icon")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("KeepAlive")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Link")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("MenuVisibleWithForbidden")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Order")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Path")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PermissionCode")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Redirect")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Type")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -974,91 +973,91 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppPlatformFile", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("FileKey")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("ParentPath")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("Size")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StorageLocation")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StorageProvider")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasColumnType("TEXT")
                         .HasDefaultValue("Local");
 
                     b.Property<Guid?>("UploadedByUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1075,80 +1074,80 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppRequestAuditLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ActionSummary")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BrowserInfo")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<string>("ExceptionMessage")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ExecutionDuration")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("ExecutionTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("HasException")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("HttpStatusCode")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MenuTitle")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TenantName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Url")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1164,12 +1163,12 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppRoleAuthorization", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AccountScopeMode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AllowedUserIds")
                         .IsRequired()
@@ -1183,15 +1182,15 @@ namespace General.Admin.Migrations.PostgreSql
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<string>("CustomOrganizationUnitIds")
@@ -1201,37 +1200,37 @@ namespace General.Admin.Migrations.PostgreSql
                     b.Property<string>("DataScopeMode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1244,13 +1243,13 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppRoleMenu", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("MenuId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1263,62 +1262,62 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppScheduledJobRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<long?>("DurationMilliseconds")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("EndTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InstanceId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("JobKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Result")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TriggerKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TriggerMode")
                         .IsRequired()
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1334,10 +1333,10 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppTenantAuthorization", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("AdminUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApiBlacklist")
                         .IsRequired()
@@ -1347,45 +1346,45 @@ namespace General.Admin.Migrations.PostgreSql
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("MenuIds")
@@ -1394,10 +1393,10 @@ namespace General.Admin.Migrations.PostgreSql
 
                     b.Property<string>("Remark")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1410,74 +1409,74 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppUpdateLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("AuthorUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("ImpactScope")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<DateTime>("PublishedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1492,89 +1491,89 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.AppUserProfile", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("EmployeeNo")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExternalSource")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExternalUserId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<DateTime?>("ForceLogoutAfter")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastLoginTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<DateTime?>("LastSeenAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LastSeenBrowser")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LastSeenDevice")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LastSeenIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1590,95 +1589,95 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.PlatformScheduledJob", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<string>("CronExpression")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("HandlerKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("JobKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LastRunResult")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastRunTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LockExpirationTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("NextRunTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RunningInstanceId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1695,80 +1694,80 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.PlatformScheduledJobClusterNode", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("HostName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InstanceId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime>("LastHeartbeatTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("ProcessId")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1785,86 +1784,86 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Platform.PlatformScheduledJobTrigger", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<string>("CronExpression")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("JobId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LastRunResult")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastRunTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("NextRunTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TriggerKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1879,112 +1878,112 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.Project", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("BudgetTotalAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<decimal?>("ContractTotalAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsKeyProject")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("ManagerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrganizationUnitId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PlannedEndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PlannedStartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProjectCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProjectSource")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProjectType")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("ReceivedAmount")
-                        .HasColumnType("numeric");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ShortName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SponsorUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2001,84 +2000,84 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectCycle", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<DateTime?>("EndDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Progress")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("StartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2092,80 +2091,80 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectDocument", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2179,94 +2178,94 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectIssue", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("DeveloperOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("DueDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProductOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RequirementTitle")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TesterOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2280,72 +2279,72 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectMember", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("AllowHistoricalRead")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime>("JoinDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<DateTime?>("LeaveDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrganizationUnitId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RoleNames")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2360,71 +2359,71 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectMilestone", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ActualCompletionDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("PlannedCompletionDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2438,78 +2437,78 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectRaidItem", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PlannedResolveDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2523,119 +2522,119 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectTask", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ActualEndTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ActualStartTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<double?>("ActualWorkHours")
-                        .HasColumnType("double precision");
+                        .HasColumnType("REAL");
 
                     b.Property<string>("BlockReason")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("ContractClause")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("DeveloperOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<double?>("EstimatedWorkHours")
-                        .HasColumnType("double precision");
+                        .HasColumnType("REAL");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsBlocked")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("OrganizationUnitId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("OwnerUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PlannedEndTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("PlannedStartTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Priority")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProductOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TaskCode")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TesterOwnerName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2654,72 +2653,72 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("General.Admin.Project.ProjectWorklog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<double>("Hours")
-                        .HasColumnType("double precision");
+                        .HasColumnType("REAL");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid>("ProjectId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TaskId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("WeekStartDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("WorkDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -2734,113 +2733,113 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApplicationName")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ApplicationName");
 
                     b.Property<string>("BrowserInfo")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("BrowserInfo");
 
                     b.Property<string>("ClientId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ClientId");
 
                     b.Property<string>("ClientIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ClientIpAddress");
 
                     b.Property<string>("ClientName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ClientName");
 
                     b.Property<string>("Comments")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Comments");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("CorrelationId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CorrelationId");
 
                     b.Property<string>("Exceptions")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ExecutionDuration")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("ExecutionDuration");
 
                     b.Property<DateTime>("ExecutionTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("HttpMethod");
 
                     b.Property<int?>("HttpStatusCode")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("HttpStatusCode");
 
                     b.Property<Guid?>("ImpersonatorTenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ImpersonatorTenantId");
 
                     b.Property<string>("ImpersonatorTenantName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ImpersonatorTenantName");
 
                     b.Property<Guid?>("ImpersonatorUserId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ImpersonatorUserId");
 
                     b.Property<string>("ImpersonatorUserName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ImpersonatorUserName");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<string>("TenantName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantName");
 
                     b.Property<string>("Url")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Url");
 
                     b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("UserId");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("UserName");
 
                     b.HasKey("Id");
@@ -2856,41 +2855,41 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("AuditLogId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("AuditLogId");
 
                     b.Property<int>("ExecutionDuration")
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("ExecutionDuration");
 
                     b.Property<DateTime>("ExecutionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExecutionTime");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("MethodName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("MethodName");
 
                     b.Property<string>("Parameters")
                         .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Parameters");
 
                     b.Property<string>("ServiceName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ServiceName");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -2906,23 +2905,23 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<string>("FileName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("FileName");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -2934,40 +2933,40 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("AuditLogId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("AuditLogId");
 
                     b.Property<DateTime>("ChangeTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ChangeTime");
 
                     b.Property<byte>("ChangeType")
-                        .HasColumnType("smallint")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("ChangeType");
 
                     b.Property<string>("EntityId")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("EntityId");
 
                     b.Property<Guid?>("EntityTenantId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("EntityTypeFullName")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("EntityTypeFullName");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -2983,35 +2982,35 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("EntityChangeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NewValue")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("NewValue");
 
                     b.Property<string>("OriginalValue")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("OriginalValue");
 
                     b.Property<string>("PropertyName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("PropertyName");
 
                     b.Property<string>("PropertyTypeFullName")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("PropertyTypeFullName");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -3025,57 +3024,57 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApplicationName")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsAbandoned")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false);
 
                     b.Property<string>("JobArgs")
                         .IsRequired()
                         .HasMaxLength(1048576)
-                        .HasColumnType("character varying(1048576)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("JobName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastTryTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("NextTryTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("Priority")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue((byte)15);
 
                     b.Property<short>("TryCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue((short)0);
 
                     b.HasKey("Id");
@@ -3089,52 +3088,52 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("AllowedProviders")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DefaultValue")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("GroupName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsAvailableToHost")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsVisibleToClients")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParentName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ValueType")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3150,21 +3149,21 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3178,25 +3177,25 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderKey")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3209,49 +3208,49 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityClaimType", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<string>("Description")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsStatic")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Regex")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RegexDescription")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("Required")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ValueType")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3261,19 +3260,19 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityLinkUser", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("SourceTenantId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TargetTenantId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("TargetUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3286,51 +3285,51 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityRole", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<int>("EntityVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IsDefault");
 
                     b.Property<bool>("IsPublic")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IsPublic");
 
                     b.Property<bool>("IsStatic")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IsStatic");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -3343,22 +3342,22 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityRoleClaim", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClaimType")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClaimValue")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -3371,65 +3370,65 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentitySecurityLog", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Action")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApplicationName")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BrowserInfo")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("CorrelationId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("Identity")
                         .HasMaxLength(96)
-                        .HasColumnType("character varying(96)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<string>("TenantName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3447,46 +3446,46 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentitySession", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientId")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Device")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DeviceInfo")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("IpAddresses")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastAccessed")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SessionId")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("SignedIn")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3502,11 +3501,11 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUser", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("AccessFailedCount")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(0)
                         .HasColumnName("AccessFailedCount");
 
@@ -3514,151 +3513,151 @@ namespace General.Admin.Migrations.PostgreSql
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Email");
 
                     b.Property<bool>("EmailConfirmed")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("EmailConfirmed");
 
                     b.Property<int>("EntityVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasColumnName("IsActive");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<bool>("IsExternal")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsExternal");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<DateTimeOffset?>("LastPasswordChangeTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("LastSignInTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("Leaved")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("Leaved");
 
                     b.Property<bool>("LockoutEnabled")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("LockoutEnabled");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Name");
 
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("NormalizedEmail");
 
                     b.Property<string>("NormalizedUserName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("NormalizedUserName");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("PasswordHash");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("PhoneNumber");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("PhoneNumberConfirmed");
 
                     b.Property<string>("SecurityStamp")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("SecurityStamp");
 
                     b.Property<bool>("ShouldChangePasswordOnNextLogin")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Surname")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Surname");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("TwoFactorEnabled");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("UserName");
 
                     b.HasKey("Id");
@@ -3677,23 +3676,23 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserClaim", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClaimType")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClaimValue")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -3705,22 +3704,22 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserDelegation", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("EndTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("SourceUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("StartTime")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("TargetUserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -3731,23 +3730,23 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserLogin", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LoginProvider")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderDisplayName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderKey")
                         .IsRequired()
                         .HasMaxLength(196)
-                        .HasColumnType("character varying(196)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("UserId", "LoginProvider");
@@ -3760,21 +3759,21 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserOrganizationUnit", b =>
                 {
                     b.Property<Guid>("OrganizationUnitId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("OrganizationUnitId", "UserId");
@@ -3788,14 +3787,14 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<byte[]>("CredentialId")
                         .HasMaxLength(1024)
-                        .HasColumnType("bytea");
+                        .HasColumnType("BLOB");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("CredentialId");
 
@@ -3807,17 +3806,17 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserPasswordHistory", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Password")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("UserId", "Password");
@@ -3828,13 +3827,13 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserRole", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("UserId", "RoleId");
@@ -3847,22 +3846,22 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.IdentityUserToken", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LoginProvider")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.Property<string>("Value")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
@@ -3872,70 +3871,70 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.OrganizationUnit", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(95)
-                        .HasColumnType("character varying(95)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("Code");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DisplayName");
 
                     b.Property<int>("EntityVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<Guid?>("ParentId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -3950,21 +3949,21 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.Identity.OrganizationUnitRole", b =>
                 {
                     b.Property<Guid>("OrganizationUnitId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("OrganizationUnitId", "RoleId");
@@ -3978,104 +3977,104 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ApplicationType")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientSecret")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientType")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ClientUri")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<string>("ConsentType")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("DisplayName")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayNames")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("FrontChannelLogoutUri")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<string>("JsonWebKeySet")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("LogoUri")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Permissions")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("PostLogoutRedirectUris")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Properties")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RedirectUris")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Requirements")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Settings")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4088,43 +4087,43 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ApplicationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime?>("CreationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("Properties")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Scopes")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Subject")
                         .HasMaxLength(400)
-                        .HasColumnType("character varying(400)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4137,71 +4136,71 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<string>("Description")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Descriptions")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayNames")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Name")
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Properties")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Resources")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4214,56 +4213,56 @@ namespace General.Admin.Migrations.PostgreSql
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("ApplicationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("AuthorizationId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime?>("CreationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ExpirationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("Payload")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Properties")
-                        .HasColumnType("text");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("RedemptionDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ReferenceId")
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Subject")
                         .HasMaxLength(400)
-                        .HasColumnType("character varying(400)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Type")
                         .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4279,51 +4278,51 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.PermissionManagement.PermissionDefinitionRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("GroupName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ManagementPermissionName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("MultiTenancySide")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParentName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Providers")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResourceName")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StateCheckers")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4338,25 +4337,25 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.PermissionManagement.PermissionGrant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -4370,21 +4369,21 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.PermissionManagement.PermissionGroupDefinitionRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4397,35 +4396,35 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.PermissionManagement.ResourcePermissionGrant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResourceKey")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ResourceName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<Guid?>("TenantId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("TenantId");
 
                     b.HasKey("Id");
@@ -4439,25 +4438,25 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.SettingManagement.Setting", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderKey")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ProviderName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4470,42 +4469,42 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.SettingManagement.SettingDefinitionRecord", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DefaultValue")
                         .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ExtraProperties")
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsInherited")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsVisibleToClients")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Providers")
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4518,62 +4517,62 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.TenantManagement.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ConcurrencyStamp");
 
                     b.Property<DateTime>("CreationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreationTime");
 
                     b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("CreatorId");
 
                     b.Property<Guid?>("DeleterId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeleterId");
 
                     b.Property<DateTime?>("DeletionTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("DeletionTime");
 
                     b.Property<int>("EntityVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ExtraProperties")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("TEXT")
                         .HasColumnName("ExtraProperties");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
                     b.Property<DateTime?>("LastModificationTime")
-                        .HasColumnType("timestamp with time zone")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
 
                     b.Property<Guid?>("LastModifierId")
-                        .HasColumnType("uuid")
+                        .HasColumnType("TEXT")
                         .HasColumnName("LastModifierId");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("NormalizedName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -4587,16 +4586,16 @@ namespace General.Admin.Migrations.PostgreSql
             modelBuilder.Entity("Volo.Abp.TenantManagement.TenantConnectionString", b =>
                 {
                     b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(1024)
-                        .HasColumnType("character varying(1024)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("TenantId", "Name");
 
@@ -4700,7 +4699,7 @@ namespace General.Admin.Migrations.PostgreSql
 
                             b1.Property<byte[]>("PublicKey");
 
-                            b1.Property<long>("SignCount");
+                            b1.Property<uint>("SignCount");
 
                             b1.PrimitiveCollection<string>("Transports");
 
@@ -4710,7 +4709,7 @@ namespace General.Admin.Migrations.PostgreSql
 
                             b1
                                 .ToJson("Data")
-                                .HasColumnType("jsonb");
+                                .HasColumnType("TEXT");
 
                             b1.WithOwner()
                                 .HasForeignKey("IdentityUserPasskeyCredentialId");

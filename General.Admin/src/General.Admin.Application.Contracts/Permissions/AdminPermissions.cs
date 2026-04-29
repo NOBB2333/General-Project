@@ -11,6 +11,8 @@ public static class AdminPermissions
         Platform.RoleManage,
         Platform.TenantManage,
         Platform.MenuManage,
+        Platform.ConfigManage,
+        Platform.DictManage,
         Platform.FileManage,
         Platform.AuditLogView,
         Platform.SystemMonitorView,
@@ -26,6 +28,8 @@ public static class AdminPermissions
         public const string RoleManage = "Platform.Role.Manage";
         public const string TenantManage = "Platform.Tenant.Manage";
         public const string MenuManage = "Platform.Menu.Manage";
+        public const string ConfigManage = "Platform.Config.Manage";
+        public const string DictManage = "Platform.Dict.Manage";
         public const string FileManage = "Platform.File.Manage";
         public const string AuditLogView = "Platform.AuditLog.View";
         public const string SystemMonitorView = "Platform.SystemMonitor.View";

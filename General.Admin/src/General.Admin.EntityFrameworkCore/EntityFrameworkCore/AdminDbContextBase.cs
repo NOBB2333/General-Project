@@ -66,6 +66,8 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<AppUserProfile> AppUserProfiles { get; set; }
     public DbSet<AppRequestAuditLog> AppRequestAuditLogs { get; set; }
     public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
+    public DbSet<AppDictData> AppDictData { get; set; }
+    public DbSet<AppDictType> AppDictTypes { get; set; }
     public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
     public DbSet<AppScheduledJobRecord> AppScheduledJobRecords { get; set; }
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
@@ -204,6 +206,29 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.Status).IsRequired().HasMaxLength(32);
             b.Property(x => x.Remark).HasMaxLength(256);
             b.HasIndex(x => new { x.UserId, x.ExternalSource, x.ExternalUserId }).IsUnique();
+        });
+
+        builder.Entity<AppDictType>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}DictTypes", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Code).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.HasIndex(x => x.Code).IsUnique();
+            b.HasIndex(x => x.Sort);
+        });
+
+        builder.Entity<AppDictData>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}DictData", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Label).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Value).IsRequired().HasMaxLength(128);
+            b.Property(x => x.TagColor).HasMaxLength(32);
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.HasIndex(x => new { x.DictTypeId, x.Value }).IsUnique();
+            b.HasIndex(x => new { x.DictTypeId, x.IsEnabled, x.Sort });
         });
 
         builder.Entity<AppPlatformFile>(b =>

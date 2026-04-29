@@ -29,6 +29,7 @@ public class PlatformUserService : ITransientDependency
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
     private readonly IdentityUserManager _userManager;
     private readonly ITenantRepository _tenantRepository;
+    private readonly PlatformCacheService _platformCacheService;
     private readonly ILogger<PlatformUserService> _logger;
 
     public PlatformUserService(
@@ -44,6 +45,7 @@ public class PlatformUserService : ITransientDependency
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository,
         IdentityUserManager userManager,
         ITenantRepository tenantRepository,
+        PlatformCacheService platformCacheService,
         ILogger<PlatformUserService> logger)
     {
         _currentUser = currentUser;
@@ -58,6 +60,7 @@ public class PlatformUserService : ITransientDependency
         _userOrganizationUnitRepository = userOrganizationUnitRepository;
         _userManager = userManager;
         _tenantRepository = tenantRepository;
+        _platformCacheService = platformCacheService;
         _logger = logger;
     }
 
@@ -333,6 +336,11 @@ public class PlatformUserService : ITransientDependency
     public async Task CreateAsync(PlatformUserSaveInput input)
     {
         await NormalizeAndValidateInputAsync(input, null);
+        if (string.IsNullOrWhiteSpace(input.Password))
+        {
+            throw new InvalidOperationException("创建用户时密码不能为空。");
+        }
+
         await EnsureOrganizationUnitAccessibleAsync(input.OrganizationUnitId);
 
         var user = new IdentityUser(Guid.NewGuid(), input.Username.Trim(), input.Email.Trim())
@@ -342,7 +350,7 @@ public class PlatformUserService : ITransientDependency
         };
         user.SetIsActive(input.IsActive);
 
-        EnsureSucceeded(await _userManager.CreateAsync(user, string.IsNullOrWhiteSpace(input.Password) ? "1q2w3E*" : input.Password));
+        EnsureSucceeded(await _userManager.CreateAsync(user, input.Password.Trim()));
         await UpsertUserProfileAsync(user.Id, input);
         await SyncUserRolesAsync(user, input.RoleNames);
         await SyncUserOrganizationUnitsAsync(user.Id, input.OrganizationUnitId);
@@ -381,6 +389,14 @@ public class PlatformUserService : ITransientDependency
         }
 
         var user = await _userManager.GetByIdAsync(id);
+        var userOrganizationUnits = (await _userOrganizationUnitRepository.GetListAsync())
+            .Where(x => x.UserId == id)
+            .ToList();
+        if (userOrganizationUnits.Count > 0)
+        {
+            await _userOrganizationUnitRepository.DeleteManyAsync(userOrganizationUnits, autoSave: true);
+        }
+
         var profile = await _userProfileRepository.FindAsync(x => x.UserId == id);
         if (profile != null)
         {
@@ -396,6 +412,9 @@ public class PlatformUserService : ITransientDependency
         }
 
         EnsureSucceeded(await _userManager.DeleteAsync(user));
+        await _platformCacheService.InvalidateAsync("menu");
+        await _platformCacheService.InvalidateAsync("organization");
+        await _platformCacheService.InvalidateAsync("role");
     }
 
     public async Task ChangePasswordAsync(PlatformPasswordChangeInput input)
@@ -587,6 +606,8 @@ public class PlatformUserService : ITransientDependency
         {
             await _userManager.AddToOrganizationUnitAsync(userId, organizationUnitId.Value);
         }
+
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     private async Task SyncUserRolesAsync(IdentityUser user, IReadOnlyCollection<string> roleNames)
@@ -617,6 +638,12 @@ public class PlatformUserService : ITransientDependency
         if (rolesToAdd.Count > 0)
         {
             EnsureSucceeded(await _userManager.AddToRolesAsync(user, rolesToAdd));
+        }
+
+        if (rolesToRemove.Count > 0 || rolesToAdd.Count > 0)
+        {
+            await _platformCacheService.InvalidateAsync("menu");
+            await _platformCacheService.InvalidateAsync("organization");
         }
     }
 

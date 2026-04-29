@@ -15,6 +15,7 @@ public class PlatformTenantService : ITransientDependency
     private readonly IRepository<AppMenu, Guid> _menuRepository;
     private readonly IRepository<AppTenantAuthorization, Guid> _tenantAuthorizationRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
+    private readonly PlatformCacheService _platformCacheService;
     private readonly TenantManager _tenantManager;
     private readonly ITenantRepository _tenantRepository;
 
@@ -23,6 +24,7 @@ public class PlatformTenantService : ITransientDependency
         IRepository<AppMenu, Guid> menuRepository,
         IRepository<AppTenantAuthorization, Guid> tenantAuthorizationRepository,
         IRepository<IdentityUser, Guid> userRepository,
+        PlatformCacheService platformCacheService,
         TenantManager tenantManager,
         ITenantRepository tenantRepository)
     {
@@ -30,6 +32,7 @@ public class PlatformTenantService : ITransientDependency
         _menuRepository = menuRepository;
         _tenantAuthorizationRepository = tenantAuthorizationRepository;
         _userRepository = userRepository;
+        _platformCacheService = platformCacheService;
         _tenantManager = tenantManager;
         _tenantRepository = tenantRepository;
     }
@@ -194,11 +197,13 @@ public class PlatformTenantService : ITransientDependency
                 input.AdminUserId,
                 input.Remark);
             await _tenantAuthorizationRepository.InsertAsync(authorization, autoSave: true);
+            await _platformCacheService.InvalidateAsync("menu");
             return;
         }
 
         authorization.Update(normalizedMenuIds, normalizedApiBlacklist, input.IsActive, input.AdminUserId, input.Remark);
         await _tenantAuthorizationRepository.UpdateAsync(authorization, autoSave: true);
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     public async Task SetStatusAsync(Guid tenantId, bool isActive)
@@ -214,11 +219,13 @@ public class PlatformTenantService : ITransientDependency
                 "[]",
                 isActive);
             await _tenantAuthorizationRepository.InsertAsync(authorization, autoSave: true);
+            await _platformCacheService.InvalidateAsync("menu");
             return;
         }
 
         authorization.UpdateStatus(isActive);
         await _tenantAuthorizationRepository.UpdateAsync(authorization, autoSave: true);
+        await _platformCacheService.InvalidateAsync("menu");
     }
 
     private async Task<List<Guid>> ResolveDefaultMenuIdsAsync()
