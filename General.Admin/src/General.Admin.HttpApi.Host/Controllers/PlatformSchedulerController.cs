@@ -30,6 +30,12 @@ public class PlatformSchedulerController : ControllerBase
         return ApiResponse<List<PlatformScheduledJobHandlerDto>>.Ok(await _schedulerService.GetHandlersAsync());
     }
 
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<ApiResponse<PlatformScheduledJobDashboardDto>>> GetDashboardAsync()
+    {
+        return ApiResponse<PlatformScheduledJobDashboardDto>.Ok(await _schedulerService.GetDashboardAsync());
+    }
+
     [HttpGet("cluster-nodes")]
     public async Task<ActionResult<ApiResponse<List<PlatformScheduledJobClusterNodeDto>>>> GetClusterNodesAsync()
     {
@@ -106,6 +112,14 @@ public class PlatformSchedulerController : ControllerBase
         return ApiResponse<string>.Ok(await _schedulerService.RunAsync(jobKey));
     }
 
+    [HttpPost("batch/run")]
+    public async Task<ActionResult<ApiResponse<List<PlatformScheduledJobOperationResultDto>>>> RunBatchAsync(
+        [FromBody] PlatformScheduledJobBatchInput input)
+    {
+        return ApiResponse<List<PlatformScheduledJobOperationResultDto>>.Ok(
+            await _schedulerService.RunBatchAsync(input.JobKeys));
+    }
+
     [HttpPost("{jobKey}/cancel")]
     public async Task<ActionResult<ApiResponse<string>>> CancelAsync(string jobKey)
     {
@@ -117,6 +131,14 @@ public class PlatformSchedulerController : ControllerBase
     {
         await _schedulerService.ToggleAsync(jobKey, input.IsEnabled);
         return ApiResponse<string>.Ok("ok");
+    }
+
+    [HttpPost("batch/toggle")]
+    public async Task<ActionResult<ApiResponse<bool>>> ToggleBatchAsync(
+        [FromBody] PlatformScheduledJobBatchToggleInput input)
+    {
+        await _schedulerService.ToggleBatchAsync(input.JobKeys, input.IsEnabled);
+        return ApiResponse<bool>.Ok(true);
     }
 
     [HttpDelete("{jobKey}")]
@@ -132,6 +154,14 @@ public class PlatformSchedulerController : ControllerBase
         [FromQuery] int keepLastN = 0)
     {
         await _schedulerService.ClearRecordsAsync(jobKey, keepLastN);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [HttpPost("batch/records/clear")]
+    public async Task<ActionResult<ApiResponse<bool>>> ClearRecordsBatchAsync(
+        [FromBody] PlatformScheduledJobBatchClearRecordsInput input)
+    {
+        await _schedulerService.ClearRecordsBatchAsync(input.JobKeys, input.KeepLastN);
         return ApiResponse<bool>.Ok(true);
     }
 }

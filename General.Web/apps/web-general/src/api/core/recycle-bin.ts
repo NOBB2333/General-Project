@@ -18,3 +18,7 @@ export async function getRecycleBinItemsApi(entityType?: string) {
 export async function restoreRecycleBinItemApi(entityType: string, id: string) {
   return requestClient.post<boolean>(`/app/platform/recycle-bin/${entityType}/${id}/restore`);
 }
+
+export async function deleteRecycleBinItemPermanentlyApi(entityType: string, id: string) {
+  return requestClient.delete<boolean>(`/app/platform/recycle-bin/${entityType}/${id}`);
+}

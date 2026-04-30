@@ -27,11 +27,12 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
         string contentType,
         string category,
         string? parentPath,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default)
     {
         var originalName = Path.GetFileName(fileName);
         var fileKey = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{Path.GetExtension(originalName)}";
-        var storageDirectory = GetStorageDirectory(DateTime.Now);
+        var storageDirectory = GetStorageDirectory(DateTime.Now, source);
         Directory.CreateDirectory(storageDirectory);
 
         var filePath = Path.Combine(storageDirectory, fileKey);
@@ -44,9 +45,10 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
     public Task<Stream> OpenReadAsync(
         string fileKey,
         string storageLocation,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default)
     {
-        var filePath = ResolveFilePath(fileKey, storageLocation);
+        var filePath = ResolveFilePath(fileKey, storageLocation, source);
         if (!File.Exists(filePath))
         {
             throw new FileNotFoundException("文件不存在。", fileKey);
@@ -58,9 +60,10 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
     public Task<bool> DeleteAsync(
         string fileKey,
         string storageLocation,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default)
     {
-        var filePath = ResolveFilePath(fileKey, storageLocation);
+        var filePath = ResolveFilePath(fileKey, storageLocation, source);
         if (!File.Exists(filePath))
         {
             return Task.FromResult(false);
@@ -74,14 +77,15 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
         string fileKey,
         string storageLocation,
         TimeSpan expiry,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default)
     {
         return Task.FromResult<string?>(null);
     }
 
-    private string ResolveFilePath(string fileKey, string storageLocation)
+    private string ResolveFilePath(string fileKey, string storageLocation, PlatformFileStorageSourceDescriptor? source)
     {
-        var rootDirectory = GetRootDirectory();
+        var rootDirectory = GetRootDirectory(source);
         if (!string.IsNullOrWhiteSpace(storageLocation))
         {
             var candidate = Path.IsPathRooted(storageLocation)
@@ -110,13 +114,13 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
         return Path.GetFullPath(filePath);
     }
 
-    private string GetStorageDirectory(DateTime now)
+    private string GetStorageDirectory(DateTime now, PlatformFileStorageSourceDescriptor? source)
     {
-        var pathTemplate = RenderPathTemplate(_options.Local.PathTemplate, now);
+        var pathTemplate = RenderPathTemplate(source?.PathTemplate ?? _options.Local.PathTemplate, now);
         var storageDirectory = string.IsNullOrWhiteSpace(pathTemplate)
-            ? GetRootDirectory()
-            : Path.Combine(GetRootDirectory(), pathTemplate);
-        if (!IsPathUnderRoot(storageDirectory, GetRootDirectory()))
+            ? GetRootDirectory(source)
+            : Path.Combine(GetRootDirectory(source), pathTemplate);
+        if (!IsPathUnderRoot(storageDirectory, GetRootDirectory(source)))
         {
             throw new InvalidOperationException("文件存储路径配置不合法。");
         }
@@ -124,11 +128,11 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
         return Path.GetFullPath(storageDirectory);
     }
 
-    private string GetRootDirectory()
+    private string GetRootDirectory(PlatformFileStorageSourceDescriptor? source = null)
     {
-        var rootPath = string.IsNullOrWhiteSpace(_options.Local.RootPath)
+        var rootPath = string.IsNullOrWhiteSpace(source?.RootPath ?? _options.Local.RootPath)
             ? "App_Data/upload-files"
-            : _options.Local.RootPath.Trim();
+            : (source?.RootPath ?? _options.Local.RootPath).Trim();
 
         var rootDirectory = Path.IsPathRooted(rootPath)
             ? rootPath

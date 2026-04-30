@@ -7,7 +7,11 @@ import { Page } from '@vben/common-ui';
 
 import { Button, Card, Popconfirm, Select, Space, Table, Tag, message } from 'ant-design-vue';
 
-import { getRecycleBinItemsApi, restoreRecycleBinItemApi } from '#/api/core';
+import {
+  deleteRecycleBinItemPermanentlyApi,
+  getRecycleBinItemsApi,
+  restoreRecycleBinItemApi,
+} from '#/api/core';
 
 defineOptions({ name: 'PlatformRecycleBinPage' });
 
@@ -27,7 +31,7 @@ const columns = [
   { dataIndex: 'entityType', key: 'entityType', title: '类型', width: 150 },
   { dataIndex: 'displayName', key: 'displayName', title: '名称' },
   { dataIndex: 'deletionTime', key: 'deletionTime', title: '删除时间', width: 190 },
-  { key: 'actions', title: '操作', width: 120 },
+  { key: 'actions', title: '操作', width: 180 },
 ];
 
 const entityType = ref('');
@@ -46,6 +50,12 @@ async function loadItems() {
 async function handleRestore(record: RecycleBinApi.RecycleBinItem) {
   await restoreRecycleBinItemApi(record.entityType, record.id);
   message.success('数据已恢复');
+  await loadItems();
+}
+
+async function handleDeletePermanently(record: RecycleBinApi.RecycleBinItem) {
+  await deleteRecycleBinItemPermanentlyApi(record.entityType, record.id);
+  message.success('文件已彻底删除');
   await loadItems();
 }
 
@@ -80,9 +90,18 @@ onMounted(loadItems);
             {{ formatTime(record.deletionTime) }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <Popconfirm title="确认恢复该数据？" @confirm="handleRestore(record as RecycleBinApi.RecycleBinItem)">
-              <Button size="small" type="link">恢复</Button>
-            </Popconfirm>
+            <Space>
+              <Popconfirm title="确认恢复该数据？" @confirm="handleRestore(record as RecycleBinApi.RecycleBinItem)">
+                <Button size="small" type="link">恢复</Button>
+              </Popconfirm>
+              <Popconfirm
+                v-if="(record as RecycleBinApi.RecycleBinItem).entityType === 'file'"
+                title="确认彻底删除该文件？物理文件也会被删除。"
+                @confirm="handleDeletePermanently(record as RecycleBinApi.RecycleBinItem)"
+              >
+                <Button danger size="small" type="link">彻底删除</Button>
+              </Popconfirm>
+            </Space>
           </template>
         </template>
       </Table>

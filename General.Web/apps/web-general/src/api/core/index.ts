@@ -5,6 +5,7 @@ export * from './config';
 export * from './dict';
 export * from './file';
 export * from './menu';
+export * from './notification';
 export * from './online-user';
 export * from './open-api';
 export * from './organization';

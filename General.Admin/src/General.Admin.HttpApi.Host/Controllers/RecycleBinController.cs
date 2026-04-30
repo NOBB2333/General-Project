@@ -30,4 +30,12 @@ public class RecycleBinController : ControllerBase
         await _recycleBinService.RestoreAsync(entityType, id);
         return ApiResponse<bool>.Ok(true);
     }
+
+    [HttpDelete("{entityType}/{id:guid}")]
+    [PlatformEndpoint("Platform.RecycleBin.Manage")]
+    public async Task<ActionResult<ApiResponse<bool>>> DeletePermanentlyAsync(string entityType, Guid id)
+    {
+        await _recycleBinService.DeletePermanentlyAsync(entityType, id, HttpContext.RequestAborted);
+        return ApiResponse<bool>.Ok(true);
+    }
 }

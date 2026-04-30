@@ -80,6 +80,20 @@ export namespace SchedulerApi {
     startedAt: string;
     status: string;
   }
+
+  export interface Dashboard {
+    enabledCount: number;
+    failedLast24Hours: number;
+    runningCount: number;
+    slowLast24Hours: number;
+    totalCount: number;
+  }
+
+  export interface OperationResult {
+    jobKey: string;
+    message: string;
+    success: boolean;
+  }
 }
 
 export async function getSchedulerListApi() {
@@ -88,6 +102,10 @@ export async function getSchedulerListApi() {
 
 export async function getSchedulerHandlersApi() {
   return requestClient.get<SchedulerApi.HandlerItem[]>('/app/platform/scheduler/handlers');
+}
+
+export async function getSchedulerDashboardApi() {
+  return requestClient.get<SchedulerApi.Dashboard>('/app/platform/scheduler/dashboard');
 }
 
 export async function getSchedulerClusterNodesApi() {
@@ -108,8 +126,19 @@ export async function toggleSchedulerJobApi(jobKey: string, isEnabled: boolean) 
   });
 }
 
+export async function toggleSchedulerJobsBatchApi(jobKeys: string[], isEnabled: boolean) {
+  return requestClient.post<boolean>('/app/platform/scheduler/batch/toggle', {
+    isEnabled,
+    jobKeys,
+  });
+}
+
 export async function runSchedulerJobApi(jobKey: string) {
   return requestClient.post<string>(`/app/platform/scheduler/${jobKey}/run`);
+}
+
+export async function runSchedulerJobsBatchApi(jobKeys: string[]) {
+  return requestClient.post<SchedulerApi.OperationResult[]>('/app/platform/scheduler/batch/run', { jobKeys });
 }
 
 export async function cancelSchedulerJobApi(jobKey: string) {
@@ -129,6 +158,13 @@ export async function getSchedulerJobRecordsApi(jobKey: string, params?: Schedul
 export async function clearSchedulerJobRecordsApi(jobKey: string, keepLastN = 100) {
   return requestClient.delete<boolean>(`/app/platform/scheduler/${jobKey}/records`, {
     params: { keepLastN },
+  });
+}
+
+export async function clearSchedulerJobRecordsBatchApi(jobKeys: string[], keepLastN = 100) {
+  return requestClient.post<boolean>('/app/platform/scheduler/batch/records/clear', {
+    jobKeys,
+    keepLastN,
   });
 }
 

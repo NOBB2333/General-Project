@@ -838,6 +838,124 @@ namespace General.Admin.Migrations.Sqlite
                     b.ToTable("AppExternalAccountMappings", (string)null);
                 });
 
+            modelBuilder.Entity("General.Admin.Platform.AppFileStorageSource", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AccessKeyId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BucketName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("CustomDomain")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("EncryptedSecret")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Endpoint")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PathTemplate")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Region")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Remark")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RootPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UseSsl")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsDefault");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("ProviderName", "IsEnabled");
+
+                    b.ToTable("AppFileStorageSources", (string)null);
+                });
+
             modelBuilder.Entity("General.Admin.Platform.AppMenu", b =>
                 {
                     b.Property<Guid>("Id")
@@ -967,6 +1085,104 @@ namespace General.Admin.Migrations.Sqlite
                     b.ToTable("AppMenus", (string)null);
                 });
 
+            modelBuilder.Entity("General.Admin.Platform.AppNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Avatar")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("DeleterId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DeleterId");
+
+                    b.Property<DateTime?>("DeletionTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DeletionTime");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false)
+                        .HasColumnName("IsDeleted");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Link")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientMode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientSummary")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SenderUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.HasIndex("Type", "CreationTime");
+
+                    b.ToTable("AppNotifications", (string)null);
+                });
+
             modelBuilder.Entity("General.Admin.Platform.AppOpenApiApplication", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1056,6 +1272,18 @@ namespace General.Admin.Migrations.Sqlite
                     b.Property<Guid>("Id")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BucketName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BusinessId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BusinessType")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1110,6 +1338,9 @@ namespace General.Admin.Migrations.Sqlite
                         .HasDefaultValue(false)
                         .HasColumnName("IsDeleted");
 
+                    b.Property<bool>("IsPublic")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("TEXT")
                         .HasColumnName("LastModificationTime");
@@ -1137,6 +1368,9 @@ namespace General.Admin.Migrations.Sqlite
                         .HasColumnType("TEXT")
                         .HasDefaultValue("Local");
 
+                    b.Property<Guid?>("StorageSourceId")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("UploadedByUserId")
                         .HasColumnType("TEXT");
 
@@ -1146,6 +1380,10 @@ namespace General.Admin.Migrations.Sqlite
                         .IsUnique();
 
                     b.HasIndex("StorageProvider");
+
+                    b.HasIndex("StorageSourceId");
+
+                    b.HasIndex("BusinessType", "BusinessId");
 
                     b.HasIndex("Category", "ParentPath");
 
@@ -1567,6 +1805,51 @@ namespace General.Admin.Migrations.Sqlite
                         .IsUnique();
 
                     b.ToTable("AppUpdateLogs", (string)null);
+                });
+
+            modelBuilder.Entity("General.Admin.Platform.AppUserNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotificationId");
+
+                    b.HasIndex("UserId", "NotificationId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsRemoved", "IsRead");
+
+                    b.HasIndex("UserId", "IsRemoved", "IsRead", "CreationTime");
+
+                    b.ToTable("AppUserNotifications", (string)null);
                 });
 
             modelBuilder.Entity("General.Admin.Platform.AppUserProfile", b =>

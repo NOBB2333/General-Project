@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.Caching.Distributed;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
@@ -15,9 +16,11 @@ public class PlatformRecycleBinService : ITransientDependency
     private readonly IDistributedCache _distributedCache;
     private readonly IDataFilter<ISoftDelete> _softDeleteFilter;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
+    private readonly IPlatformFileStorageProviderResolver _fileStorageProviderResolver;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
     private readonly IRepository<AppOpenApiApplication, Guid> _openApiRepository;
     private readonly IRepository<AppPlatformFile, Guid> _fileRepository;
+    private readonly PlatformFileStorageSourceService _fileStorageSourceService;
     private readonly PlatformCacheService _platformCacheService;
     private readonly IRepository<PlatformScheduledJob, Guid> _scheduledJobRepository;
     private readonly IRepository<PlatformScheduledJobTrigger, Guid> _scheduledJobTriggerRepository;
@@ -29,9 +32,11 @@ public class PlatformRecycleBinService : ITransientDependency
         IDistributedCache distributedCache,
         IDataFilter<ISoftDelete> softDeleteFilter,
         IAsyncQueryableExecuter asyncQueryableExecuter,
+        IPlatformFileStorageProviderResolver fileStorageProviderResolver,
         IRepository<AppMenu, Guid> menuRepository,
         IRepository<AppOpenApiApplication, Guid> openApiRepository,
         IRepository<AppPlatformFile, Guid> fileRepository,
+        PlatformFileStorageSourceService fileStorageSourceService,
         PlatformCacheService platformCacheService,
         IRepository<PlatformScheduledJob, Guid> scheduledJobRepository,
         IRepository<PlatformScheduledJobTrigger, Guid> scheduledJobTriggerRepository,
@@ -42,9 +47,11 @@ public class PlatformRecycleBinService : ITransientDependency
         _distributedCache = distributedCache;
         _softDeleteFilter = softDeleteFilter;
         _asyncQueryableExecuter = asyncQueryableExecuter;
+        _fileStorageProviderResolver = fileStorageProviderResolver;
         _menuRepository = menuRepository;
         _openApiRepository = openApiRepository;
         _fileRepository = fileRepository;
+        _fileStorageSourceService = fileStorageSourceService;
         _platformCacheService = platformCacheService;
         _scheduledJobRepository = scheduledJobRepository;
         _scheduledJobTriggerRepository = scheduledJobTriggerRepository;
@@ -114,6 +121,21 @@ public class PlatformRecycleBinService : ITransientDependency
         }
     }
 
+    public async Task DeletePermanentlyAsync(string entityType, Guid id, CancellationToken cancellationToken = default)
+    {
+        using (_softDeleteFilter.Disable())
+        {
+            switch (NormalizeEntityType(entityType))
+            {
+                case "file":
+                    await DeleteFilePermanentlyAsync(id, cancellationToken);
+                    break;
+                default:
+                    throw new InvalidOperationException("当前仅支持彻底删除文件类型。");
+            }
+        }
+    }
+
     private async Task AppendAsync<TEntity>(
         ICollection<PlatformRecycleBinItemDto> result,
         string entityType,
@@ -150,6 +172,22 @@ public class PlatformRecycleBinService : ITransientDependency
         SetProperty(entity, "DeletionTime", null);
         SetProperty(entity, "DeleterId", null);
         await repository.UpdateAsync(entity, autoSave: true);
+    }
+
+    private async Task DeleteFilePermanentlyAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var file = await _fileRepository.GetAsync(id, cancellationToken: cancellationToken);
+        var storageSource = file.StorageSourceId.HasValue
+            ? await _fileStorageSourceService.ResolveDescriptorAsync(file.StorageSourceId, requireEnabled: false)
+            : null;
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName ?? file.StorageProvider);
+
+        await storageProvider.DeleteAsync(
+            file.FileKey,
+            file.StorageLocation,
+            storageSource,
+            cancellationToken);
+        await _fileRepository.DeleteDirectAsync(x => x.Id == id, cancellationToken);
     }
 
     private static bool ShouldInclude(string entityType, string? filterEntityType)

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { NotificationItem } from '@vben/layouts';
 
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { AuthenticationLoginExpiredModal } from '@vben/common-ui';
@@ -18,62 +18,21 @@ import { preferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
 import { openWindow } from '@vben/utils';
 
+import {
+  clearNotificationsApi,
+  getNotificationListApi,
+  getNotificationUnreadCountApi,
+  markAllNotificationsReadApi,
+  markNotificationReadApi,
+  removeNotificationApi,
+} from '#/api/core';
 import { $t } from '#/locales';
 import { useAuthStore } from '#/store';
 import LoginForm from '#/views/_core/authentication/login.vue';
 
-const notifications = ref<NotificationItem[]>([
-  {
-    id: 1,
-    avatar: 'https://avatar.vercel.sh/vercel.svg?text=VB',
-    date: '3小时前',
-    isRead: true,
-    message: '描述信息描述信息描述信息',
-    title: '收到了 14 份新周报',
-  },
-  {
-    id: 2,
-    avatar: 'https://avatar.vercel.sh/1',
-    date: '刚刚',
-    isRead: false,
-    message: '描述信息描述信息描述信息',
-    title: '朱偏右 回复了你',
-  },
-  {
-    id: 3,
-    avatar: 'https://avatar.vercel.sh/1',
-    date: '2024-01-01',
-    isRead: false,
-    message: '描述信息描述信息描述信息',
-    title: '曲丽丽 评论了你',
-  },
-  {
-    id: 4,
-    avatar: 'https://avatar.vercel.sh/satori',
-    date: '1天前',
-    isRead: false,
-    message: '描述信息描述信息描述信息',
-    title: '代办提醒',
-  },
-  {
-    id: 5,
-    avatar: 'https://avatar.vercel.sh/satori',
-    date: '1天前',
-    isRead: false,
-    message: '描述信息描述信息描述信息',
-    title: '跳转Workspace示例',
-    link: '/workspace',
-  },
-  {
-    id: 6,
-    avatar: 'https://avatar.vercel.sh/satori',
-    date: '1天前',
-    isRead: false,
-    message: '描述信息描述信息描述信息',
-    title: '跳转外部链接示例',
-    link: 'https://doc.vben.pro',
-  },
-]);
+const notifications = ref<NotificationItem[]>([]);
+const unreadCount = ref(0);
+let unreadCountTimer: ReturnType<typeof setInterval> | undefined;
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -81,7 +40,7 @@ const authStore = useAuthStore();
 const accessStore = useAccessStore();
 const { destroyWatermark, updateWatermark } = useWatermark();
 const showDot = computed(() =>
-  notifications.value.some((item) => !item.isRead),
+  unreadCount.value > 0 || notifications.value.some((item) => !item.isRead),
 );
 
 const menus = computed(() => [
@@ -129,24 +88,66 @@ async function handleLogout() {
   await authStore.logout(false);
 }
 
-function handleNoticeClear() {
+async function handleNoticeClear() {
+  await clearNotificationsApi();
   notifications.value = [];
+  unreadCount.value = 0;
 }
 
-function markRead(id: number | string) {
+async function markRead(id: number | string) {
+  await markNotificationReadApi(String(id));
   const item = notifications.value.find((item) => item.id === id);
-  if (item) {
+  if (item && !item.isRead) {
     item.isRead = true;
+    unreadCount.value = Math.max(0, unreadCount.value - 1);
   }
 }
 
-function remove(id: number | string) {
+async function remove(id: number | string) {
+  await removeNotificationApi(String(id));
+  const item = notifications.value.find((item) => item.id === id);
+  if (item && !item.isRead) {
+    unreadCount.value = Math.max(0, unreadCount.value - 1);
+  }
   notifications.value = notifications.value.filter((item) => item.id !== id);
 }
 
-function handleMakeAll() {
+async function handleMakeAll() {
+  await markAllNotificationsReadApi();
   notifications.value.forEach((item) => (item.isRead = true));
+  unreadCount.value = 0;
 }
+
+async function loadNotifications() {
+  const [items, unread] = await Promise.all([
+    getNotificationListApi({ maxResultCount: 20 }),
+    getNotificationUnreadCountApi(),
+  ]);
+  notifications.value = items;
+  unreadCount.value = unread.count;
+}
+
+async function refreshUnreadCount() {
+  if (document.visibilityState !== 'visible') {
+    return;
+  }
+
+  const unread = await getNotificationUnreadCountApi();
+  unreadCount.value = unread.count;
+}
+
+onMounted(() => {
+  void loadNotifications();
+  unreadCountTimer = setInterval(() => {
+    void refreshUnreadCount();
+  }, 60_000);
+});
+
+onBeforeUnmount(() => {
+  if (unreadCountTimer) {
+    clearInterval(unreadCountTimer);
+  }
+});
 watch(
   () => ({
     enable: preferences.app.watermark,
@@ -186,8 +187,8 @@ watch(
         :dot="showDot"
         :notifications="notifications"
         @clear="handleNoticeClear"
-        @read="(item) => item.id && markRead(item.id)"
-        @remove="(item) => item.id && remove(item.id)"
+        @read="(item) => item.id && void markRead(item.id)"
+        @remove="(item) => item.id && void remove(item.id)"
         @make-all="handleMakeAll"
       />
     </template>

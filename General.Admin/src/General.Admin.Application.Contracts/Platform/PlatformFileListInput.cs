@@ -4,7 +4,11 @@ public class PlatformFileListInput
 {
     public string? Category { get; set; }
 
+    public string? BusinessType { get; set; }
+
     public string? Keyword { get; set; }
+
+    public Guid? StorageSourceId { get; set; }
 
     public DateTime? UploadedFrom { get; set; }
 

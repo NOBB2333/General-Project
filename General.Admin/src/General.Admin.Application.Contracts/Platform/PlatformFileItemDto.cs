@@ -6,6 +6,12 @@ public class PlatformFileItemDto
 
     public string ContentType { get; set; } = string.Empty;
 
+    public string? BusinessId { get; set; }
+
+    public string? BusinessType { get; set; }
+
+    public string? BucketName { get; set; }
+
     public string FileKey { get; set; } = string.Empty;
 
     public string FileName { get; set; } = string.Empty;
@@ -16,9 +22,15 @@ public class PlatformFileItemDto
 
     public long Size { get; set; }
 
+    public bool IsPublic { get; set; }
+
     public string StorageLocation { get; set; } = string.Empty;
 
     public string StorageProvider { get; set; } = string.Empty;
+
+    public Guid? StorageSourceId { get; set; }
+
+    public string? StorageSourceName { get; set; }
 
     public string? UploadedBy { get; set; }
 

@@ -3,6 +3,7 @@ using System;
 using General.Admin.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace General.Admin.Migrations.PostgreSql
 {
     [DbContext(typeof(AdminPostgreSqlMigrationsDbContext))]
-    partial class AdminPostgreSqlMigrationsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260430045157_AddPlatformNotifications")]
+    partial class AddPlatformNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1848,8 +1851,6 @@ namespace General.Admin.Migrations.PostgreSql
 
                     b.HasIndex("UserId", "NotificationId")
                         .IsUnique();
-
-                    b.HasIndex("UserId", "IsRemoved", "IsRead");
 
                     b.HasIndex("UserId", "IsRemoved", "IsRead", "CreationTime");
 

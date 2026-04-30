@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.Account;
+using Volo.Abp.DistributedLocking;
 using Volo.Abp.Mapperly;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.Identity;
@@ -23,7 +24,8 @@ namespace General.Admin;
     typeof(AbpPermissionManagementApplicationModule),
     typeof(AbpTenantManagementApplicationModule),
     typeof(AbpFeatureManagementApplicationModule),
-    typeof(AbpSettingManagementApplicationModule)
+    typeof(AbpSettingManagementApplicationModule),
+    typeof(AbpDistributedLockingAbstractionsModule)
     )]
 public class AdminApplicationModule : AbpModule
 {

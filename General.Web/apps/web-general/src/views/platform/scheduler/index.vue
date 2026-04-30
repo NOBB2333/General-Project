@@ -25,18 +25,22 @@ import {
 
 import {
   cancelSchedulerJobApi,
+  clearSchedulerJobRecordsBatchApi,
   clearSchedulerJobRecordsApi,
   createSchedulerJobApi,
   createSchedulerJobTriggerApi,
   deleteSchedulerJobApi,
   deleteSchedulerJobTriggerApi,
   getSchedulerClusterNodesApi,
+  getSchedulerDashboardApi,
   getSchedulerHandlersApi,
   getSchedulerJobRecordsApi,
   getSchedulerJobTriggersApi,
   getSchedulerListApi,
   runSchedulerJobApi,
+  runSchedulerJobsBatchApi,
   toggleSchedulerJobApi,
+  toggleSchedulerJobsBatchApi,
   toggleSchedulerJobTriggerApi,
   updateSchedulerJobApi,
   updateSchedulerJobTriggerApi,
@@ -49,6 +53,8 @@ const loading = ref(false);
 const actionLoadingKey = ref('');
 const items = ref<SchedulerApi.JobItem[]>([]);
 const handlers = ref<SchedulerApi.HandlerItem[]>([]);
+const dashboard = ref<SchedulerApi.Dashboard>();
+const selectedJobKeys = ref<string[]>([]);
 const recordDrawerOpen = ref(false);
 const recordLoading = ref(false);
 const triggerDrawerOpen = ref(false);
@@ -82,12 +88,16 @@ const triggerForm = reactive<SchedulerApi.TriggerSaveInput>({
 });
 
 const metrics = computed(() => [
-  { label: '任务总数', value: items.value.length },
-  { label: '启用任务', value: items.value.filter((item) => item.isEnabled).length },
-  { label: '执行中', value: items.value.filter((item) => item.isRunning).length },
+  { label: '任务总数', value: dashboard.value?.totalCount ?? items.value.length },
+  { label: '启用任务', value: dashboard.value?.enabledCount ?? items.value.filter((item) => item.isEnabled).length },
+  { label: '执行中', value: dashboard.value?.runningCount ?? items.value.filter((item) => item.isRunning).length },
   {
-    label: '触发器',
-    value: items.value.reduce((total, item) => total + item.triggerCount, 0),
+    label: '近 24h 失败',
+    value: dashboard.value?.failedLast24Hours ?? 0,
+  },
+  {
+    label: '近 24h 慢任务',
+    value: dashboard.value?.slowLast24Hours ?? 0,
   },
 ]);
 
@@ -97,6 +107,16 @@ const handlerOptions = computed(() =>
     value: item.handlerKey,
   })),
 );
+
+const rowSelection = computed(() => ({
+  getCheckboxProps: (record: SchedulerApi.JobItem) => ({
+    disabled: record.isRunning,
+  }),
+  onChange: (keys: (number | string)[]) => {
+    selectedJobKeys.value = keys.map((key) => `${key}`);
+  },
+  selectedRowKeys: selectedJobKeys.value,
+}));
 
 const columns = [
   { dataIndex: 'title', key: 'title', title: '任务名称', width: 180 },
@@ -143,9 +163,15 @@ const nodeColumns = [
 async function loadData() {
   loading.value = true;
   try {
-    const [jobList, handlerList] = await Promise.all([getSchedulerListApi(), getSchedulerHandlersApi()]);
+    const [jobList, handlerList, dashboardData] = await Promise.all([
+      getSchedulerListApi(),
+      getSchedulerHandlersApi(),
+      getSchedulerDashboardApi(),
+    ]);
     items.value = jobList;
     handlers.value = handlerList;
+    dashboard.value = dashboardData;
+    selectedJobKeys.value = selectedJobKeys.value.filter((key) => jobList.some((item) => item.jobKey === key));
   } finally {
     loading.value = false;
   }
@@ -305,6 +331,65 @@ async function runJob(item: SchedulerApi.JobItem) {
   }
 }
 
+function ensureBatchSelection() {
+  if (selectedJobKeys.value.length === 0) {
+    message.warning('请先选择任务');
+    return false;
+  }
+
+  return true;
+}
+
+async function batchToggle(isEnabled: boolean) {
+  if (!ensureBatchSelection()) {
+    return;
+  }
+
+  actionLoadingKey.value = isEnabled ? 'batch:enable' : 'batch:disable';
+  try {
+    await toggleSchedulerJobsBatchApi(selectedJobKeys.value, isEnabled);
+    message.success(isEnabled ? '已批量启用任务' : '已批量停用任务');
+    selectedJobKeys.value = [];
+    await loadData();
+  } finally {
+    actionLoadingKey.value = '';
+  }
+}
+
+async function batchRun() {
+  if (!ensureBatchSelection()) {
+    return;
+  }
+
+  actionLoadingKey.value = 'batch:run';
+  try {
+    const results = await runSchedulerJobsBatchApi(selectedJobKeys.value);
+    const failed = results.filter((item) => !item.success);
+    if (failed.length > 0) {
+      message.warning(`批量执行完成，${failed.length} 个任务失败或跳过`);
+    } else {
+      message.success('批量执行完成');
+    }
+    await loadData();
+  } finally {
+    actionLoadingKey.value = '';
+  }
+}
+
+async function batchClearRecords() {
+  if (!ensureBatchSelection()) {
+    return;
+  }
+
+  actionLoadingKey.value = 'batch:clear-records';
+  try {
+    await clearSchedulerJobRecordsBatchApi(selectedJobKeys.value, 100);
+    message.success('已批量清理执行记录，保留最近 100 条');
+  } finally {
+    actionLoadingKey.value = '';
+  }
+}
+
 async function loadJobRecords(item: SchedulerApi.JobItem) {
   selectedJob.value = item;
   recordLoading.value = true;
@@ -441,6 +526,37 @@ onMounted(loadData);
     <Card :bordered="false" title="任务中心">
       <template #extra>
         <Space>
+          <Tag v-if="selectedJobKeys.length" color="blue">已选 {{ selectedJobKeys.length }}</Tag>
+          <Button
+            :disabled="selectedJobKeys.length === 0"
+            :loading="actionLoadingKey === 'batch:enable'"
+            @click="batchToggle(true)"
+          >
+            批量启用
+          </Button>
+          <Button
+            :disabled="selectedJobKeys.length === 0"
+            :loading="actionLoadingKey === 'batch:disable'"
+            @click="batchToggle(false)"
+          >
+            批量停用
+          </Button>
+          <Button
+            :disabled="selectedJobKeys.length === 0"
+            :loading="actionLoadingKey === 'batch:run'"
+            @click="batchRun"
+          >
+            批量执行
+          </Button>
+          <Popconfirm title="确认批量清理所选任务的执行记录？将保留最近 100 条。" @confirm="batchClearRecords">
+            <Button
+              danger
+              :disabled="selectedJobKeys.length === 0"
+              :loading="actionLoadingKey === 'batch:clear-records'"
+            >
+              批量清理
+            </Button>
+          </Popconfirm>
           <Button @click="openClusterNodes">集群节点</Button>
           <Button type="primary" @click="openCreateJob">新增任务</Button>
           <Button :loading="loading" @click="loadData">刷新</Button>
@@ -457,6 +573,7 @@ onMounted(loadData);
         :loading="loading"
         :pagination="false"
         row-key="jobKey"
+        :row-selection="rowSelection"
         :scroll="{ x: 1660 }"
       >
         <template #bodyCell="{ column, record }">

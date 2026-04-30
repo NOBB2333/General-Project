@@ -68,10 +68,13 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<AppExternalAccountMapping> AppExternalAccountMappings { get; set; }
     public DbSet<AppDictData> AppDictData { get; set; }
     public DbSet<AppDictType> AppDictTypes { get; set; }
+    public DbSet<AppFileStorageSource> AppFileStorageSources { get; set; }
+    public DbSet<AppNotification> AppNotifications { get; set; }
     public DbSet<AppOpenApiApplication> AppOpenApiApplications { get; set; }
     public DbSet<AppPlatformFile> AppPlatformFiles { get; set; }
     public DbSet<AppScheduledJobRecord> AppScheduledJobRecords { get; set; }
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
+    public DbSet<AppUserNotification> AppUserNotifications { get; set; }
     public DbSet<ProjectEntity> Projects { get; set; }
     public DbSet<ProjectCycle> ProjectCycles { get; set; }
     public DbSet<ProjectDocument> ProjectDocuments { get; set; }
@@ -245,6 +248,26 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.HasIndex(x => x.IsEnabled);
         });
 
+        builder.Entity<AppFileStorageSource>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}FileStorageSources", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.ProviderName).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Endpoint).HasMaxLength(512);
+            b.Property(x => x.RootPath).HasMaxLength(512);
+            b.Property(x => x.AccessKeyId).IsRequired().HasMaxLength(256);
+            b.Property(x => x.EncryptedSecret).HasMaxLength(2048);
+            b.Property(x => x.BucketName).HasMaxLength(128);
+            b.Property(x => x.Region).HasMaxLength(128);
+            b.Property(x => x.CustomDomain).HasMaxLength(512);
+            b.Property(x => x.PathTemplate).HasMaxLength(128);
+            b.Property(x => x.Remark).HasMaxLength(256);
+            b.HasIndex(x => x.Name).IsUnique();
+            b.HasIndex(x => new { x.ProviderName, x.IsEnabled });
+            b.HasIndex(x => x.IsDefault);
+        });
+
         builder.Entity<AppPlatformFile>(b =>
         {
             b.ToTable($"{AdminConsts.DbTablePrefix}PlatformFiles", AdminConsts.DbSchema);
@@ -254,14 +277,45 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.ContentType).IsRequired().HasMaxLength(256);
             b.Property(x => x.Category).IsRequired().HasMaxLength(64);
             b.Property(x => x.ParentPath).HasMaxLength(256);
+            b.Property(x => x.BusinessId).HasMaxLength(128);
+            b.Property(x => x.BusinessType).HasMaxLength(64);
+            b.Property(x => x.BucketName).HasMaxLength(128);
             b.Property(x => x.StorageLocation).IsRequired().HasMaxLength(512);
             b.Property(x => x.StorageProvider)
                 .IsRequired()
                 .HasMaxLength(32)
                 .HasDefaultValue(PlatformFileStorageNames.Local);
             b.HasIndex(x => x.FileKey).IsUnique();
+            b.HasIndex(x => x.StorageSourceId);
             b.HasIndex(x => x.StorageProvider);
+            b.HasIndex(x => new { x.BusinessType, x.BusinessId });
             b.HasIndex(x => new { x.Category, x.ParentPath });
+        });
+
+        builder.Entity<AppNotification>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}Notifications", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Title).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Content).IsRequired().HasMaxLength(1024);
+            b.Property(x => x.Type).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Level).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Link).HasMaxLength(512);
+            b.Property(x => x.Avatar).HasMaxLength(512);
+            b.Property(x => x.RecipientMode).IsRequired().HasMaxLength(64);
+            b.Property(x => x.RecipientSummary).IsRequired().HasColumnType("TEXT");
+            b.HasIndex(x => new { x.Type, x.CreationTime });
+            b.HasIndex(x => x.SenderUserId);
+        });
+
+        builder.Entity<AppUserNotification>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}UserNotifications", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.HasIndex(x => new { x.UserId, x.IsRemoved, x.IsRead });
+            b.HasIndex(x => new { x.UserId, x.IsRemoved, x.IsRead, x.CreationTime });
+            b.HasIndex(x => new { x.UserId, x.NotificationId }).IsUnique();
+            b.HasIndex(x => x.NotificationId);
         });
 
         builder.Entity<AppScheduledJobRecord>(b =>

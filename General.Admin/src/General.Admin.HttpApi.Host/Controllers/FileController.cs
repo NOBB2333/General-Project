@@ -19,9 +19,17 @@ public class FileUploadInput
     [Required]
     public IFormFile File { get; set; } = default!;
 
+    public string? BusinessId { get; set; }
+
+    public string? BusinessType { get; set; }
+
     public string? Category { get; set; }
 
+    public bool IsPublic { get; set; }
+
     public string? ParentPath { get; set; }
+
+    public Guid? StorageSourceId { get; set; }
 }
 
 [ApiController]
@@ -33,6 +41,7 @@ public class FileController : ControllerBase
     private readonly ICurrentUser _currentUser;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly IPlatformFileStorageProviderResolver _fileStorageProviderResolver;
+    private readonly PlatformFileStorageSourceService _fileStorageSourceService;
     private readonly PlatformFileStorageOptions _fileStorageOptions;
     private readonly IRepository<AppPlatformFile, Guid> _platformFileRepository;
     private readonly IRepository<Volo.Abp.Identity.IdentityUser, Guid> _userRepository;
@@ -41,6 +50,7 @@ public class FileController : ControllerBase
         ICurrentUser currentUser,
         IAsyncQueryableExecuter asyncQueryableExecuter,
         IPlatformFileStorageProviderResolver fileStorageProviderResolver,
+        PlatformFileStorageSourceService fileStorageSourceService,
         IOptions<PlatformFileStorageOptions> fileStorageOptions,
         IRepository<AppPlatformFile, Guid> platformFileRepository,
         IRepository<Volo.Abp.Identity.IdentityUser, Guid> userRepository)
@@ -48,6 +58,7 @@ public class FileController : ControllerBase
         _currentUser = currentUser;
         _asyncQueryableExecuter = asyncQueryableExecuter;
         _fileStorageProviderResolver = fileStorageProviderResolver;
+        _fileStorageSourceService = fileStorageSourceService;
         _fileStorageOptions = fileStorageOptions.Value;
         _platformFileRepository = platformFileRepository;
         _userRepository = userRepository;
@@ -71,6 +82,17 @@ public class FileController : ControllerBase
         {
             var category = input.Category.Trim();
             queryable = queryable.Where(x => x.Category == category);
+        }
+
+        if (input.StorageSourceId.HasValue)
+        {
+            queryable = queryable.Where(x => x.StorageSourceId == input.StorageSourceId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.BusinessType))
+        {
+            var businessType = input.BusinessType.Trim();
+            queryable = queryable.Where(x => x.BusinessType == businessType);
         }
 
         if (input.UploadedFrom.HasValue)
@@ -105,6 +127,14 @@ public class FileController : ControllerBase
 
         var files = await _asyncQueryableExecuter.ToListAsync(
             queryable.OrderByDescending(x => x.CreationTime));
+        var sourceIds = files
+            .Where(x => x.StorageSourceId.HasValue)
+            .Select(x => x.StorageSourceId!.Value)
+            .Distinct()
+            .ToHashSet();
+        var sourceNames = sourceIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _fileStorageSourceService.ResolveSourceNameMapAsync(sourceIds);
         var userIds = files
             .Where(x => x.UploadedByUserId.HasValue)
             .Select(x => x.UploadedByUserId!.Value)
@@ -122,14 +152,22 @@ public class FileController : ControllerBase
             return new PlatformFileItemDto
             {
                 Category = x.Category,
+                BusinessId = x.BusinessId,
+                BusinessType = x.BusinessType,
+                BucketName = x.BucketName,
                 ContentType = x.ContentType,
                 FileKey = x.FileKey,
                 FileName = x.FileName,
+                IsPublic = x.IsPublic,
                 ParentPath = x.ParentPath,
                 RelativePath = BuildRelativePath(x.Category, x.ParentPath, x.FileName),
                 Size = x.Size,
                 StorageLocation = x.StorageLocation,
                 StorageProvider = x.StorageProvider,
+                StorageSourceId = x.StorageSourceId,
+                StorageSourceName = x.StorageSourceId.HasValue && sourceNames.TryGetValue(x.StorageSourceId.Value, out var sourceName)
+                    ? sourceName
+                    : null,
                 UploadedAt = x.CreationTime,
                 UploadedBy = user?.UserName
             };
@@ -166,7 +204,8 @@ public class FileController : ControllerBase
             throw new InvalidOperationException("上传文件类型不允许。");
         }
 
-        var storageProvider = _fileStorageProviderResolver.Resolve();
+        var storageSource = await _fileStorageSourceService.ResolveDescriptorAsync(input.StorageSourceId, requireEnabled: true);
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName);
         await using (var validationStream = file.OpenReadStream())
         {
             await ValidateFileSignatureAsync(validationStream, contentType, HttpContext.RequestAborted);
@@ -179,6 +218,7 @@ public class FileController : ControllerBase
             contentType,
             string.IsNullOrWhiteSpace(input.Category) ? "default" : input.Category,
             input.ParentPath,
+            storageSource,
             HttpContext.RequestAborted);
 
         AppPlatformFile metadata;
@@ -194,7 +234,12 @@ public class FileController : ControllerBase
                 input.ParentPath,
                 storageResult.StorageLocation,
                 storageResult.Provider,
-                _currentUser.Id);
+                _currentUser.Id,
+                storageSource?.SourceId,
+                ResolveBucketName(storageResult.Provider, storageSource),
+                input.IsPublic || storageSource?.IsPublic == true,
+                input.BusinessType,
+                input.BusinessId);
             await _platformFileRepository.InsertAsync(metadata, autoSave: true);
         }
         catch
@@ -202,6 +247,7 @@ public class FileController : ControllerBase
             await storageProvider.DeleteAsync(
                 storageResult.FileKey,
                 storageResult.StorageLocation,
+                storageSource,
                 HttpContext.RequestAborted);
             throw;
         }
@@ -209,14 +255,20 @@ public class FileController : ControllerBase
         return ApiResponse<PlatformFileItemDto>.Ok(new PlatformFileItemDto
         {
             Category = metadata.Category,
+            BusinessId = metadata.BusinessId,
+            BusinessType = metadata.BusinessType,
+            BucketName = metadata.BucketName,
             ContentType = contentType,
             FileKey = storageResult.FileKey,
             FileName = originalName,
+            IsPublic = metadata.IsPublic,
             ParentPath = metadata.ParentPath,
             RelativePath = BuildRelativePath(metadata.Category, metadata.ParentPath, originalName),
             Size = file.Length,
             StorageLocation = storageResult.StorageLocation,
             StorageProvider = storageResult.Provider,
+            StorageSourceId = metadata.StorageSourceId,
+            StorageSourceName = storageSource?.Name,
             UploadedBy = _currentUser.UserName,
             UploadedAt = DateTime.UtcNow
         });
@@ -231,10 +283,14 @@ public class FileController : ControllerBase
             return NotFound();
         }
 
-        var storageProvider = _fileStorageProviderResolver.Resolve(metadata.StorageProvider);
+        var storageSource = metadata.StorageSourceId.HasValue
+            ? await _fileStorageSourceService.ResolveDescriptorAsync(metadata.StorageSourceId, requireEnabled: true)
+            : null;
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName ?? metadata.StorageProvider);
         var stream = await storageProvider.OpenReadAsync(
             metadata.FileKey,
             metadata.StorageLocation,
+            storageSource,
             HttpContext.RequestAborted);
         return File(stream, metadata.ContentType, metadata.FileName);
     }
@@ -247,15 +303,25 @@ public class FileController : ControllerBase
         var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
         if (metadata != null)
         {
-            var storageProvider = _fileStorageProviderResolver.Resolve(metadata.StorageProvider);
-            await storageProvider.DeleteAsync(
-                metadata.FileKey,
-                metadata.StorageLocation,
-                HttpContext.RequestAborted);
             await _platformFileRepository.DeleteAsync(metadata, autoSave: true);
         }
 
         return ApiResponse<bool>.Ok(true);
+    }
+
+    private string? ResolveBucketName(string providerName, PlatformFileStorageSourceDescriptor? source)
+    {
+        if (!string.IsNullOrWhiteSpace(source?.BucketName))
+        {
+            return source.BucketName;
+        }
+
+        return providerName.ToLowerInvariant() switch
+        {
+            "aliyunoss" => _fileStorageOptions.AliyunOSS.BucketName,
+            "minio" => _fileStorageOptions.MinIO.BucketName,
+            _ => null
+        };
     }
 
     private static string BuildRelativePath(string category, string? parentPath, string fileName)

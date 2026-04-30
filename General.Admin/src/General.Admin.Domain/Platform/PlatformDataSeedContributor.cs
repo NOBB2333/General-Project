@@ -41,6 +41,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     private readonly IRepository<BusinessReceivable, Guid> _businessReceivableRepository;
     private readonly IRepository<AppDictData, Guid> _dictDataRepository;
     private readonly IRepository<AppDictType, Guid> _dictTypeRepository;
+    private readonly IRepository<AppFileStorageSource, Guid> _fileStorageSourceRepository;
     private readonly IRepository<PlatformScheduledJob, Guid> _platformScheduledJobRepository;
     private readonly IRepository<PlatformScheduledJobTrigger, Guid> _platformScheduledJobTriggerRepository;
     private readonly IRepository<PermissionGrant, Guid> _permissionGrantRepository;
@@ -77,6 +78,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IRepository<BusinessReceivable, Guid> businessReceivableRepository,
         IRepository<AppDictData, Guid> dictDataRepository,
         IRepository<AppDictType, Guid> dictTypeRepository,
+        IRepository<AppFileStorageSource, Guid> fileStorageSourceRepository,
         IRepository<PlatformScheduledJob, Guid> platformScheduledJobRepository,
         IRepository<PlatformScheduledJobTrigger, Guid> platformScheduledJobTriggerRepository,
         IRepository<PermissionGrant, Guid> permissionGrantRepository,
@@ -112,6 +114,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         _businessReceivableRepository = businessReceivableRepository;
         _dictDataRepository = dictDataRepository;
         _dictTypeRepository = dictTypeRepository;
+        _fileStorageSourceRepository = fileStorageSourceRepository;
         _platformScheduledJobRepository = platformScheduledJobRepository;
         _platformScheduledJobTriggerRepository = platformScheduledJobTriggerRepository;
         _permissionGrantRepository = permissionGrantRepository;
@@ -140,6 +143,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         await SeedProjectExecutionDataAsync();
         await SeedBusinessManagementDataAsync();
         await SeedDictionariesAsync();
+        await SeedFileStorageSourcesAsync();
         await SeedPlatformScheduledJobsAsync();
         await SeedMenusAsync();
         await SeedDefaultTenantAuthorizationAsync(defaultTenant, defaultTenantAdminId);
@@ -596,6 +600,34 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 x.NextRunTime,
                 x.LastRunTime,
                 x.LastRunResult)).ToList(),
+            autoSave: true);
+    }
+
+    private async Task SeedFileStorageSourcesAsync()
+    {
+        if (await _fileStorageSourceRepository.AnyAsync())
+        {
+            return;
+        }
+
+        await _fileStorageSourceRepository.InsertAsync(
+            new AppFileStorageSource(
+                Guid.Parse("69000000-0000-0000-0000-000000000001"),
+                "本地默认",
+                PlatformFileStorageNames.Local,
+                null,
+                "App_Data/upload-files",
+                string.Empty,
+                null,
+                null,
+                null,
+                null,
+                string.Empty,
+                false,
+                true,
+                true,
+                false,
+                "平台默认本地文件存储源。"),
             autoSave: true);
     }
 

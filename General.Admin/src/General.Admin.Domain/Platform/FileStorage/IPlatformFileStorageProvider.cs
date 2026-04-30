@@ -13,21 +13,25 @@ public interface IPlatformFileStorageProvider
         string contentType,
         string category,
         string? parentPath,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default);
 
     Task<Stream> OpenReadAsync(
         string fileKey,
         string storageLocation,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default);
 
     Task<bool> DeleteAsync(
         string fileKey,
         string storageLocation,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default);
 
     Task<string?> GetPublicUrlAsync(
         string fileKey,
         string storageLocation,
         TimeSpan expiry,
+        PlatformFileStorageSourceDescriptor? source = null,
         CancellationToken cancellationToken = default);
 }

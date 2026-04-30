@@ -16,9 +16,19 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
 
     public long Size { get; private set; }
 
+    public string? BusinessId { get; private set; }
+
+    public string? BusinessType { get; private set; }
+
+    public string? BucketName { get; private set; }
+
+    public bool IsPublic { get; private set; }
+
     public string StorageLocation { get; private set; }
 
     public string StorageProvider { get; private set; }
+
+    public Guid? StorageSourceId { get; private set; }
 
     public Guid? UploadedByUserId { get; private set; }
 
@@ -42,7 +52,12 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         string? parentPath,
         string storageLocation,
         string storageProvider,
-        Guid? uploadedByUserId) : base(id)
+        Guid? uploadedByUserId,
+        Guid? storageSourceId = null,
+        string? bucketName = null,
+        bool isPublic = false,
+        string? businessType = null,
+        string? businessId = null) : base(id)
     {
         FileKey = Check.NotNullOrWhiteSpace(fileKey, nameof(fileKey), 256);
         FileName = Check.NotNullOrWhiteSpace(fileName, nameof(fileName), 256);
@@ -53,12 +68,24 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         StorageLocation = Check.NotNullOrWhiteSpace(storageLocation, nameof(storageLocation), 512);
         StorageProvider = Check.NotNullOrWhiteSpace(storageProvider, nameof(storageProvider), 32);
         UploadedByUserId = uploadedByUserId;
+        StorageSourceId = storageSourceId;
+        BucketName = Normalize(bucketName, 128);
+        IsPublic = isPublic;
+        BusinessType = Normalize(businessType, 64);
+        BusinessId = Normalize(businessId, 128);
     }
 
     public void UpdateCategory(string category, string? parentPath)
     {
         Category = Normalize(category, 64) ?? "default";
         ParentPath = Normalize(parentPath, 256);
+    }
+
+    public void UpdateMetadata(bool isPublic, string? businessType, string? businessId)
+    {
+        IsPublic = isPublic;
+        BusinessType = Normalize(businessType, 64);
+        BusinessId = Normalize(businessId, 128);
     }
 
     private static string? Normalize(string? value, int maxLength)

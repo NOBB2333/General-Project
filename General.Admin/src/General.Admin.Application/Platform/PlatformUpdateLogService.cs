@@ -8,15 +8,18 @@ namespace General.Admin.Platform;
 public class PlatformUpdateLogService : ITransientDependency
 {
     private readonly ICurrentUser _currentUser;
+    private readonly PlatformNotificationPublisher _notificationPublisher;
     private readonly IRepository<AppUpdateLog, Guid> _updateLogRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PlatformUpdateLogService(
         ICurrentUser currentUser,
+        PlatformNotificationPublisher notificationPublisher,
         IRepository<AppUpdateLog, Guid> updateLogRepository,
         IRepository<IdentityUser, Guid> userRepository)
     {
         _currentUser = currentUser;
+        _notificationPublisher = notificationPublisher;
         _updateLogRepository = updateLogRepository;
         _userRepository = userRepository;
     }
@@ -60,6 +63,18 @@ public class PlatformUpdateLogService : ITransientDependency
             input.PublishedAt,
             input.ImpactScope);
         await _updateLogRepository.InsertAsync(log, autoSave: true);
+        await _notificationPublisher.PublishAsync(new PlatformNotificationSendInput
+        {
+            Content = log.Summary,
+            Link = "/platform/update-logs",
+            Level = PlatformNotificationLevels.Info,
+            Recipient = new PlatformNotificationRecipientInput
+            {
+                Mode = PlatformNotificationRecipientModes.AllUsers
+            },
+            Title = $"更新日志：{log.Version}",
+            Type = PlatformNotificationTypes.UpdateLog
+        });
     }
 
     public async Task UpdateAsync(Guid id, PlatformUpdateLogSaveInput input)

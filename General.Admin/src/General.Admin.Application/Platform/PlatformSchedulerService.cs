@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using System.Threading;
 using Quartz;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Linq;
+using Volo.Abp.Uow;
 
 namespace General.Admin.Platform;
 
@@ -13,6 +15,7 @@ public class PlatformSchedulerService : ITransientDependency
 {
     private const int ClusterNodeRetentionDays = 7;
     private const int MaxClearRecordBatchSize = 500;
+    private const int MaxBatchRunConcurrency = 5;
     private const int MaxDueTriggerBatchSize = 200;
     private const int MaxRecordResultCount = 200;
     private const string AutoTriggerMode = "auto";
@@ -28,6 +31,7 @@ public class PlatformSchedulerService : ITransientDependency
 
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly IEnumerable<IPlatformScheduledJobHandler> _jobHandlers;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IRepository<PlatformScheduledJobClusterNode, Guid> _clusterNodeRepository;
     private readonly IRepository<PlatformScheduledJob, Guid> _jobRepository;
     private readonly IRepository<AppScheduledJobRecord, Guid> _recordRepository;
@@ -37,6 +41,7 @@ public class PlatformSchedulerService : ITransientDependency
     public PlatformSchedulerService(
         IAsyncQueryableExecuter asyncQueryableExecuter,
         IEnumerable<IPlatformScheduledJobHandler> jobHandlers,
+        IServiceScopeFactory serviceScopeFactory,
         IRepository<PlatformScheduledJobClusterNode, Guid> clusterNodeRepository,
         IRepository<PlatformScheduledJob, Guid> jobRepository,
         IRepository<AppScheduledJobRecord, Guid> recordRepository,
@@ -45,6 +50,7 @@ public class PlatformSchedulerService : ITransientDependency
     {
         _asyncQueryableExecuter = asyncQueryableExecuter;
         _jobHandlers = jobHandlers;
+        _serviceScopeFactory = serviceScopeFactory;
         _clusterNodeRepository = clusterNodeRepository;
         _jobRepository = jobRepository;
         _recordRepository = recordRepository;
@@ -71,6 +77,26 @@ public class PlatformSchedulerService : ITransientDependency
             .Select(x => new PlatformScheduledJobHandlerDto { HandlerKey = x.JobKey })
             .OrderBy(x => x.HandlerKey)
             .ToList());
+    }
+
+    public async Task<PlatformScheduledJobDashboardDto> GetDashboardAsync()
+    {
+        var jobs = await _jobRepository.GetListAsync();
+        var since = DateTime.Now.AddHours(-24);
+        var recordQueryable = await _recordRepository.GetQueryableAsync();
+        var recentRecords = await _asyncQueryableExecuter.ToListAsync(
+            recordQueryable.Where(x => x.StartTime >= since));
+
+        return new PlatformScheduledJobDashboardDto
+        {
+            EnabledCount = jobs.Count(x => x.IsEnabled),
+            FailedLast24Hours = recentRecords.Count(x => x.Status == PlatformScheduledJobRecordStatus.Failed),
+            RunningCount = jobs.Count(x =>
+                RunningJobs.ContainsKey(x.JobKey) ||
+                (x.LockExpirationTime.HasValue && x.LockExpirationTime.Value > DateTime.Now)),
+            SlowLast24Hours = recentRecords.Count(x => x.DurationMilliseconds.HasValue && x.DurationMilliseconds.Value >= 60_000),
+            TotalCount = jobs.Count
+        };
     }
 
     public async Task<List<PlatformScheduledJobClusterNodeDto>> GetClusterNodesAsync()
@@ -298,6 +324,28 @@ public class PlatformSchedulerService : ITransientDependency
         return await ExecuteJobAsync(job, null, manualTrigger: true, CancellationToken.None);
     }
 
+    public async Task<List<PlatformScheduledJobOperationResultDto>> RunBatchAsync(IEnumerable<string> jobKeys)
+    {
+        var keys = NormalizeJobKeys(jobKeys);
+        var results = new PlatformScheduledJobOperationResultDto[keys.Count];
+        using var semaphore = new SemaphoreSlim(MaxBatchRunConcurrency);
+
+        await Task.WhenAll(keys.Select(async (jobKey, index) =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                results[index] = await RunSingleInNewScopeAsync(jobKey);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }));
+
+        return results.ToList();
+    }
+
     public async Task ToggleAsync(string jobKey, bool isEnabled)
     {
         var job = await FindJobByKeyAsync(jobKey);
@@ -306,6 +354,14 @@ public class PlatformSchedulerService : ITransientDependency
             isEnabled,
             isEnabled ? CalculateNextRunTime(job.CronExpression, DateTime.Now) : null);
         await _jobRepository.UpdateAsync(job, autoSave: true);
+    }
+
+    public async Task ToggleBatchAsync(IEnumerable<string> jobKeys, bool isEnabled)
+    {
+        foreach (var jobKey in NormalizeJobKeys(jobKeys))
+        {
+            await ToggleAsync(jobKey, isEnabled);
+        }
     }
 
     public async Task<string> CancelAsync(string jobKey)
@@ -380,6 +436,58 @@ public class PlatformSchedulerService : ITransientDependency
             {
                 return;
             }
+        }
+    }
+
+    public async Task ClearRecordsBatchAsync(IEnumerable<string> jobKeys, int keepLastN = 100)
+    {
+        foreach (var jobKey in NormalizeJobKeys(jobKeys))
+        {
+            await ClearRecordsAsync(jobKey, keepLastN);
+        }
+    }
+
+    private static List<string> NormalizeJobKeys(IEnumerable<string> jobKeys)
+    {
+        var keys = jobKeys
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(100)
+            .ToList();
+        if (keys.Count == 0)
+        {
+            throw new InvalidOperationException("请选择定时任务。");
+        }
+
+        return keys;
+    }
+
+    private async Task<PlatformScheduledJobOperationResultDto> RunSingleInNewScopeAsync(string jobKey)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var unitOfWorkManager = scope.ServiceProvider.GetRequiredService<IUnitOfWorkManager>();
+            using var unitOfWork = unitOfWorkManager.Begin(requiresNew: true, isTransactional: false);
+            var schedulerService = scope.ServiceProvider.GetRequiredService<PlatformSchedulerService>();
+            var message = await schedulerService.RunAsync(jobKey);
+            await unitOfWork.CompleteAsync();
+            return new PlatformScheduledJobOperationResultDto
+            {
+                JobKey = jobKey,
+                Message = message,
+                Success = !message.Contains("失败", StringComparison.OrdinalIgnoreCase)
+            };
+        }
+        catch (Exception ex)
+        {
+            return new PlatformScheduledJobOperationResultDto
+            {
+                JobKey = jobKey,
+                Message = ex.GetBaseException().Message,
+                Success = false
+            };
         }
     }
 
