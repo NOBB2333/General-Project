@@ -10,9 +10,12 @@ export namespace AuditLogApi {
     executionTime: string;
     exceptionMessage?: null | string;
     hasException: boolean;
+    hostOperatorUserId?: null | string;
+    hostOperatorUserName?: null | string;
     httpMethod?: null | string;
     httpStatusCode?: null | number;
     id: string;
+    isHostTenantOperation: boolean;
     menuTitle?: null | string;
     tenantName?: null | string;
     url?: null | string;

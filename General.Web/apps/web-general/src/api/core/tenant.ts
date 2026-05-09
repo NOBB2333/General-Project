@@ -25,7 +25,10 @@ export namespace TenantApi {
   }
 
   export interface TenantSaveInput {
+    adminEmail?: null | string;
+    adminPassword?: null | string;
     adminUserId?: null | string;
+    adminUserName?: null | string;
     defaultConnectionString?: null | string;
     name: string;
     remark?: null | string;

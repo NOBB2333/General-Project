@@ -1445,11 +1445,21 @@ namespace General.Admin.Migrations.Sqlite
                     b.Property<bool>("HasException")
                         .HasColumnType("INTEGER");
 
+                    b.Property<Guid?>("HostOperatorUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("HostOperatorUserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("HttpStatusCode")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsHostTenantOperation")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("MenuTitle")
@@ -1473,6 +1483,8 @@ namespace General.Admin.Migrations.Sqlite
                     b.HasIndex("ExecutionTime");
 
                     b.HasIndex("Category", "ExecutionTime");
+
+                    b.HasIndex("IsHostTenantOperation", "ExecutionTime");
 
                     b.HasIndex("UserName", "ExecutionTime");
 

@@ -65,7 +65,307 @@ public class FileController : ControllerBase
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PlatformFileItemDto>>>> GetListAsync([FromQuery] PlatformFileListInput input)
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformFileItemDto>>>> GetListAsync([FromQuery] PlatformFileListInput input)
+    {
+        var queryable = await BuildFilteredQueryableAsync(input);
+
+        var totalCount = await _asyncQueryableExecuter.CountAsync(queryable);
+        var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 100);
+        var skipCount = Math.Max(0, input.SkipCount);
+        var files = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .OrderByDescending(x => x.CreationTime)
+                .Skip(skipCount)
+                .Take(maxResultCount));
+        var sourceIds = files
+            .Where(x => x.StorageSourceId.HasValue)
+            .Select(x => x.StorageSourceId!.Value)
+            .Distinct()
+            .ToHashSet();
+        var sourceNames = sourceIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _fileStorageSourceService.ResolveSourceNameMapAsync(sourceIds);
+        var userIds = files
+            .Where(x => x.UploadedByUserId.HasValue)
+            .Select(x => x.UploadedByUserId!.Value)
+            .Distinct()
+            .ToList();
+        var users = userIds.Count == 0
+            ? new Dictionary<Guid, Volo.Abp.Identity.IdentityUser>()
+            : (await _asyncQueryableExecuter.ToListAsync(
+                    (await _userRepository.GetQueryableAsync()).Where(x => userIds.Contains(x.Id))))
+                .ToDictionary(x => x.Id);
+
+        var result = files.Select(x =>
+        {
+            users.TryGetValue(x.UploadedByUserId ?? Guid.Empty, out var user);
+            return new PlatformFileItemDto
+            {
+                Category = x.Category,
+                BusinessId = x.BusinessId,
+                BusinessType = x.BusinessType,
+                BucketName = x.BucketName,
+                ContentType = x.ContentType,
+                FileKey = x.FileKey,
+                FileName = x.FileName,
+                IsPublic = x.IsPublic,
+                ParentPath = x.ParentPath,
+                RelativePath = PlatformFilePathPolicy.BuildRelativePath(x.Category, x.ParentPath, x.FileName),
+                Size = x.Size,
+                StorageLocation = x.StorageLocation,
+                StorageProvider = x.StorageProvider,
+                StorageSourceId = x.StorageSourceId,
+                StorageSourceName = x.StorageSourceId.HasValue && sourceNames.TryGetValue(x.StorageSourceId.Value, out var sourceName)
+                    ? sourceName
+                    : null,
+                UploadedAt = x.CreationTime,
+                UploadedBy = user?.UserName
+            };
+        }).ToList();
+
+        return ApiResponse<PlatformPagedResultDto<PlatformFileItemDto>>.Ok(new PlatformPagedResultDto<PlatformFileItemDto>
+        {
+            Items = result,
+            TotalCount = totalCount
+        });
+    }
+
+    [HttpGet("tree")]
+    public async Task<ActionResult<ApiResponse<List<PlatformFileTreeItemDto>>>> GetTreeAsync([FromQuery] PlatformFileListInput input)
+    {
+        var queryable = await BuildFilteredQueryableAsync(input, applyParentPathFilter: false);
+        var items = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .Select(x => new { x.Category, x.ParentPath })
+                .Distinct()
+                .OrderBy(x => x.Category)
+                .ThenBy(x => x.ParentPath));
+
+        return ApiResponse<List<PlatformFileTreeItemDto>>.Ok(items.Select(x => new PlatformFileTreeItemDto
+        {
+            Category = x.Category,
+            ParentPath = x.ParentPath
+        }).ToList());
+    }
+
+    [Authorize(AdminPermissions.Platform.FileManage)]
+    [PlatformEndpoint("Platform.File.Manage")]
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(104_857_600)]
+    public async Task<ActionResult<ApiResponse<PlatformFileItemDto>>> UploadAsync([FromForm] FileUploadInput input)
+    {
+        var file = input.File;
+        if (file == null || file.Length == 0)
+        {
+            throw new InvalidOperationException("上传文件不能为空。");
+        }
+
+        if (_fileStorageOptions.MaxFileSizeBytes > 0 && file.Length > _fileStorageOptions.MaxFileSizeBytes)
+        {
+            throw new InvalidOperationException("上传文件超过大小限制。");
+        }
+
+        var originalName = Path.GetFileName(file.FileName);
+        var contentType = NormalizeContentType(string.IsNullOrWhiteSpace(file.ContentType)
+            ? GetContentType(Path.GetExtension(originalName))
+            : file.ContentType);
+        if (_fileStorageOptions.AllowedContentTypes.Length > 0 &&
+            !_fileStorageOptions.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("上传文件类型不允许。");
+        }
+
+        var category = PlatformFilePathPolicy.NormalizeCategory(input.Category);
+        var parentPath = PlatformFilePathPolicy.NormalizeParentPath(input.ParentPath);
+        var storageSource = await _fileStorageSourceService.ResolveDescriptorAsync(input.StorageSourceId, requireEnabled: true);
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName);
+        await using (var validationStream = file.OpenReadStream())
+        {
+            await ValidateFileSignatureAsync(validationStream, contentType, HttpContext.RequestAborted);
+        }
+
+        await using var inputStream = file.OpenReadStream();
+        var storageResult = await storageProvider.SaveAsync(
+            inputStream,
+            originalName,
+            contentType,
+            category,
+            parentPath,
+            storageSource,
+            HttpContext.RequestAborted);
+
+        AppPlatformFile metadata;
+        try
+        {
+            metadata = new AppPlatformFile(
+                Guid.NewGuid(),
+                storageResult.FileKey,
+                originalName,
+                contentType,
+                file.Length,
+                category,
+                parentPath,
+                storageResult.StorageLocation,
+                storageResult.Provider,
+                _currentUser.Id,
+                storageSource?.SourceId,
+                ResolveBucketName(storageResult.Provider, storageSource),
+                input.IsPublic || storageSource?.IsPublic == true,
+                input.BusinessType,
+                input.BusinessId);
+            await _platformFileRepository.InsertAsync(metadata, autoSave: true);
+        }
+        catch
+        {
+            await storageProvider.DeleteAsync(
+                storageResult.FileKey,
+                storageResult.StorageLocation,
+                storageSource,
+                HttpContext.RequestAborted);
+            throw;
+        }
+
+        return ApiResponse<PlatformFileItemDto>.Ok(new PlatformFileItemDto
+        {
+            Category = metadata.Category,
+            BusinessId = metadata.BusinessId,
+            BusinessType = metadata.BusinessType,
+            BucketName = metadata.BucketName,
+            ContentType = contentType,
+            FileKey = storageResult.FileKey,
+            FileName = originalName,
+            IsPublic = metadata.IsPublic,
+            ParentPath = metadata.ParentPath,
+            RelativePath = PlatformFilePathPolicy.BuildRelativePath(metadata.Category, metadata.ParentPath, originalName),
+            Size = file.Length,
+            StorageLocation = storageResult.StorageLocation,
+            StorageProvider = storageResult.Provider,
+            StorageSourceId = metadata.StorageSourceId,
+            StorageSourceName = storageSource?.Name,
+            UploadedBy = _currentUser.UserName,
+            UploadedAt = DateTime.UtcNow
+        });
+    }
+
+    [HttpGet("download/{fileKey}")]
+    public async Task<IActionResult> DownloadAsync(string fileKey)
+    {
+        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
+        if (metadata == null)
+        {
+            return NotFound();
+        }
+
+        var storageSource = metadata.StorageSourceId.HasValue
+            ? await _fileStorageSourceService.ResolveDescriptorAsync(metadata.StorageSourceId, requireEnabled: true)
+            : null;
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName ?? metadata.StorageProvider);
+        var stream = await storageProvider.OpenReadAsync(
+            metadata.FileKey,
+            metadata.StorageLocation,
+            storageSource,
+            HttpContext.RequestAborted);
+        return File(stream, metadata.ContentType, metadata.FileName);
+    }
+
+    [HttpGet("preview/{fileKey}")]
+    public async Task<IActionResult> PreviewAsync(string fileKey)
+    {
+        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
+        if (metadata == null)
+        {
+            return NotFound();
+        }
+
+        var storageSource = metadata.StorageSourceId.HasValue
+            ? await _fileStorageSourceService.ResolveDescriptorAsync(metadata.StorageSourceId, requireEnabled: true)
+            : null;
+        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName ?? metadata.StorageProvider);
+        var stream = await storageProvider.OpenReadAsync(
+            metadata.FileKey,
+            metadata.StorageLocation,
+            storageSource,
+            HttpContext.RequestAborted);
+        Response.Headers.ContentDisposition = $"inline; filename=\"{Uri.EscapeDataString(metadata.FileName)}\"";
+        return File(stream, metadata.ContentType);
+    }
+
+    [Authorize(AdminPermissions.Platform.FileManage)]
+    [PlatformEndpoint("Platform.File.Manage")]
+    [HttpPut("{fileKey}/metadata")]
+    public async Task<ActionResult<ApiResponse<bool>>> UpdateMetadataAsync(
+        string fileKey,
+        [FromBody] PlatformFileMetadataInput input)
+    {
+        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
+        if (metadata == null)
+        {
+            return ApiResponse<bool>.Ok(true);
+        }
+
+        metadata.UpdateMetadata(input.FileName, input.IsPublic, input.BusinessType, input.BusinessId);
+        await _platformFileRepository.UpdateAsync(metadata, autoSave: true);
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [Authorize(AdminPermissions.Platform.FileManage)]
+    [PlatformEndpoint("Platform.File.Manage")]
+    [HttpDelete("{fileKey}")]
+    public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(string fileKey)
+    {
+        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
+        if (metadata != null)
+        {
+            await _platformFileRepository.DeleteAsync(metadata, autoSave: true);
+        }
+
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    [Authorize(AdminPermissions.Platform.FileManage)]
+    [PlatformEndpoint("Platform.File.Manage")]
+    [HttpPost("batch-delete")]
+    public async Task<ActionResult<ApiResponse<bool>>> BatchDeleteAsync([FromBody] PlatformFileBatchDeleteInput input)
+    {
+        var fileKeys = input.FileKeys
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (fileKeys.Count == 0)
+        {
+            return ApiResponse<bool>.Ok(true);
+        }
+
+        var queryable = await _platformFileRepository.GetQueryableAsync();
+        var files = await _asyncQueryableExecuter.ToListAsync(queryable.Where(x => fileKeys.Contains(x.FileKey)));
+        if (files.Count > 0)
+        {
+            await _platformFileRepository.DeleteManyAsync(files, autoSave: true);
+        }
+
+        return ApiResponse<bool>.Ok(true);
+    }
+
+    private string? ResolveBucketName(string providerName, PlatformFileStorageSourceDescriptor? source)
+    {
+        if (!string.IsNullOrWhiteSpace(source?.BucketName))
+        {
+            return source.BucketName;
+        }
+
+        return providerName.ToLowerInvariant() switch
+        {
+            "aliyunoss" => _fileStorageOptions.AliyunOSS.BucketName,
+            "minio" => _fileStorageOptions.MinIO.BucketName,
+            _ => null
+        };
+    }
+
+    private async Task<IQueryable<AppPlatformFile>> BuildFilteredQueryableAsync(
+        PlatformFileListInput input,
+        bool applyParentPathFilter = true)
     {
         var queryable = await _platformFileRepository.GetQueryableAsync();
         var keyword = input.Keyword?.Trim();
@@ -80,8 +380,14 @@ public class FileController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(input.Category))
         {
-            var category = input.Category.Trim();
+            var category = PlatformFilePathPolicy.NormalizeCategory(input.Category);
             queryable = queryable.Where(x => x.Category == category);
+        }
+
+        if (applyParentPathFilter && !string.IsNullOrWhiteSpace(input.ParentPath))
+        {
+            var parentPath = PlatformFilePathPolicy.NormalizeParentPath(input.ParentPath);
+            queryable = queryable.Where(x => x.ParentPath == parentPath);
         }
 
         if (input.StorageSourceId.HasValue)
@@ -117,220 +423,12 @@ public class FileController : ControllerBase
                         (x.Name != null && x.Name.Contains(uploadedBy)))
                     .Select(x => x.Id));
 
-            if (uploaderIds.Count == 0)
-            {
-                return ApiResponse<List<PlatformFileItemDto>>.Ok([]);
-            }
-
-            queryable = queryable.Where(x => x.UploadedByUserId.HasValue && uploaderIds.Contains(x.UploadedByUserId.Value));
+            queryable = uploaderIds.Count == 0
+                ? queryable.Where(_ => false)
+                : queryable.Where(x => x.UploadedByUserId.HasValue && uploaderIds.Contains(x.UploadedByUserId.Value));
         }
 
-        var files = await _asyncQueryableExecuter.ToListAsync(
-            queryable.OrderByDescending(x => x.CreationTime));
-        var sourceIds = files
-            .Where(x => x.StorageSourceId.HasValue)
-            .Select(x => x.StorageSourceId!.Value)
-            .Distinct()
-            .ToHashSet();
-        var sourceNames = sourceIds.Count == 0
-            ? new Dictionary<Guid, string>()
-            : await _fileStorageSourceService.ResolveSourceNameMapAsync(sourceIds);
-        var userIds = files
-            .Where(x => x.UploadedByUserId.HasValue)
-            .Select(x => x.UploadedByUserId!.Value)
-            .Distinct()
-            .ToList();
-        var users = userIds.Count == 0
-            ? new Dictionary<Guid, Volo.Abp.Identity.IdentityUser>()
-            : (await _userRepository.GetListAsync())
-                .Where(x => userIds.Contains(x.Id))
-                .ToDictionary(x => x.Id);
-
-        var result = files.Select(x =>
-        {
-            users.TryGetValue(x.UploadedByUserId ?? Guid.Empty, out var user);
-            return new PlatformFileItemDto
-            {
-                Category = x.Category,
-                BusinessId = x.BusinessId,
-                BusinessType = x.BusinessType,
-                BucketName = x.BucketName,
-                ContentType = x.ContentType,
-                FileKey = x.FileKey,
-                FileName = x.FileName,
-                IsPublic = x.IsPublic,
-                ParentPath = x.ParentPath,
-                RelativePath = BuildRelativePath(x.Category, x.ParentPath, x.FileName),
-                Size = x.Size,
-                StorageLocation = x.StorageLocation,
-                StorageProvider = x.StorageProvider,
-                StorageSourceId = x.StorageSourceId,
-                StorageSourceName = x.StorageSourceId.HasValue && sourceNames.TryGetValue(x.StorageSourceId.Value, out var sourceName)
-                    ? sourceName
-                    : null,
-                UploadedAt = x.CreationTime,
-                UploadedBy = user?.UserName
-            };
-        }).ToList();
-
-        return ApiResponse<List<PlatformFileItemDto>>.Ok(result);
-    }
-
-    [Authorize(AdminPermissions.Platform.FileManage)]
-    [PlatformEndpoint("Platform.File.Manage")]
-    [HttpPost("upload")]
-    [Consumes("multipart/form-data")]
-    [RequestSizeLimit(104_857_600)]
-    public async Task<ActionResult<ApiResponse<PlatformFileItemDto>>> UploadAsync([FromForm] FileUploadInput input)
-    {
-        var file = input.File;
-        if (file == null || file.Length == 0)
-        {
-            throw new InvalidOperationException("上传文件不能为空。");
-        }
-
-        if (_fileStorageOptions.MaxFileSizeBytes > 0 && file.Length > _fileStorageOptions.MaxFileSizeBytes)
-        {
-            throw new InvalidOperationException("上传文件超过大小限制。");
-        }
-
-        var originalName = Path.GetFileName(file.FileName);
-        var contentType = NormalizeContentType(string.IsNullOrWhiteSpace(file.ContentType)
-            ? GetContentType(Path.GetExtension(originalName))
-            : file.ContentType);
-        if (_fileStorageOptions.AllowedContentTypes.Length > 0 &&
-            !_fileStorageOptions.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("上传文件类型不允许。");
-        }
-
-        var storageSource = await _fileStorageSourceService.ResolveDescriptorAsync(input.StorageSourceId, requireEnabled: true);
-        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName);
-        await using (var validationStream = file.OpenReadStream())
-        {
-            await ValidateFileSignatureAsync(validationStream, contentType, HttpContext.RequestAborted);
-        }
-
-        await using var inputStream = file.OpenReadStream();
-        var storageResult = await storageProvider.SaveAsync(
-            inputStream,
-            originalName,
-            contentType,
-            string.IsNullOrWhiteSpace(input.Category) ? "default" : input.Category,
-            input.ParentPath,
-            storageSource,
-            HttpContext.RequestAborted);
-
-        AppPlatformFile metadata;
-        try
-        {
-            metadata = new AppPlatformFile(
-                Guid.NewGuid(),
-                storageResult.FileKey,
-                originalName,
-                contentType,
-                file.Length,
-                string.IsNullOrWhiteSpace(input.Category) ? "default" : input.Category,
-                input.ParentPath,
-                storageResult.StorageLocation,
-                storageResult.Provider,
-                _currentUser.Id,
-                storageSource?.SourceId,
-                ResolveBucketName(storageResult.Provider, storageSource),
-                input.IsPublic || storageSource?.IsPublic == true,
-                input.BusinessType,
-                input.BusinessId);
-            await _platformFileRepository.InsertAsync(metadata, autoSave: true);
-        }
-        catch
-        {
-            await storageProvider.DeleteAsync(
-                storageResult.FileKey,
-                storageResult.StorageLocation,
-                storageSource,
-                HttpContext.RequestAborted);
-            throw;
-        }
-
-        return ApiResponse<PlatformFileItemDto>.Ok(new PlatformFileItemDto
-        {
-            Category = metadata.Category,
-            BusinessId = metadata.BusinessId,
-            BusinessType = metadata.BusinessType,
-            BucketName = metadata.BucketName,
-            ContentType = contentType,
-            FileKey = storageResult.FileKey,
-            FileName = originalName,
-            IsPublic = metadata.IsPublic,
-            ParentPath = metadata.ParentPath,
-            RelativePath = BuildRelativePath(metadata.Category, metadata.ParentPath, originalName),
-            Size = file.Length,
-            StorageLocation = storageResult.StorageLocation,
-            StorageProvider = storageResult.Provider,
-            StorageSourceId = metadata.StorageSourceId,
-            StorageSourceName = storageSource?.Name,
-            UploadedBy = _currentUser.UserName,
-            UploadedAt = DateTime.UtcNow
-        });
-    }
-
-    [HttpGet("download/{fileKey}")]
-    public async Task<IActionResult> DownloadAsync(string fileKey)
-    {
-        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
-        if (metadata == null)
-        {
-            return NotFound();
-        }
-
-        var storageSource = metadata.StorageSourceId.HasValue
-            ? await _fileStorageSourceService.ResolveDescriptorAsync(metadata.StorageSourceId, requireEnabled: true)
-            : null;
-        var storageProvider = _fileStorageProviderResolver.Resolve(storageSource?.ProviderName ?? metadata.StorageProvider);
-        var stream = await storageProvider.OpenReadAsync(
-            metadata.FileKey,
-            metadata.StorageLocation,
-            storageSource,
-            HttpContext.RequestAborted);
-        return File(stream, metadata.ContentType, metadata.FileName);
-    }
-
-    [Authorize(AdminPermissions.Platform.FileManage)]
-    [PlatformEndpoint("Platform.File.Manage")]
-    [HttpDelete("{fileKey}")]
-    public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(string fileKey)
-    {
-        var metadata = await _platformFileRepository.FindAsync(x => x.FileKey == fileKey);
-        if (metadata != null)
-        {
-            await _platformFileRepository.DeleteAsync(metadata, autoSave: true);
-        }
-
-        return ApiResponse<bool>.Ok(true);
-    }
-
-    private string? ResolveBucketName(string providerName, PlatformFileStorageSourceDescriptor? source)
-    {
-        if (!string.IsNullOrWhiteSpace(source?.BucketName))
-        {
-            return source.BucketName;
-        }
-
-        return providerName.ToLowerInvariant() switch
-        {
-            "aliyunoss" => _fileStorageOptions.AliyunOSS.BucketName,
-            "minio" => _fileStorageOptions.MinIO.BucketName,
-            _ => null
-        };
-    }
-
-    private static string BuildRelativePath(string category, string? parentPath, string fileName)
-    {
-        return string.Join(
-            '/',
-            new[] { category, parentPath, fileName }
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x!.Trim().Replace('\\', '/').Trim('/')));
+        return queryable;
     }
 
     private static string GetContentType(string extension)

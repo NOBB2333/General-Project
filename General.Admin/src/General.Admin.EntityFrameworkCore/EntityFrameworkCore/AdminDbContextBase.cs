@@ -191,6 +191,7 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.Url).HasMaxLength(1024);
             b.Property(x => x.UserName).HasMaxLength(128);
             b.Property(x => x.TenantName).HasMaxLength(128);
+            b.Property(x => x.HostOperatorUserName).HasMaxLength(128);
             b.Property(x => x.ClientIpAddress).HasMaxLength(64);
             b.Property(x => x.BrowserInfo).HasMaxLength(512);
             b.Property(x => x.ActionSummary).HasMaxLength(512);
@@ -199,6 +200,7 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.HasIndex(x => x.ExecutionTime);
             b.HasIndex(x => new { x.Category, x.ExecutionTime });
             b.HasIndex(x => new { x.UserName, x.ExecutionTime });
+            b.HasIndex(x => new { x.IsHostTenantOperation, x.ExecutionTime });
         });
 
         builder.Entity<AppExternalAccountMapping>(b =>

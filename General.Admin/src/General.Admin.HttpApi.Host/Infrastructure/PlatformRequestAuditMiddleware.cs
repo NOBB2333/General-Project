@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Volo.Abp.DependencyInjection;
+using Volo.Abp.Security.Claims;
 
 namespace General.Admin.Infrastructure;
 
@@ -36,6 +37,14 @@ public class PlatformRequestAuditMiddleware : IMiddleware, ITransientDependency
         finally
         {
             stopwatch.Stop();
+            var isHostTenantOperation = string.Equals(
+                context.User.FindFirst(PlatformTenantOperationClaimTypes.HostTenantOperation)?.Value,
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            var hostOperatorUserIdText = context.User.FindFirst(PlatformTenantOperationClaimTypes.HostOperatorUserId)?.Value;
+            var hostOperatorUserId = Guid.TryParse(hostOperatorUserIdText, out var parsedHostOperatorUserId)
+                ? parsedHostOperatorUserId
+                : (Guid?)null;
 
             await _requestAuditStore.AppendAsync(new PlatformRequestAuditEntry
             {
@@ -48,8 +57,13 @@ public class PlatformRequestAuditMiddleware : IMiddleware, ITransientDependency
                 HasException = exception != null || context.Response.StatusCode >= StatusCodes.Status500InternalServerError,
                 HttpMethod = context.Request.Method,
                 HttpStatusCode = context.Response.StatusCode,
+                HostOperatorUserId = hostOperatorUserId,
+                HostOperatorUserName = context.User.FindFirst(PlatformTenantOperationClaimTypes.HostOperatorUserName)?.Value,
                 Id = Guid.NewGuid(),
-                TenantName = context.User.FindFirst("tenant_name")?.Value,
+                IsHostTenantOperation = isHostTenantOperation,
+                TenantName = context.User.FindFirst(PlatformTenantOperationClaimTypes.OperationTenantName)?.Value
+                    ?? context.User.FindFirst("tenant_name")?.Value
+                    ?? context.User.FindFirst(AbpClaimTypes.TenantId)?.Value,
                 Url = $"{context.Request.Path}{context.Request.QueryString}",
                 UserName = context.User.Identity?.IsAuthenticated == true
                     ? context.User.Identity?.Name

@@ -24,6 +24,12 @@ public class PlatformAuditLogItemDto
 
     public int? HttpStatusCode { get; set; }
 
+    public Guid? HostOperatorUserId { get; set; }
+
+    public string? HostOperatorUserName { get; set; }
+
+    public bool IsHostTenantOperation { get; set; }
+
     public string? MenuTitle { get; set; }
 
     public string? TenantName { get; set; }

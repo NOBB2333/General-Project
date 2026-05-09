@@ -18,6 +18,8 @@ import { preferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
 import { openWindow } from '@vben/utils';
 
+import { Button } from 'ant-design-vue';
+
 import {
   clearNotificationsApi,
   getNotificationListApi,
@@ -43,42 +45,60 @@ const showDot = computed(() =>
   unreadCount.value > 0 || notifications.value.some((item) => !item.isRead),
 );
 
-const menus = computed(() => [
-  {
-    handler: () => {
-      router.push({ name: 'Profile' });
+const isHostTenantOperation = computed(
+  () => userStore.userInfo?.isHostTenantOperation === true,
+);
+
+const menus = computed(() => {
+  const items = [
+    {
+      handler: () => {
+        router.push({ name: 'Profile' });
+      },
+      icon: 'lucide:user',
+      text: $t('page.auth.profile'),
     },
-    icon: 'lucide:user',
-    text: $t('page.auth.profile'),
-  },
-  {
-    handler: () => {
-      openWindow(VBEN_DOC_URL, {
-        target: '_blank',
-      });
+    {
+      handler: () => {
+        openWindow(VBEN_DOC_URL, {
+          target: '_blank',
+        });
+      },
+      icon: BookOpenText,
+      text: $t('ui.widgets.document'),
     },
-    icon: BookOpenText,
-    text: $t('ui.widgets.document'),
-  },
-  {
-    handler: () => {
-      openWindow(VBEN_GITHUB_URL, {
-        target: '_blank',
-      });
+    {
+      handler: () => {
+        openWindow(VBEN_GITHUB_URL, {
+          target: '_blank',
+        });
+      },
+      icon: SvgGithubIcon,
+      text: 'GitHub',
     },
-    icon: SvgGithubIcon,
-    text: 'GitHub',
-  },
-  {
-    handler: () => {
-      openWindow(`${VBEN_GITHUB_URL}/issues`, {
-        target: '_blank',
-      });
+    {
+      handler: () => {
+        openWindow(`${VBEN_GITHUB_URL}/issues`, {
+          target: '_blank',
+        });
+      },
+      icon: CircleHelp,
+      text: $t('ui.widgets.qa'),
     },
-    icon: CircleHelp,
-    text: $t('ui.widgets.qa'),
-  },
-]);
+  ];
+
+  if (isHostTenantOperation.value) {
+    items.unshift({
+      handler: () => {
+        void handleExitTenantOperation();
+      },
+      icon: 'lucide:log-out',
+      text: '退出租户运维',
+    });
+  }
+
+  return items;
+});
 
 const avatar = computed(() => {
   return userStore.userInfo?.avatar ?? preferences.app.defaultAvatar;
@@ -86,6 +106,11 @@ const avatar = computed(() => {
 
 async function handleLogout() {
   await authStore.logout(false);
+}
+
+async function handleExitTenantOperation() {
+  await authStore.exitTenantOperation();
+  await router.replace('/platform/tenants');
 }
 
 async function handleNoticeClear() {
@@ -172,6 +197,16 @@ watch(
 
 <template>
   <BasicLayout @clear-preferences-and-logout="handleLogout">
+    <template #header-right-120>
+      <div v-if="isHostTenantOperation" class="tenant-operation-bar">
+        <span class="tenant-operation-text">
+          运维：{{ userStore.userInfo?.operationTenantName || '-' }}
+        </span>
+        <Button size="small" type="link" @click="handleExitTenantOperation">
+          退出
+        </Button>
+      </div>
+    </template>
     <template #user-dropdown>
       <UserDropdown
         :avatar
@@ -205,3 +240,33 @@ watch(
     </template>
   </BasicLayout>
 </template>
+
+<style scoped>
+.tenant-operation-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 2px 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  font-size: 13px;
+}
+
+.tenant-operation-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .tenant-operation-bar {
+    max-width: 132px;
+    gap: 4px;
+    padding-inline: 6px;
+  }
+}
+</style>

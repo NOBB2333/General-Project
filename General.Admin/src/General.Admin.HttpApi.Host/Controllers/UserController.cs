@@ -32,9 +32,9 @@ public class UserController : ControllerBase
     }
 
     [HttpGet("list")]
-    public async Task<ActionResult<ApiResponse<List<PlatformUserListItemDto>>>> GetListAsync([FromQuery] PlatformUserListInput input)
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformUserListItemDto>>>> GetListAsync([FromQuery] PlatformUserListInput input)
     {
-        return ApiResponse<List<PlatformUserListItemDto>>.Ok(await _userService.GetListAsync(input));
+        return ApiResponse<PlatformPagedResultDto<PlatformUserListItemDto>>.Ok(await _userService.GetListAsync(input));
     }
 
     [Authorize(AdminPermissions.Platform.UserManage)]

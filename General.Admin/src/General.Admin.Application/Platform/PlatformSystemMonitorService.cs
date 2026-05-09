@@ -21,8 +21,8 @@ public class PlatformSystemMonitorService : ITransientDependency
     public async Task<PlatformSystemMonitorDto> GetAsync()
     {
         using var currentProcess = Process.GetCurrentProcess();
-        var now = DateTime.Now;
-        var startTime = currentProcess.StartTime;
+        var now = DateTime.UtcNow;
+        var startTime = currentProcess.StartTime.ToUniversalTime();
         var totalMemoryBytes = GetTotalMemoryBytes();
         var availableMemoryBytes = GetAvailableMemoryBytes();
         var workingSetBytes = currentProcess.WorkingSet64;

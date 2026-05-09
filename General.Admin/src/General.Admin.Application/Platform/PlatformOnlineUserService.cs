@@ -10,14 +10,14 @@ public class PlatformOnlineUserService : ITransientDependency
 {
     private readonly PlatformUserActivityService _userActivityService;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
-    private readonly ITenantRepository _tenantRepository;
+    private readonly IRepository<Tenant, Guid> _tenantRepository;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PlatformOnlineUserService(
         PlatformUserActivityService userActivityService,
         IAsyncQueryableExecuter asyncQueryableExecuter,
-        ITenantRepository tenantRepository,
+        IRepository<Tenant, Guid> tenantRepository,
         IRepository<AppUserProfile, Guid> userProfileRepository,
         IRepository<IdentityUser, Guid> userRepository)
     {
@@ -49,7 +49,9 @@ public class PlatformOnlineUserService : ITransientDependency
         var tenantIds = users.Values.Where(x => x.TenantId.HasValue).Select(x => x.TenantId!.Value).Distinct().ToList();
         var tenants = tenantIds.Count == 0
             ? new Dictionary<Guid, string>()
-            : (await _tenantRepository.GetListAsync()).Where(x => tenantIds.Contains(x.Id)).ToDictionary(x => x.Id, x => x.Name);
+            : (await _asyncQueryableExecuter.ToListAsync(
+                    (await _tenantRepository.GetQueryableAsync()).Where(x => tenantIds.Contains(x.Id))))
+                .ToDictionary(x => x.Id, x => x.Name);
 
         return profiles
             .Select(profile =>

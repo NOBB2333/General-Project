@@ -2,6 +2,7 @@ using General.Admin.Settings;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.SettingManagement;
 using Volo.Abp.Settings;
+using Volo.Abp.MultiTenancy;
 
 namespace General.Admin.Platform;
 
@@ -18,11 +19,16 @@ public class PlatformConfigService : ITransientDependency
 
     private readonly ISettingManager _settingManager;
     private readonly ISettingProvider _settingProvider;
+    private readonly ICurrentTenant _currentTenant;
 
-    public PlatformConfigService(ISettingManager settingManager, ISettingProvider settingProvider)
+    public PlatformConfigService(
+        ISettingManager settingManager,
+        ISettingProvider settingProvider,
+        ICurrentTenant currentTenant)
     {
         _settingManager = settingManager;
         _settingProvider = settingProvider;
+        _currentTenant = currentTenant;
     }
 
     public async Task<List<PlatformConfigDto>> GetListAsync()
@@ -30,14 +36,27 @@ public class PlatformConfigService : ITransientDependency
         var result = new List<PlatformConfigDto>();
         foreach (var item in ManagedConfigs)
         {
+            var tenantValue = _currentTenant.Id.HasValue
+                ? await _settingManager.GetOrNullAsync(
+                    item.Code,
+                    TenantSettingValueProvider.ProviderName,
+                    _currentTenant.Id.Value.ToString())
+                : null;
             result.Add(new PlatformConfigDto
             {
                 Code = item.Code,
+                DefaultValue = item.DefaultValue,
                 Description = item.Description,
                 GroupCode = item.GroupCode,
+                GroupName = ResolveGroupName(item.GroupCode),
+                HasTenantValue = tenantValue != null,
                 IsReadonly = false,
                 Name = item.Name,
-                Value = await _settingProvider.GetOrNullAsync(item.Code) ?? item.DefaultValue,
+                ProviderName = tenantValue != null
+                    ? TenantSettingValueProvider.ProviderName
+                    : GlobalSettingValueProvider.ProviderName,
+                ProviderKey = _currentTenant.Id?.ToString(),
+                Value = tenantValue ?? await _settingProvider.GetOrNullAsync(item.Code) ?? item.DefaultValue,
                 ValueType = item.ValueType
             });
         }
@@ -53,7 +72,58 @@ public class PlatformConfigService : ITransientDependency
         var descriptor = ManagedConfigs.FirstOrDefault(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("配置项不存在或不允许在线修改。");
         var value = NormalizeValue(descriptor, input.Value);
-        await _settingManager.SetGlobalAsync(descriptor.Code, value);
+        var providerName = NormalizeProviderName(input.ProviderName);
+        var providerKey = NormalizeProviderKey(providerName, input.ProviderKey);
+        await _settingManager.SetAsync(descriptor.Code, value, providerName, providerKey);
+    }
+
+    private static string NormalizeProviderName(string? providerName)
+    {
+        if (string.IsNullOrWhiteSpace(providerName))
+        {
+            return GlobalSettingValueProvider.ProviderName;
+        }
+
+        var normalized = providerName.Trim();
+        if (normalized != GlobalSettingValueProvider.ProviderName &&
+            normalized != TenantSettingValueProvider.ProviderName)
+        {
+            throw new InvalidOperationException("只允许修改全局配置或租户配置。");
+        }
+
+        return normalized;
+    }
+
+    private string? NormalizeProviderKey(string providerName, string? providerKey)
+    {
+        if (providerName == GlobalSettingValueProvider.ProviderName)
+        {
+            return null;
+        }
+
+        if (Guid.TryParse(providerKey, out var tenantId))
+        {
+            return tenantId.ToString();
+        }
+
+        if (_currentTenant.Id.HasValue)
+        {
+            return _currentTenant.Id.Value.ToString();
+        }
+
+        throw new InvalidOperationException("保存租户配置时必须指定租户。");
+    }
+
+    private static string ResolveGroupName(string groupCode)
+    {
+        return groupCode switch
+        {
+            "audit" => "审计日志",
+            "general" => "通用",
+            "scheduler" => "定时任务",
+            "ui" => "界面",
+            _ => groupCode
+        };
     }
 
     private static string NormalizeValue(PlatformConfigDescriptor descriptor, string? value)

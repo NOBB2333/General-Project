@@ -12,6 +12,8 @@ import {
   getRecycleBinItemsApi,
   restoreRecycleBinItemApi,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import { useDateFormatter } from '#/composables/platform/use-date-formatter';
 
 defineOptions({ name: 'PlatformRecycleBinPage' });
 
@@ -29,7 +31,9 @@ const ENTITY_OPTIONS = [
 
 const columns = [
   { dataIndex: 'entityType', key: 'entityType', title: '类型', width: 150 },
-  { dataIndex: 'displayName', key: 'displayName', title: '名称' },
+  { dataIndex: 'displayName', key: 'displayName', title: '名称', width: 220 },
+  { dataIndex: 'originalLocation', key: 'originalLocation', title: '原始位置' },
+  { dataIndex: 'deleterName', key: 'deleterName', title: '删除人', width: 140 },
   { dataIndex: 'deletionTime', key: 'deletionTime', title: '删除时间', width: 190 },
   { key: 'actions', title: '操作', width: 180 },
 ];
@@ -37,30 +41,52 @@ const columns = [
 const entityType = ref('');
 const items = ref<RecycleBinApi.RecycleBinItem[]>([]);
 const loading = ref(false);
+const pageIndex = ref(1);
+const pageSize = ref(20);
+const totalCount = ref(0);
+const { actionLoadingKey, runAction } = useActionLoading();
+const { formatDateTime } = useDateFormatter();
 
 async function loadItems() {
   loading.value = true;
   try {
-    items.value = await getRecycleBinItemsApi(entityType.value || undefined);
+    const result = await getRecycleBinItemsApi({
+      entityType: entityType.value || undefined,
+      maxResultCount: pageSize.value,
+      skipCount: (pageIndex.value - 1) * pageSize.value,
+    });
+    items.value = result.items;
+    totalCount.value = result.totalCount;
   } finally {
     loading.value = false;
   }
 }
 
+function handleEntityTypeChange() {
+  pageIndex.value = 1;
+  void loadItems();
+}
+
+function handleTableChange(pagination: { current?: number; pageSize?: number }) {
+  pageIndex.value = pagination.current || 1;
+  pageSize.value = pagination.pageSize || pageSize.value;
+  void loadItems();
+}
+
 async function handleRestore(record: RecycleBinApi.RecycleBinItem) {
-  await restoreRecycleBinItemApi(record.entityType, record.id);
-  message.success('数据已恢复');
-  await loadItems();
+  await runAction(`restore:${record.entityType}:${record.id}`, async () => {
+    await restoreRecycleBinItemApi(record.entityType, record.id);
+    message.success('数据已恢复');
+    await loadItems();
+  });
 }
 
 async function handleDeletePermanently(record: RecycleBinApi.RecycleBinItem) {
-  await deleteRecycleBinItemPermanentlyApi(record.entityType, record.id);
-  message.success('文件已彻底删除');
-  await loadItems();
-}
-
-function formatTime(value?: string) {
-  return value ? new Date(value).toLocaleString() : '-';
+  await runAction(`delete:${record.entityType}:${record.id}`, async () => {
+    await deleteRecycleBinItemPermanentlyApi(record.entityType, record.id);
+    message.success('数据已彻底删除');
+    await loadItems();
+  });
 }
 
 onMounted(loadItems);
@@ -75,31 +101,63 @@ onMounted(loadItems);
             v-model:value="entityType"
             :options="ENTITY_OPTIONS"
             style="width: 160px"
-            @change="loadItems"
+            @change="handleEntityTypeChange"
           />
           <Button @click="loadItems">刷新</Button>
         </Space>
       </template>
 
-      <Table :columns="columns" :data-source="items" :loading="loading" :pagination="{ pageSize: 10 }" row-key="id">
+      <Table
+        :columns="columns"
+        :data-source="items"
+        :loading="loading"
+        :pagination="{
+          current: pageIndex,
+          pageSize,
+          showSizeChanger: true,
+          showTotal: (total: number) => `共 ${total} 条`,
+          total: totalCount,
+        }"
+        row-key="id"
+        @change="handleTableChange"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'entityType'">
             <Tag>{{ record.entityType }}</Tag>
           </template>
           <template v-else-if="column.key === 'deletionTime'">
-            {{ formatTime(record.deletionTime) }}
+            {{ formatDateTime(record.deletionTime) }}
+          </template>
+          <template v-else-if="column.key === 'deleterName'">
+            {{ record.deleterName || '系统' }}
+          </template>
+          <template v-else-if="column.key === 'originalLocation'">
+            {{ record.originalLocation || '-' }}
           </template>
           <template v-else-if="column.key === 'actions'">
             <Space>
               <Popconfirm title="确认恢复该数据？" @confirm="handleRestore(record as RecycleBinApi.RecycleBinItem)">
-                <Button size="small" type="link">恢复</Button>
+                <Button
+                  :loading="actionLoadingKey === `restore:${(record as RecycleBinApi.RecycleBinItem).entityType}:${(record as RecycleBinApi.RecycleBinItem).id}`"
+                  size="small"
+                  type="link"
+                >
+                  恢复
+                </Button>
               </Popconfirm>
               <Popconfirm
                 v-if="(record as RecycleBinApi.RecycleBinItem).entityType === 'file'"
                 title="确认彻底删除该文件？物理文件也会被删除。"
                 @confirm="handleDeletePermanently(record as RecycleBinApi.RecycleBinItem)"
               >
-                <Button danger size="small" type="link">彻底删除</Button>
+                <Button
+                  danger
+                  :loading="actionLoadingKey === `delete:${(record as RecycleBinApi.RecycleBinItem).entityType}:${(record as RecycleBinApi.RecycleBinItem).id}`"
+                  size="small"
+                  type="link"
+                >
+                  彻底删除
+                </Button>
               </Popconfirm>
             </Space>
           </template>

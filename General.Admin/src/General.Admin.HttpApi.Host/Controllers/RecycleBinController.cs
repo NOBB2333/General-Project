@@ -18,9 +18,9 @@ public class RecycleBinController : ControllerBase
     }
 
     [HttpGet("items")]
-    public async Task<ActionResult<ApiResponse<List<PlatformRecycleBinItemDto>>>> GetListAsync([FromQuery] string? entityType)
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformRecycleBinItemDto>>>> GetListAsync([FromQuery] PlatformRecycleBinListInput input)
     {
-        return ApiResponse<List<PlatformRecycleBinItemDto>>.Ok(await _recycleBinService.GetListAsync(entityType));
+        return ApiResponse<PlatformPagedResultDto<PlatformRecycleBinItemDto>>.Ok(await _recycleBinService.GetListAsync(input));
     }
 
     [HttpPost("{entityType}/{id:guid}/restore")]

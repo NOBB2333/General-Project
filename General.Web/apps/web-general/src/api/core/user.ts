@@ -40,8 +40,15 @@ export namespace UserApi {
   export interface UserListInput {
     isActive?: boolean;
     keyword?: string;
+    maxResultCount?: number;
     organizationUnitId?: string;
     roleName?: string;
+    skipCount?: number;
+  }
+
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
   }
 
   export interface UserListItem {
@@ -68,7 +75,7 @@ export async function getUserInfoApi() {
 }
 
 export async function getUserListApi(params: UserApi.UserListInput = {}) {
-  return requestClient.get<UserApi.UserListItem[]>('/app/user/list', { params });
+  return requestClient.get<UserApi.PagedResult<UserApi.UserListItem>>('/app/user/list', { params });
 }
 
 export async function createUserApi(data: UserApi.UserSaveInput) {

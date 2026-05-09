@@ -1449,12 +1449,22 @@ namespace General.Admin.Migrations.PostgreSql
                     b.Property<bool>("HasException")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("HostOperatorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HostOperatorUserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
                     b.Property<int?>("HttpStatusCode")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsHostTenantOperation")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("MenuTitle")
                         .HasMaxLength(256)
@@ -1477,6 +1487,8 @@ namespace General.Admin.Migrations.PostgreSql
                     b.HasIndex("ExecutionTime");
 
                     b.HasIndex("Category", "ExecutionTime");
+
+                    b.HasIndex("IsHostTenantOperation", "ExecutionTime");
 
                     b.HasIndex("UserName", "ExecutionTime");
 

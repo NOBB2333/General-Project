@@ -36,16 +36,16 @@ import {
   saveRoleAuthorizationApi,
   saveRoleMenusApi,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import {
+  collectPlatformLeafKeys,
+  normalizePlatformTree,
+  type PlatformTreeNode,
+} from '#/composables/platform/use-tree-normalization';
 
 defineOptions({ name: 'PlatformRolePage' });
 
 type DrawerType = 'api' | 'account' | 'data' | 'menu';
-
-interface UiTreeNode {
-  children?: UiTreeNode[];
-  key: string;
-  title: string;
-}
 
 const DATA_SCOPE_OPTIONS = [
   { label: '本组织及下级', value: 'current_org_and_descendants' },
@@ -79,11 +79,12 @@ const drawerVisible = ref(false);
 const drawerLoading = ref(false);
 const activeRole = ref<null | RoleApi.RoleItem>(null);
 const drawerType = ref<DrawerType>('menu');
-const treeData = ref<UiTreeNode[]>([]);
+const treeData = ref<PlatformTreeNode[]>([]);
 const endpointGroups = ref<PlatformEndpointApi.EndpointGroup[]>([]);
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
 const accountKeyword = ref('');
+const { actionLoadingKey, runAction } = useActionLoading();
 
 const createForm = reactive<RoleApi.RoleSaveInput>({ name: '' });
 const authorizationState = reactive<RoleApi.RoleAuthorization>({
@@ -145,38 +146,19 @@ const metrics = computed(() => [
   },
 ]);
 
-function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): UiTreeNode[] {
-  return items.map((item) => ({
-    children: normalizeMenuTree(item.children || []),
-    key: item.id,
-    title: `[${item.appCode}] ${item.title}${item.permissionCode ? ` · ${item.permissionCode}` : ''}`,
-  }));
+function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTree(
+    items,
+    (item) => `[${item.appCode}] ${item.title}${item.permissionCode ? ` · ${item.permissionCode}` : ''}`,
+  );
 }
 
-function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]): UiTreeNode[] {
-  return items.map((item) => ({
-    children: normalizeOrganizationTree(item.children || []),
-    key: item.id,
-    title: item.displayName,
-  }));
-}
-
-function collectLeafKeys(nodes: UiTreeNode[]): Set<string> {
-  const keys = new Set<string>();
-  for (const node of nodes) {
-    if (node.children && node.children.length > 0) {
-      for (const key of collectLeafKeys(node.children)) {
-        keys.add(key);
-      }
-    } else {
-      keys.add(node.key);
-    }
-  }
-  return keys;
+function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTree(items, (item) => item.displayName);
 }
 
 function filterLeafMenuIds(menuIds: string[]) {
-  const leafKeys = collectLeafKeys(treeData.value);
+  const leafKeys = collectPlatformLeafKeys(treeData.value);
   return menuIds.filter((id) => leafKeys.has(id));
 }
 
@@ -187,13 +169,13 @@ async function loadBaseData() {
       getRoleListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
       getOrganizationTreeApi(),
-      getUserListApi(),
+      getUserListApi({ maxResultCount: 1000 }),
       getPlatformEndpointOptionsApi(),
     ]);
     roles.value = roleResult.status === 'fulfilled' ? roleResult.value : [];
     treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
     organizationTree.value = organizationResult.status === 'fulfilled' ? organizationResult.value : [];
-    users.value = userResult.status === 'fulfilled' ? userResult.value : [];
+    users.value = userResult.status === 'fulfilled' ? userResult.value.items : [];
     endpointGroups.value = endpointResult.status === 'fulfilled' ? endpointResult.value : [];
 
     if (
@@ -279,9 +261,11 @@ async function handleCreateRole() {
 }
 
 async function handleDeleteRole(id: string) {
-  await deleteRoleApi(id);
-  message.success('角色已删除');
-  await loadBaseData();
+  await runAction(`delete:${id}`, async () => {
+    await deleteRoleApi(id);
+    message.success('角色已删除');
+    await loadBaseData();
+  });
 }
 
 function resolveDrawerTitle() {
@@ -356,7 +340,13 @@ onMounted(loadBaseData);
                   <Button size="small" @click="openDrawer('data', record as RoleApi.RoleItem)">数据</Button>
                   <Button size="small" @click="openDrawer('account', record as RoleApi.RoleItem)">账号</Button>
                   <Button size="small" @click="openDrawer('api', record as RoleApi.RoleItem)">接口</Button>
-                  <Button danger size="small" type="link" @click="handleDeleteRole((record as RoleApi.RoleItem).id)">
+                  <Button
+                    danger
+                    :loading="actionLoadingKey === `delete:${(record as RoleApi.RoleItem).id}`"
+                    size="small"
+                    type="link"
+                    @click="handleDeleteRole((record as RoleApi.RoleItem).id)"
+                  >
                     删除
                   </Button>
                 </Space>

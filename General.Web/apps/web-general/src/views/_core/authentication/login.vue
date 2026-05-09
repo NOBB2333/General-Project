@@ -16,7 +16,11 @@ const authStore = useAuthStore();
 const MOCK_USER_OPTIONS: BasicOption[] = [
   {
     label: '系统管理员',
-    value: 'admin.demo',
+    value: 'host.admin',
+  },
+  {
+    label: '默认租户管理员',
+    value: 'tenant.admin',
   },
   {
     label: 'PMO',
@@ -50,7 +54,7 @@ const formSchema = computed((): VbenFormSchema[] => {
         .string()
         .min(1, { message: $t('authentication.selectAccount') })
         .optional()
-        .default('admin.demo'),
+        .default('host.admin'),
     },
     {
       component: 'VbenInput',

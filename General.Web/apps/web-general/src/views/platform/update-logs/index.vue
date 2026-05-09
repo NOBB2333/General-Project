@@ -8,6 +8,7 @@ import { Page } from '@vben/common-ui';
 import { Button, Card, Empty, Form, Input, Modal, Popconfirm, Space, Table, message } from 'ant-design-vue';
 
 import { createUpdateLogApi, deleteUpdateLogApi, getUpdateLogListApi, updateUpdateLogApi } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
 
 defineOptions({ name: 'PlatformUpdateLogsPage' });
 
@@ -25,6 +26,7 @@ const loading = ref(false);
 const saving = ref(false);
 const modalVisible = ref(false);
 const editingId = ref<null | string>(null);
+const { actionLoadingKey, runAction } = useActionLoading();
 const formState = reactive<UpdateLogApi.UpdateLogSaveInput>({
   impactScope: undefined,
   publishedAt: new Date().toISOString(),
@@ -86,9 +88,11 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: string) {
-  await deleteUpdateLogApi(id);
-  message.success('更新日志已删除');
-  await loadLogs();
+  await runAction(`delete:${id}`, async () => {
+    await deleteUpdateLogApi(id);
+    message.success('更新日志已删除');
+    await loadLogs();
+  });
 }
 
 onMounted(loadLogs);
@@ -122,7 +126,14 @@ onMounted(loadLogs);
                 编辑
               </Button>
               <Popconfirm title="确认删除该更新日志？" @confirm="handleDelete(record.id)">
-                <Button danger size="small" type="link">删除</Button>
+                <Button
+                  danger
+                  :loading="actionLoadingKey === `delete:${(record as UpdateLogApi.UpdateLogItem).id}`"
+                  size="small"
+                  type="link"
+                >
+                  删除
+                </Button>
               </Popconfirm>
             </Space>
           </template>

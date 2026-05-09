@@ -5,12 +5,16 @@ using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Entities;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Identity;
 using Volo.Abp.Linq;
 
 namespace General.Admin.Platform;
 
 public class PlatformRecycleBinService : ITransientDependency
 {
+    private const int MaxRecycleBinResultCount = 100;
+    private const int MaxRecycleBinSkipCount = 10_000;
+
     private readonly IRepository<AppDictData, Guid> _dictDataRepository;
     private readonly IRepository<AppDictType, Guid> _dictTypeRepository;
     private readonly IDistributedCache _distributedCache;
@@ -25,6 +29,7 @@ public class PlatformRecycleBinService : ITransientDependency
     private readonly IRepository<PlatformScheduledJob, Guid> _scheduledJobRepository;
     private readonly IRepository<PlatformScheduledJobTrigger, Guid> _scheduledJobTriggerRepository;
     private readonly IRepository<AppUpdateLog, Guid> _updateLogRepository;
+    private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PlatformRecycleBinService(
         IRepository<AppDictData, Guid> dictDataRepository,
@@ -40,7 +45,8 @@ public class PlatformRecycleBinService : ITransientDependency
         PlatformCacheService platformCacheService,
         IRepository<PlatformScheduledJob, Guid> scheduledJobRepository,
         IRepository<PlatformScheduledJobTrigger, Guid> scheduledJobTriggerRepository,
-        IRepository<AppUpdateLog, Guid> updateLogRepository)
+        IRepository<AppUpdateLog, Guid> updateLogRepository,
+        IRepository<IdentityUser, Guid> userRepository)
     {
         _dictDataRepository = dictDataRepository;
         _dictTypeRepository = dictTypeRepository;
@@ -56,26 +62,39 @@ public class PlatformRecycleBinService : ITransientDependency
         _scheduledJobRepository = scheduledJobRepository;
         _scheduledJobTriggerRepository = scheduledJobTriggerRepository;
         _updateLogRepository = updateLogRepository;
+        _userRepository = userRepository;
     }
 
-    public async Task<List<PlatformRecycleBinItemDto>> GetListAsync(string? entityType = null)
+    public async Task<PlatformPagedResultDto<PlatformRecycleBinItemDto>> GetListAsync(PlatformRecycleBinListInput input)
     {
         using (_softDeleteFilter.Disable())
         {
+            var entityType = input.EntityType;
+            var maxResultCount = Math.Clamp(input.MaxResultCount, 1, MaxRecycleBinResultCount);
+            var skipCount = Math.Clamp(input.SkipCount, 0, MaxRecycleBinSkipCount);
+            var fetchCount = skipCount + maxResultCount;
+            var totalCount = 0;
             var result = new List<PlatformRecycleBinItemDto>();
-            await AppendAsync(result, "menu", _menuRepository, x => x.Title, entityType);
-            await AppendAsync(result, "dict-type", _dictTypeRepository, x => x.Name, entityType);
-            await AppendAsync(result, "dict-data", _dictDataRepository, x => $"{x.Label}({x.Value})", entityType);
-            await AppendAsync(result, "file", _fileRepository, x => x.FileName, entityType);
-            await AppendAsync(result, "scheduled-job", _scheduledJobRepository, x => x.Title, entityType);
-            await AppendAsync(result, "scheduled-trigger", _scheduledJobTriggerRepository, x => x.Title, entityType);
-            await AppendAsync(result, "update-log", _updateLogRepository, x => x.Title, entityType);
-            await AppendAsync(result, "open-api", _openApiRepository, x => x.Name, entityType);
+            totalCount += await AppendAsync(result, "menu", _menuRepository, x => x.Title, ResolveMenuLocation, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "dict-type", _dictTypeRepository, x => x.Name, x => x.Code, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "dict-data", _dictDataRepository, x => $"{x.Label}({x.Value})", x => x.Value, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "file", _fileRepository, x => x.FileName, ResolveFileLocation, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "scheduled-job", _scheduledJobRepository, x => x.Title, x => x.JobKey, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "scheduled-trigger", _scheduledJobTriggerRepository, x => x.Title, x => x.TriggerKey, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "update-log", _updateLogRepository, x => x.Title, x => x.Version, entityType, fetchCount);
+            totalCount += await AppendAsync(result, "open-api", _openApiRepository, x => x.Name, x => x.AppId, entityType, fetchCount);
 
-            return result
+            await FillDeleterNamesAsync(result);
+
+            var ordered = result
                 .OrderByDescending(x => x.DeletionTime)
                 .ThenBy(x => x.EntityType)
                 .ToList();
+            return new PlatformPagedResultDto<PlatformRecycleBinItemDto>
+            {
+                Items = ordered.Skip(skipCount).Take(maxResultCount).ToList(),
+                TotalCount = totalCount
+            };
         }
     }
 
@@ -136,31 +155,66 @@ public class PlatformRecycleBinService : ITransientDependency
         }
     }
 
-    private async Task AppendAsync<TEntity>(
+    private async Task<int> AppendAsync<TEntity>(
         ICollection<PlatformRecycleBinItemDto> result,
         string entityType,
         IRepository<TEntity, Guid> repository,
         Func<TEntity, string> displayNameResolver,
-        string? filterEntityType)
+        Func<TEntity, string> originalLocationResolver,
+        string? filterEntityType,
+        int fetchCount)
         where TEntity : class, IEntity<Guid>, ISoftDelete
     {
         if (!ShouldInclude(entityType, filterEntityType))
         {
-            return;
+            return 0;
         }
 
         var queryable = await repository.GetQueryableAsync();
-        var deletedItems = await _asyncQueryableExecuter.ToListAsync(queryable.Where(x => x.IsDeleted));
+        var deletedQuery = queryable.Where(x => x.IsDeleted);
+        var totalCount = await _asyncQueryableExecuter.CountAsync(deletedQuery);
+        var deletedItems = await _asyncQueryableExecuter.ToListAsync(
+            deletedQuery
+                .Take(fetchCount));
 
-        foreach (var item in deletedItems)
+        foreach (var item in deletedItems.OrderByDescending(x => ResolveDateTime(x, "DeletionTime") ?? DateTime.MinValue))
         {
             result.Add(new PlatformRecycleBinItemDto
             {
+                DeleterId = ResolveGuid(item, "DeleterId"),
                 DeletionTime = ResolveDateTime(item, "DeletionTime"),
                 DisplayName = displayNameResolver(item),
                 EntityType = entityType,
-                Id = item.Id
+                Id = item.Id,
+                OriginalLocation = originalLocationResolver(item)
             });
+        }
+
+        return totalCount;
+    }
+
+    private async Task FillDeleterNamesAsync(ICollection<PlatformRecycleBinItemDto> result)
+    {
+        var deleterIds = result
+            .Where(x => x.DeleterId.HasValue)
+            .Select(x => x.DeleterId!.Value)
+            .Distinct()
+            .ToList();
+        if (deleterIds.Count == 0)
+        {
+            return;
+        }
+
+        var userQueryable = await _userRepository.GetQueryableAsync();
+        var users = (await _asyncQueryableExecuter.ToListAsync(
+                userQueryable.Where(x => deleterIds.Contains(x.Id))))
+            .ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.UserName) ? x.Name : x.UserName);
+
+        foreach (var item in result.Where(x => x.DeleterId.HasValue))
+        {
+            item.DeleterName = users.TryGetValue(item.DeleterId!.Value, out var userName)
+                ? userName
+                : null;
         }
     }
 
@@ -204,6 +258,23 @@ public class PlatformRecycleBinService : ITransientDependency
     private static DateTime? ResolveDateTime(object entity, string propertyName)
     {
         return entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)?.GetValue(entity) as DateTime?;
+    }
+
+    private static Guid? ResolveGuid(object entity, string propertyName)
+    {
+        return entity.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)?.GetValue(entity) as Guid?;
+    }
+
+    private static string ResolveFileLocation(AppPlatformFile file)
+    {
+        return PlatformFilePathPolicy.BuildRelativePath(file.Category, file.ParentPath, file.FileName);
+    }
+
+    private static string ResolveMenuLocation(AppMenu menu)
+    {
+        return string.IsNullOrWhiteSpace(menu.PermissionCode)
+            ? menu.Path
+            : $"{menu.Path} / {menu.PermissionCode}";
     }
 
     private static void SetProperty(object entity, string propertyName, object? value)

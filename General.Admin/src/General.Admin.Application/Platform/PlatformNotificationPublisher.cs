@@ -9,6 +9,9 @@ namespace General.Admin.Platform;
 
 public class PlatformNotificationPublisher : ITransientDependency
 {
+    private const int MaxRecipientCount = 5000;
+    private const int NotificationInsertBatchSize = 500;
+
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly ICurrentUser _currentUser;
     private readonly IRepository<AppNotification, Guid> _notificationRepository;
@@ -63,10 +66,13 @@ public class PlatformNotificationPublisher : ITransientDependency
             _currentUser.Id);
         await _notificationRepository.InsertAsync(notification, autoSave: true);
 
-        var userNotifications = recipientUserIds
-            .Select(userId => new AppUserNotification(Guid.NewGuid(), notification.Id, userId))
-            .ToList();
-        await _userNotificationRepository.InsertManyAsync(userNotifications, autoSave: true);
+        foreach (var batch in recipientUserIds.Chunk(NotificationInsertBatchSize))
+        {
+            var userNotifications = batch
+                .Select(userId => new AppUserNotification(Guid.NewGuid(), notification.Id, userId))
+                .ToList();
+            await _userNotificationRepository.InsertManyAsync(userNotifications, autoSave: true);
+        }
         return notification.Id;
     }
 
@@ -87,11 +93,13 @@ public class PlatformNotificationPublisher : ITransientDependency
     private async Task<HashSet<Guid>> ResolveAllUserIdsAsync()
     {
         var queryable = await _userRepository.GetQueryableAsync();
-        return (await _asyncQueryableExecuter.ToListAsync(
-                queryable
-                    .Where(x => x.IsActive)
-                    .Select(x => x.Id)))
-            .ToHashSet();
+        var userIds = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Id)
+                .Take(MaxRecipientCount + 1)
+                .Select(x => x.Id));
+        return ToLimitedRecipientSet(userIds);
     }
 
     private async Task<HashSet<Guid>> ResolveExistingUserIdsAsync(IReadOnlyCollection<Guid> userIds)
@@ -103,11 +111,13 @@ public class PlatformNotificationPublisher : ITransientDependency
 
         var idSet = userIds.ToHashSet();
         var queryable = await _userRepository.GetQueryableAsync();
-        return (await _asyncQueryableExecuter.ToListAsync(
-                queryable
-                    .Where(x => x.IsActive && idSet.Contains(x.Id))
-                    .Select(x => x.Id)))
-            .ToHashSet();
+        var existingUserIds = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .Where(x => x.IsActive && idSet.Contains(x.Id))
+                .OrderBy(x => x.Id)
+                .Take(MaxRecipientCount + 1)
+                .Select(x => x.Id));
+        return ToLimitedRecipientSet(existingUserIds);
     }
 
     private async Task<HashSet<Guid>> ResolveOrganizationUserIdsAsync(
@@ -125,14 +135,14 @@ public class PlatformNotificationPublisher : ITransientDependency
             var organizationQueryable = await _organizationUnitRepository.GetQueryableAsync();
             var selectedOrganizations = await _asyncQueryableExecuter.ToListAsync(
                 organizationQueryable.Where(x => targetIds.Contains(x.Id)));
-            foreach (var selected in selectedOrganizations)
+            if (selectedOrganizations.Count > 0)
             {
-                var descendantQueryable = await _organizationUnitRepository.GetQueryableAsync();
-                var descendantIds = await _asyncQueryableExecuter.ToListAsync(
-                    descendantQueryable
-                        .Where(x => x.Code.StartsWith(selected.Code))
-                        .Select(x => x.Id));
-                foreach (var childId in descendantIds)
+                var selectedCodes = selectedOrganizations.Select(x => x.Code).ToList();
+                var descendantCandidates = await _asyncQueryableExecuter.ToListAsync(
+                    organizationQueryable.Select(x => new { x.Id, x.Code }));
+                foreach (var childId in descendantCandidates
+                             .Where(x => selectedCodes.Any(code => x.Code.StartsWith(code)))
+                             .Select(x => x.Id))
                 {
                     targetIds.Add(childId);
                 }
@@ -143,6 +153,8 @@ public class PlatformNotificationPublisher : ITransientDependency
         var userIds = (await _asyncQueryableExecuter.ToListAsync(
                 userOrganizationQueryable
                     .Where(x => targetIds.Contains(x.OrganizationUnitId))
+                    .OrderBy(x => x.UserId)
+                    .Take(MaxRecipientCount + 1)
                     .Select(x => x.UserId)))
             .Distinct()
             .ToList();
@@ -172,6 +184,16 @@ public class PlatformNotificationPublisher : ITransientDependency
         var roleIds = roles.Select(x => x.Id).ToHashSet();
         var userIds = await _recipientResolver.GetUserIdsInRolesAsync(roleIds);
         return await ResolveExistingUserIdsAsync(userIds);
+    }
+
+    private static HashSet<Guid> ToLimitedRecipientSet(IReadOnlyCollection<Guid> userIds)
+    {
+        if (userIds.Count > MaxRecipientCount)
+        {
+            throw new InvalidOperationException($"通知接收人不能超过 {MaxRecipientCount} 人。");
+        }
+
+        return userIds.ToHashSet();
     }
 
     private static string BuildRecipientSummary(PlatformNotificationRecipientInput input, string recipientMode)

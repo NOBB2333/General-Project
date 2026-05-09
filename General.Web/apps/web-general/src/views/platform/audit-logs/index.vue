@@ -12,6 +12,10 @@ defineOptions({ name: 'PlatformAuditLogsPage' });
 const keyword = ref('');
 const loading = ref(false);
 const activeTab = ref('access');
+const logPagination = ref({
+  current: 1,
+  pageSize: 10,
+});
 const dashboard = ref<AuditLogApi.LogDashboard>({
   accessLogs: [],
   auditLogs: [],
@@ -27,6 +31,7 @@ const logColumns = [
   { dataIndex: 'executionTime', key: 'executionTime', title: '执行时间', width: 180 },
   { dataIndex: 'userName', key: 'userName', title: '用户', width: 120 },
   { dataIndex: 'tenantName', key: 'tenantName', title: '租户', width: 120 },
+  { dataIndex: 'hostOperatorUserName', key: 'hostOperatorUserName', title: '运维来源', width: 140 },
   { dataIndex: 'actionSummary', key: 'actionSummary', title: '动作摘要', width: 240 },
   { dataIndex: 'url', key: 'url', title: '请求地址', width: 280 },
   { dataIndex: 'httpStatusCode', key: 'httpStatusCode', title: '状态', width: 100 },
@@ -79,9 +84,21 @@ async function loadLogs() {
       keyword: keyword.value || undefined,
       maxResultCount: 200,
     });
+    logPagination.value.current = 1;
   } finally {
     loading.value = false;
   }
+}
+
+function handleTabChange() {
+  logPagination.value.current = 1;
+}
+
+function handleLogTableChange(pagination: { current?: number; pageSize?: number }) {
+  logPagination.value = {
+    current: pagination.current || 1,
+    pageSize: pagination.pageSize || logPagination.value.pageSize,
+  };
 }
 
 function resolveStatusColor(record: AuditLogApi.AuditLogItem) {
@@ -131,7 +148,7 @@ onMounted(loadLogs);
           </div>
         </template>
 
-        <Tabs v-model:activeKey="activeTab">
+        <Tabs v-model:activeKey="activeTab" @change="handleTabChange">
           <Tabs.TabPane key="access" tab="访问日志" />
           <Tabs.TabPane key="operation" tab="操作日志" />
           <Tabs.TabPane key="exception" tab="异常日志" />
@@ -146,10 +163,17 @@ onMounted(loadLogs);
           :columns="logColumns"
           :data-source="currentLogs"
           :loading="loading"
-          :pagination="{ pageSize: 10 }"
+          :pagination="{
+            current: logPagination.current,
+            pageSize: logPagination.pageSize,
+            showSizeChanger: true,
+            showTotal: (total: number) => `共 ${total} 条`,
+            total: currentLogs.length,
+          }"
           row-key="id"
           :scroll="{ x: 1180 }"
           size="middle"
+          @change="handleLogTableChange"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'executionTime'">
@@ -159,6 +183,12 @@ onMounted(loadLogs);
               <Tag :color="resolveStatusColor(record as AuditLogApi.AuditLogItem)">
                 {{ (record as AuditLogApi.AuditLogItem).httpStatusCode || ((record as AuditLogApi.AuditLogItem).hasException ? 500 : 200) }}
               </Tag>
+            </template>
+            <template v-else-if="column.key === 'hostOperatorUserName'">
+              <Tag v-if="(record as AuditLogApi.AuditLogItem).isHostTenantOperation" color="blue">
+                {{ (record as AuditLogApi.AuditLogItem).hostOperatorUserName || 'Host 运维' }}
+              </Tag>
+              <span v-else>-</span>
             </template>
             <template v-else-if="column.key === 'executionDuration'">
               {{ formatDuration((record as AuditLogApi.AuditLogItem).executionDuration) }}

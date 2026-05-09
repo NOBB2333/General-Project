@@ -32,7 +32,7 @@ public class AliyunOssPlatformFileStorageProvider : IPlatformFileStorageProvider
         var client = GetClient(options, source);
         var originalName = Path.GetFileName(fileName);
         var fileKey = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{Path.GetExtension(originalName)}";
-        var objectName = CloudPlatformFileStoragePathHelper.BuildObjectName(options.PathTemplate, fileKey, DateTime.Now);
+        var objectName = CloudPlatformFileStoragePathHelper.BuildObjectName(options.PathTemplate, fileKey, DateTime.UtcNow);
         var uploadStream = await CloudPlatformFileStoragePathHelper.EnsureSeekableAsync(stream, cancellationToken);
         var metadata = new ObjectMetadata { ContentType = contentType };
 
@@ -85,7 +85,7 @@ public class AliyunOssPlatformFileStorageProvider : IPlatformFileStorageProvider
         var uri = GetClient(options, source).GeneratePresignedUri(
             options.BucketName,
             storageLocation,
-            DateTime.Now.Add(expiry));
+            DateTime.UtcNow.Add(expiry));
         return Task.FromResult<string?>(uri.ToString());
     }
 

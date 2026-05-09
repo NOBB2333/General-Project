@@ -1,6 +1,7 @@
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.Linq;
 using Volo.Abp.Users;
 
 namespace General.Admin.Platform;
@@ -8,17 +9,20 @@ namespace General.Admin.Platform;
 public class PlatformUpdateLogService : ITransientDependency
 {
     private readonly ICurrentUser _currentUser;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly PlatformNotificationPublisher _notificationPublisher;
     private readonly IRepository<AppUpdateLog, Guid> _updateLogRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PlatformUpdateLogService(
         ICurrentUser currentUser,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         PlatformNotificationPublisher notificationPublisher,
         IRepository<AppUpdateLog, Guid> updateLogRepository,
         IRepository<IdentityUser, Guid> userRepository)
     {
         _currentUser = currentUser;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _notificationPublisher = notificationPublisher;
         _updateLogRepository = updateLogRepository;
         _userRepository = userRepository;
@@ -29,8 +33,12 @@ public class PlatformUpdateLogService : ITransientDependency
         var logs = (await _updateLogRepository.GetListAsync())
             .OrderByDescending(x => x.PublishedAt)
             .ToList();
-        var users = (await _userRepository.GetListAsync())
-            .ToDictionary(x => x.Id);
+        var authorUserIds = logs.Select(x => x.AuthorUserId).Distinct().ToList();
+        var users = authorUserIds.Count == 0
+            ? new Dictionary<Guid, IdentityUser>()
+            : (await _asyncQueryableExecuter.ToListAsync(
+                    (await _userRepository.GetQueryableAsync()).Where(x => authorUserIds.Contains(x.Id))))
+                .ToDictionary(x => x.Id);
 
         return logs
             .Select(item => new PlatformUpdateLogDto

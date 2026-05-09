@@ -12,6 +12,7 @@ public static class AdminPermissions
         Platform.TenantManage,
         Platform.MenuManage,
         Platform.ConfigManage,
+        Platform.CacheManage,
         Platform.DictManage,
         Platform.OpenApiManage,
         Platform.RecycleBinManage,
@@ -31,6 +32,7 @@ public static class AdminPermissions
         public const string TenantManage = "Platform.Tenant.Manage";
         public const string MenuManage = "Platform.Menu.Manage";
         public const string ConfigManage = "Platform.Config.Manage";
+        public const string CacheManage = "Platform.Cache.Manage";
         public const string DictManage = "Platform.Dict.Manage";
         public const string OpenApiManage = "Platform.OpenApi.Manage";
         public const string RecycleBinManage = "Platform.RecycleBin.Manage";

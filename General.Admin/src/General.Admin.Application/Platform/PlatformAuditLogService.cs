@@ -1,18 +1,22 @@
 using Volo.Abp.AuditLogging;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Linq;
 
 namespace General.Admin.Platform;
 
 public class PlatformAuditLogService : ITransientDependency
 {
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly IRepository<AuditLog, Guid> _auditLogRepository;
     private readonly PlatformRequestAuditStore _requestAuditStore;
 
     public PlatformAuditLogService(
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         IRepository<AuditLog, Guid> auditLogRepository,
         PlatformRequestAuditStore requestAuditStore)
     {
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _auditLogRepository = auditLogRepository;
         _requestAuditStore = requestAuditStore;
     }
@@ -55,47 +59,8 @@ public class PlatformAuditLogService : ITransientDependency
                 .ToList();
         }
 
-        var logs = await _auditLogRepository.GetListAsync(includeDetails: true);
-
-        if (!string.IsNullOrWhiteSpace(keyword))
-        {
-            logs = logs
-                .Where(x =>
-                    ContainsIgnoreCase(x.UserName, keyword) ||
-                    ContainsIgnoreCase(x.TenantName, keyword) ||
-                    ContainsIgnoreCase(x.Url, keyword) ||
-                    ContainsIgnoreCase(x.ClientIpAddress, keyword) ||
-                    x.Actions.Any(action =>
-                        ContainsIgnoreCase(action.ServiceName, keyword) ||
-                        ContainsIgnoreCase(action.MethodName, keyword)))
-                .ToList();
-        }
-
-        logs = FilterByCategory(logs, category);
-
-        return logs
-            .OrderByDescending(x => x.ExecutionTime)
-            .Take(maxResultCount)
-            .Select(x => new PlatformAuditLogItemDto
-            {
-                Id = x.Id,
-                ActionSummary = x.Actions
-                    .OrderByDescending(action => action.ExecutionTime)
-                    .Select(action => $"{action.ServiceName}.{action.MethodName}")
-                    .FirstOrDefault(),
-                BrowserInfo = x.BrowserInfo,
-                ClientIpAddress = x.ClientIpAddress,
-                ExecutionDuration = x.ExecutionDuration,
-                ExecutionTime = x.ExecutionTime,
-                ExceptionMessage = NormalizeException(x.Exceptions),
-                HasException = !string.IsNullOrWhiteSpace(x.Exceptions),
-                HttpMethod = x.HttpMethod,
-                HttpStatusCode = x.HttpStatusCode,
-                TenantName = x.TenantName,
-                Url = x.Url,
-                UserName = x.UserName
-            })
-            .ToList();
+        var logs = await QueryAuditLogsAsync(input, maxResultCount);
+        return logs.Select(MapItem).ToList();
     }
 
     public async Task<PlatformLogDashboardDto> GetDashboardAsync(PlatformAuditLogQueryInput input)
@@ -153,15 +118,7 @@ public class PlatformAuditLogService : ITransientDependency
             };
         }
 
-        var allLogs = await _auditLogRepository.GetListAsync(includeDetails: true);
-        if (!string.IsNullOrWhiteSpace(input.Keyword))
-        {
-            allLogs = (await GetListAsync(input))
-                .Select(item => allLogs.First(x => x.Id == item.Id))
-                .ToList();
-        }
-
-        var ordered = allLogs.OrderByDescending(x => x.ExecutionTime).Take(maxResultCount).ToList();
+        var ordered = await QueryAuditLogsAsync(input, maxResultCount);
         var dtoMap = ordered.ToDictionary(x => x.Id, MapItem);
 
         return new PlatformLogDashboardDto
@@ -208,6 +165,53 @@ public class PlatformAuditLogService : ITransientDependency
             "exception" => logs.Where(x => !string.IsNullOrWhiteSpace(x.Exceptions)).ToList(),
             "operation" => logs.Where(x => x.Actions.Any()).ToList(),
             _ => logs
+        };
+    }
+
+    private async Task<List<AuditLog>> QueryAuditLogsAsync(PlatformAuditLogQueryInput input, int maxResultCount)
+    {
+        var keyword = input.Keyword?.Trim();
+        var category = input.Category?.Trim().ToLowerInvariant();
+        var queryable = await _auditLogRepository.WithDetailsAsync(x => x.Actions, x => x.EntityChanges);
+
+        if (input.StartTime.HasValue)
+        {
+            queryable = queryable.Where(x => x.ExecutionTime >= input.StartTime.Value);
+        }
+
+        if (input.EndTime.HasValue)
+        {
+            queryable = queryable.Where(x => x.ExecutionTime <= input.EndTime.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            queryable = queryable.Where(x =>
+                (x.UserName != null && x.UserName.Contains(keyword)) ||
+                (x.TenantName != null && x.TenantName.Contains(keyword)) ||
+                (x.Url != null && x.Url.Contains(keyword)) ||
+                (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
+                x.Actions.Any(action =>
+                    (action.ServiceName != null && action.ServiceName.Contains(keyword)) ||
+                    (action.MethodName != null && action.MethodName.Contains(keyword))));
+        }
+
+        queryable = ApplyAuditCategoryFilter(queryable, category)
+            .OrderByDescending(x => x.ExecutionTime)
+            .Take(maxResultCount);
+
+        return await _asyncQueryableExecuter.ToListAsync(queryable);
+    }
+
+    private static IQueryable<AuditLog> ApplyAuditCategoryFilter(IQueryable<AuditLog> queryable, string? category)
+    {
+        return category switch
+        {
+            "access" => queryable.Where(x => !x.Actions.Any() && (x.Exceptions == null || x.Exceptions == string.Empty)),
+            "audit" => queryable.Where(x => x.EntityChanges.Any()),
+            "exception" => queryable.Where(x => x.Exceptions != null && x.Exceptions != string.Empty),
+            "operation" => queryable.Where(x => x.Actions.Any()),
+            _ => queryable
         };
     }
 
@@ -284,7 +288,10 @@ public class PlatformAuditLogService : ITransientDependency
                 HasException = item.HasException,
                 HttpMethod = item.HttpMethod,
                 HttpStatusCode = item.HttpStatusCode,
+                HostOperatorUserId = item.HostOperatorUserId,
+                HostOperatorUserName = item.HostOperatorUserName,
                 Id = item.Id,
+                IsHostTenantOperation = item.IsHostTenantOperation,
                 MenuTitle = item.MenuTitle,
                 TenantName = item.TenantName,
                 Url = item.Url,

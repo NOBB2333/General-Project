@@ -5,6 +5,7 @@ using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
 using Volo.Abp.Authorization.Permissions;
+using Volo.Abp.MultiTenancy;
 using Volo.Abp.PermissionManagement;
 using Volo.Abp.Users;
 
@@ -17,6 +18,7 @@ public class PlatformMenuService : ITransientDependency
         AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30)
     };
 
+    private readonly ICurrentTenant _currentTenant;
     private readonly ICurrentUser _currentUser;
     private readonly IDistributedCache _distributedCache;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
@@ -26,6 +28,7 @@ public class PlatformMenuService : ITransientDependency
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
 
     public PlatformMenuService(
+        ICurrentTenant currentTenant,
         ICurrentUser currentUser,
         IDistributedCache distributedCache,
         IRepository<AppMenu, Guid> menuRepository,
@@ -34,6 +37,7 @@ public class PlatformMenuService : ITransientDependency
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<IdentityRole, Guid> roleRepository)
     {
+        _currentTenant = currentTenant;
         _currentUser = currentUser;
         _distributedCache = distributedCache;
         _menuRepository = menuRepository;
@@ -225,11 +229,18 @@ public class PlatformMenuService : ITransientDependency
 
     private string BuildCurrentUserCachePart()
     {
+        var tenantPart = _currentTenant.Id?.ToString("N") ?? "host";
+        var operationPart = string.Equals(
+            _currentUser.FindClaim(PlatformTenantOperationClaimTypes.HostTenantOperation)?.Value,
+            "true",
+            StringComparison.OrdinalIgnoreCase)
+            ? "host-tenant-operation"
+            : "normal";
         var userId = _currentUser.Id?.ToString("N") ?? "anonymous";
         var roles = _currentUser.Roles == null
             ? "no-role"
             : string.Join('-', _currentUser.Roles.OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-        return $"{userId}:{roles}";
+        return $"{tenantPart}:{operationPart}:{userId}:{roles}";
     }
 
     private async Task SyncRolePermissionGrantsAsync(
@@ -317,7 +328,7 @@ public class PlatformMenuService : ITransientDependency
 
     private async Task<List<AppMenu>> GetGrantedMenusForCurrentUserAsync()
     {
-        if (_currentUser.IsInRole(PlatformRoleNames.Admin))
+        if (_currentUser.IsInRole(PlatformRoleNames.Admin) && !_currentTenant.Id.HasValue)
         {
             return (await _menuRepository.GetListAsync())
                 .Where(x => x.IsEnabled)

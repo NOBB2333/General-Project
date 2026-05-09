@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,22 @@ public class DbMigratorHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        DbMigratorExecutionLock executionLock;
+
+        try
+        {
+            executionLock = DbMigratorExecutionLock.Acquire(_configuration);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Log.Error(ex, "{Message}", ex.Message);
+            Environment.ExitCode = 1;
+            _hostApplicationLifetime.StopApplication();
+            return;
+        }
+
+        using (executionLock)
         using (var application = await AbpApplicationFactory.CreateAsync<AdminDbMigratorModule>(options =>
         {
            options.Services.ReplaceConfiguration(_configuration);

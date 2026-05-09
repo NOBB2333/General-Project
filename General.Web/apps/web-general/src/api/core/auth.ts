@@ -10,6 +10,9 @@ export namespace AuthApi {
   /** 登录接口返回值 */
   export interface LoginResult {
     accessToken: string;
+    isHostTenantOperation?: boolean;
+    operationTenantId?: null | string;
+    operationTenantName?: null | string;
   }
 
   export interface RefreshTokenResult {
@@ -23,6 +26,16 @@ export namespace AuthApi {
  */
 export async function loginApi(data: AuthApi.LoginParams) {
   return requestClient.post<AuthApi.LoginResult>('/app/auth/login', data);
+}
+
+export async function enterTenantOperationApi(tenantId: string) {
+  return requestClient.post<AuthApi.LoginResult>('/app/auth/tenant-operation/enter', {
+    tenantId,
+  });
+}
+
+export async function exitTenantOperationApi() {
+  return requestClient.post<AuthApi.LoginResult>('/app/auth/tenant-operation/exit');
 }
 
 /**

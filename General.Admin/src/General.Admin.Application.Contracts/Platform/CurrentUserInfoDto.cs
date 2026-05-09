@@ -8,7 +8,13 @@ public class CurrentUserInfoDto
 
     public string HomePath { get; set; } = "/platform/workspace";
 
+    public bool IsHostTenantOperation { get; set; }
+
     public DateTime? LastLoginTime { get; set; }
+
+    public Guid? OperationTenantId { get; set; }
+
+    public string? OperationTenantName { get; set; }
 
     public List<string> OrganizationUnitNames { get; set; } = [];
 

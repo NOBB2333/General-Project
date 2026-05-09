@@ -3,6 +3,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
 using Volo.Abp.Users;
 using Volo.Abp.MultiTenancy;
+using Volo.Abp.Linq;
 
 namespace General.Admin.Platform;
 
@@ -11,6 +12,7 @@ public class CurrentUserAuthorizationService : ITransientDependency
     private readonly ICurrentUser _currentUser;
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IRepository<AppTenantAuthorization, Guid> _tenantAuthorizationRepository;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly ICurrentTenant _currentTenant;
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
 
@@ -18,12 +20,14 @@ public class CurrentUserAuthorizationService : ITransientDependency
         ICurrentUser currentUser,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppTenantAuthorization, Guid> tenantAuthorizationRepository,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         ICurrentTenant currentTenant,
         IRepository<IdentityRole, Guid> roleRepository)
     {
         _currentUser = currentUser;
         _roleAuthorizationRepository = roleAuthorizationRepository;
         _tenantAuthorizationRepository = tenantAuthorizationRepository;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _currentTenant = currentTenant;
         _roleRepository = roleRepository;
     }
@@ -56,9 +60,15 @@ public class CurrentUserAuthorizationService : ITransientDependency
             return false;
         }
 
-        var roleIds = (await _roleRepository.GetListAsync())
-            .Where(x => currentRoleNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase))
-            .Select(x => x.Id)
+        var normalizedRoleNames = currentRoleNames
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var roleQueryable = await _roleRepository.GetQueryableAsync();
+        var roleIds = (await _asyncQueryableExecuter.ToListAsync(
+                roleQueryable
+                    .Where(x => x.NormalizedName != null && normalizedRoleNames.Contains(x.NormalizedName))
+                    .Select(x => x.Id)))
             .ToHashSet();
 
         if (roleIds.Count == 0)
@@ -66,9 +76,9 @@ public class CurrentUserAuthorizationService : ITransientDependency
             return false;
         }
 
-        var authorizations = (await _roleAuthorizationRepository.GetListAsync())
-            .Where(x => roleIds.Contains(x.RoleId))
-            .ToList();
+        var authorizationQueryable = await _roleAuthorizationRepository.GetQueryableAsync();
+        var authorizations = await _asyncQueryableExecuter.ToListAsync(
+            authorizationQueryable.Where(x => roleIds.Contains(x.RoleId)));
 
         if (authorizations.Any(item =>
             PlatformSerializationHelper.DeserializeStringList(item.ApiBlacklist)

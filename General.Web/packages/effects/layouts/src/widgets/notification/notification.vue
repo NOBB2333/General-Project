@@ -124,12 +124,16 @@ function navigateTo(
               ></span>
 
               <span
-                class="relative flex size-10 shrink-0 overflow-hidden rounded-full"
+                class="relative flex size-10 shrink-0 overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary"
               >
                 <img
+                  v-if="item.avatar"
                   :src="item.avatar"
                   class="aspect-square size-full object-cover"
                 />
+                <span v-else class="flex size-full items-center justify-center">
+                  {{ item.avatarText || item.title.slice(0, 1).toUpperCase() || 'G' }}
+                </span>
               </span>
               <div class="flex flex-col gap-1 leading-none">
                 <p class="font-semibold">{{ item.title }}</p>

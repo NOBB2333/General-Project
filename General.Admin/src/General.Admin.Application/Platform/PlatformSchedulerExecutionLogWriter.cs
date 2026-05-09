@@ -23,13 +23,16 @@ public class PlatformSchedulerExecutionLogWriter : ITransientDependency
         await _requestAuditLogRepository.InsertAsync(
             new AppRequestAuditLog(
                 Guid.NewGuid(),
-                DateTime.Now,
+                DateTime.UtcNow,
                 0,
                 hasException,
                 "POST",
                 hasException ? 500 : 200,
                 $"/api/app/platform/scheduler/{jobKey}/run",
                 "system",
+                null,
+                false,
+                null,
                 null,
                 "127.0.0.1",
                 "scheduler-demo",

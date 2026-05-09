@@ -2,11 +2,13 @@ using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using Volo.Abp.Identity;
+using Volo.Abp.Linq;
 
 namespace General.Admin.Platform;
 
 public class CurrentUserDataScopeService : ITransientDependency
 {
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly ICurrentUser _currentUser;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
@@ -14,12 +16,14 @@ public class CurrentUserDataScopeService : ITransientDependency
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
 
     public CurrentUserDataScopeService(
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         ICurrentUser currentUser,
         IRepository<OrganizationUnit, Guid> organizationUnitRepository,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<IdentityRole, Guid> roleRepository,
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository)
     {
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _currentUser = currentUser;
         _organizationUnitRepository = organizationUnitRepository;
         _roleAuthorizationRepository = roleAuthorizationRepository;
@@ -86,10 +90,11 @@ public class CurrentUserDataScopeService : ITransientDependency
             return [];
         }
 
-        var currentUserOrganizationUnits = (await _userOrganizationUnitRepository.GetListAsync())
-            .Where(x => x.UserId == _currentUser.Id.Value)
-            .Select(x => x.OrganizationUnitId)
-            .ToList();
+        var userOrganizationUnitQueryable = await _userOrganizationUnitRepository.GetQueryableAsync();
+        var currentUserOrganizationUnits = await _asyncQueryableExecuter.ToListAsync(
+            userOrganizationUnitQueryable
+                .Where(x => x.UserId == _currentUser.Id.Value)
+                .Select(x => x.OrganizationUnitId));
 
         if (currentUserOrganizationUnits.Count == 0)
         {
@@ -127,14 +132,24 @@ public class CurrentUserDataScopeService : ITransientDependency
             return ([], PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants);
         }
 
-        var roleIds = (await _roleRepository.GetListAsync())
-            .Where(x => currentRoleNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase))
-            .Select(x => x.Id)
-            .ToHashSet();
-
-        var authorizations = (await _roleAuthorizationRepository.GetListAsync())
-            .Where(x => roleIds.Contains(x.RoleId))
+        var normalizedRoleNames = currentRoleNames
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var roleQueryable = await _roleRepository.GetQueryableAsync();
+        var roleIds = (await _asyncQueryableExecuter.ToListAsync(
+                roleQueryable
+                    .Where(x => x.NormalizedName != null && normalizedRoleNames.Contains(x.NormalizedName))
+                    .Select(x => x.Id)))
+            .ToHashSet();
+        if (roleIds.Count == 0)
+        {
+            return ([], PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants);
+        }
+
+        var authorizationQueryable = await _roleAuthorizationRepository.GetQueryableAsync();
+        var authorizations = await _asyncQueryableExecuter.ToListAsync(
+            authorizationQueryable.Where(x => roleIds.Contains(x.RoleId)));
 
         if (authorizations.Count == 0)
         {

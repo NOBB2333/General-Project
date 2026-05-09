@@ -10,7 +10,14 @@ import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
 import { notification } from 'ant-design-vue';
 import { defineStore } from 'pinia';
 
-import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
+import {
+  enterTenantOperationApi,
+  exitTenantOperationApi,
+  getAccessCodesApi,
+  getUserInfoApi,
+  loginApi,
+  logoutApi,
+} from '#/api';
 import { $t } from '#/locales';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -120,6 +127,50 @@ export const useAuthStore = defineStore('auth', () => {
     });
   }
 
+  async function switchAccessToken(accessToken: string) {
+    const previousAccessToken = accessStore.accessToken;
+    const previousAccessCodes = [...accessStore.accessCodes];
+    const previousAccessMenus = [...accessStore.accessMenus];
+    const previousAccessRoutes = [...accessStore.accessRoutes];
+    const previousIsAccessChecked = accessStore.isAccessChecked;
+    const previousUserInfo = userStore.userInfo;
+
+    accessStore.setAccessToken(accessToken);
+    accessStore.setAccessCodes([]);
+    accessStore.setAccessMenus([]);
+    accessStore.setAccessRoutes([]);
+    accessStore.setIsAccessChecked(false);
+
+    try {
+      const [userInfoResult, accessCodes] = await Promise.all([
+        fetchUserInfo(),
+        getAccessCodesApi(),
+      ]);
+      const userInfo = normalizeHomePath(userInfoResult);
+      userStore.setUserInfo(userInfo);
+      accessStore.setAccessCodes(accessCodes);
+      return userInfo;
+    } catch (error) {
+      accessStore.setAccessToken(previousAccessToken);
+      accessStore.setAccessCodes(previousAccessCodes);
+      accessStore.setAccessMenus(previousAccessMenus);
+      accessStore.setAccessRoutes(previousAccessRoutes);
+      accessStore.setIsAccessChecked(previousIsAccessChecked);
+      userStore.setUserInfo(previousUserInfo);
+      throw error;
+    }
+  }
+
+  async function enterTenantOperation(tenantId: string) {
+    const { accessToken } = await enterTenantOperationApi(tenantId);
+    return await switchAccessToken(accessToken);
+  }
+
+  async function exitTenantOperation() {
+    const { accessToken } = await exitTenantOperationApi();
+    return await switchAccessToken(accessToken);
+  }
+
   async function fetchUserInfo() {
     const userInfo = await getUserInfoApi();
     const normalizedUserInfo = normalizeHomePath(userInfo);
@@ -134,6 +185,8 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     $reset,
     authLogin,
+    enterTenantOperation,
+    exitTenantOperation,
     fetchUserInfo,
     loginLoading,
     logout,

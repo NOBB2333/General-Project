@@ -1,9 +1,13 @@
+using System.Text.Json.Serialization;
+
 namespace General.Admin.Platform;
 
 public class PlatformFileStorageSourceDescriptor
 {
+    [JsonIgnore]
     public string AccessKeyId { get; set; } = string.Empty;
 
+    [JsonIgnore]
     public string AccessKeySecret { get; set; } = string.Empty;
 
     public string? BucketName { get; set; }
@@ -27,4 +31,9 @@ public class PlatformFileStorageSourceDescriptor
     public Guid SourceId { get; set; }
 
     public bool UseSsl { get; set; }
+
+    public override string ToString()
+    {
+        return $"{ProviderName}:{Name}:{SourceId}";
+    }
 }

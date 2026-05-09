@@ -3,6 +3,7 @@ import { requestClient } from '#/api/request';
 export namespace NotificationApi {
   export interface NotificationItem {
     avatar: string;
+    avatarText: string;
     creationTime: string;
     date: string;
     id: string;

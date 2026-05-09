@@ -36,3 +36,26 @@ public class PlatformFileItemDto
 
     public DateTime UploadedAt { get; set; }
 }
+
+public class PlatformFileTreeItemDto
+{
+    public string Category { get; set; } = "default";
+
+    public string? ParentPath { get; set; }
+}
+
+public class PlatformFileMetadataInput
+{
+    public string FileName { get; set; } = string.Empty;
+
+    public bool IsPublic { get; set; }
+
+    public string? BusinessId { get; set; }
+
+    public string? BusinessType { get; set; }
+}
+
+public class PlatformFileBatchDeleteInput
+{
+    public List<string> FileKeys { get; set; } = [];
+}

@@ -24,6 +24,7 @@ public class PlatformRoleService : ITransientDependency
 
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IDistributedCache _distributedCache;
+    private readonly IPlatformIdentityLookupService _identityLookupService;
     private readonly PlatformCacheService _platformCacheService;
     private readonly IdentityUserManager _userManager;
     private readonly IdentityRoleManager _roleManager;
@@ -34,6 +35,7 @@ public class PlatformRoleService : ITransientDependency
         IdentityUserManager userManager,
         IdentityRoleManager roleManager,
         IDistributedCache distributedCache,
+        IPlatformIdentityLookupService identityLookupService,
         PlatformCacheService platformCacheService,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
@@ -42,6 +44,7 @@ public class PlatformRoleService : ITransientDependency
         _userManager = userManager;
         _roleManager = roleManager;
         _distributedCache = distributedCache;
+        _identityLookupService = identityLookupService;
         _platformCacheService = platformCacheService;
         _roleAuthorizationRepository = roleAuthorizationRepository;
         _roleMenuRepository = roleMenuRepository;
@@ -57,11 +60,11 @@ public class PlatformRoleService : ITransientDependency
 
         var roleMenus = await _roleMenuRepository.GetListAsync();
         var roleAuthorizations = await _roleAuthorizationRepository.GetListAsync();
+        var userCounts = await _identityLookupService.GetUserCountsByRoleIdsAsync(roles.Select(x => x.Id).ToList());
         var result = new List<PlatformRoleDto>();
 
         foreach (var role in roles)
         {
-            var users = await _userManager.GetUsersInRoleAsync(role.Name);
             var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id);
             var effectiveMenuIds = roleMenus
                 .Where(x => x.RoleId == role.Id)
@@ -96,7 +99,7 @@ public class PlatformRoleService : ITransientDependency
                 MenuCount = effectiveMenuIds.Count,
                 Name = role.Name,
                 Status = true,
-                UserCount = users.Count
+                UserCount = userCounts.GetValueOrDefault(role.Id)
             });
         }
 

@@ -131,9 +131,12 @@ async function loadProjects() {
 }
 
 async function loadCreateOptions() {
-  const [tree, users] = await Promise.all([getOrganizationTreeApi(), getUserListApi()]);
+  const [tree, users] = await Promise.all([
+    getOrganizationTreeApi(),
+    getUserListApi({ maxResultCount: 1000 }),
+  ]);
   organizationTree.value = tree;
-  userOptions.value = users.map((item: UserApi.UserListItem) => ({
+  userOptions.value = users.items.map((item: UserApi.UserListItem) => ({
     label: `${item.username} · ${item.displayName}`,
     value: item.id,
   }));

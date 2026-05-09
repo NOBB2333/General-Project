@@ -6,6 +6,8 @@ public class PlatformNotificationDto
 {
     public string Avatar { get; set; } = string.Empty;
 
+    public string AvatarText { get; set; } = string.Empty;
+
     public DateTime CreationTime { get; set; }
 
     public string Date { get; set; } = string.Empty;

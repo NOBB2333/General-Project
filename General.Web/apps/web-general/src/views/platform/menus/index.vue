@@ -20,6 +20,8 @@ import {
 } from 'ant-design-vue';
 
 import { createMenuApi, deleteMenuApi, getMenuPermissionTreeApi, setMenuEnabledApi, updateMenuApi } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import { normalizePlatformTree } from '#/composables/platform/use-tree-normalization';
 
 defineOptions({ name: 'PlatformMenuPage' });
 
@@ -41,8 +43,11 @@ const items = ref<MenuApi.PermissionTreeItem[]>([]);
 const selectedId = ref('');
 const creating = ref(false);
 const editing = ref(false);
+const { actionLoadingKey, runAction } = useActionLoading();
 
-const formState = reactive<any>({
+type MenuFormState = MenuApi.MenuSaveInput;
+
+const formState = reactive<MenuFormState>({
   appCode: 'platform',
   component: '',
   icon: '',
@@ -56,15 +61,12 @@ const formState = reactive<any>({
 });
 
 const selectedMenu = computed(() => findMenuById(items.value, selectedId.value));
-const treeData = computed(() => normalizeTree(items.value));
-
-function normalizeTree(source: MenuApi.PermissionTreeItem[]): any[] {
-  return source.map((item) => ({
-    children: normalizeTree(item.children || []),
-    key: item.id,
-    title: `[${item.appCode}] ${item.title}${item.isEnabled ? '' : ' · 已停用'}`,
-  }));
-}
+const treeData = computed(() =>
+  normalizePlatformTree(
+    items.value,
+    (item) => `[${item.appCode}] ${item.title}${item.isEnabled ? '' : ' · 已停用'}`,
+  ),
+);
 
 function findMenuById(source: MenuApi.PermissionTreeItem[], id: string): MenuApi.PermissionTreeItem | null {
   for (const item of source) {
@@ -188,12 +190,15 @@ async function handleDelete() {
     return;
   }
 
-  await deleteMenuApi(selectedMenu.value.id);
-  message.success('菜单已删除');
-  selectedId.value = '';
-  creating.value = false;
-  editing.value = false;
-  await loadMenus();
+  const menuId = selectedMenu.value.id;
+  await runAction(`delete:${menuId}`, async () => {
+    await deleteMenuApi(menuId);
+    message.success('菜单已删除');
+    selectedId.value = '';
+    creating.value = false;
+    editing.value = false;
+    await loadMenus();
+  });
 }
 
 async function handleToggleEnabled(checked: unknown) {
@@ -202,9 +207,12 @@ async function handleToggleEnabled(checked: unknown) {
   }
 
   const nextEnabled = checked === true;
-  await setMenuEnabledApi(selectedMenu.value.id, nextEnabled);
-  message.success(`菜单已${nextEnabled ? '启用' : '停用'}`);
-  await loadMenus();
+  const menuId = selectedMenu.value.id;
+  await runAction(`toggle:${menuId}`, async () => {
+    await setMenuEnabledApi(menuId, nextEnabled);
+    message.success(`菜单已${nextEnabled ? '启用' : '停用'}`);
+    await loadMenus();
+  });
 }
 
 loadMenus();
@@ -242,13 +250,21 @@ loadMenus();
               v-if="selectedMenu && !creating"
               :checked="selectedMenu.isEnabled"
               checked-children="启用"
+              :loading="actionLoadingKey === `toggle:${selectedMenu.id}`"
               un-checked-children="停用"
               @change="(checked) => void handleToggleEnabled(checked)"
             />
             <Button v-if="selectedMenu && !creating && !editing" type="primary" @click="openEdit">
               编辑
             </Button>
-            <Button v-if="selectedMenu && !creating" danger @click="handleDelete">删除</Button>
+            <Button
+              v-if="selectedMenu && !creating"
+              danger
+              :loading="actionLoadingKey === `delete:${selectedMenu.id}`"
+              @click="handleDelete"
+            >
+              删除
+            </Button>
             <Button v-if="creating || editing" :loading="saving" type="primary" @click="handleSubmit">
               {{ creating ? '创建菜单' : '保存修改' }}
             </Button>

@@ -22,11 +22,10 @@ public class PlatformSchedulerService : ITransientDependency
     private const string DefaultTriggerKey = "default";
     private const string ManualTriggerMode = "manual";
     private static readonly string SchedulerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
-    private static readonly DateTime SchedulerStartedAt = DateTime.Now;
+    private static readonly DateTime SchedulerStartedAt = DateTime.UtcNow;
     private static readonly TimeSpan ExecutionLockLease = TimeSpan.FromHours(6);
     private static readonly TimeSpan NodeOfflineThreshold = TimeSpan.FromSeconds(90);
-    private static readonly ConcurrentDictionary<string, byte> RunningJobs = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly ConcurrentDictionary<string, CancellationTokenSource> RunningJobCancellationSources =
+    private static readonly ConcurrentDictionary<string, RunningJobState> RunningJobs =
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
@@ -60,12 +59,16 @@ public class PlatformSchedulerService : ITransientDependency
 
     public async Task<List<PlatformScheduledJobDto>> GetListAsync()
     {
-        var triggers = await _triggerRepository.GetListAsync();
+        var triggerQueryable = await _triggerRepository.GetQueryableAsync();
+        var triggers = await _asyncQueryableExecuter.ToListAsync(
+            triggerQueryable.Select(x => new { x.JobId }));
         var triggerCounts = triggers
             .GroupBy(x => x.JobId)
             .ToDictionary(x => x.Key, x => x.Count());
 
-        return (await _jobRepository.GetListAsync())
+        var jobQueryable = await _jobRepository.GetQueryableAsync();
+        var jobs = await _asyncQueryableExecuter.ToListAsync(jobQueryable.OrderBy(x => x.JobKey));
+        return jobs
             .OrderBy(x => x.JobKey)
             .Select(x => MapJob(x, triggerCounts.GetValueOrDefault(x.Id)))
             .ToList();
@@ -81,30 +84,36 @@ public class PlatformSchedulerService : ITransientDependency
 
     public async Task<PlatformScheduledJobDashboardDto> GetDashboardAsync()
     {
-        var jobs = await _jobRepository.GetListAsync();
-        var since = DateTime.Now.AddHours(-24);
+        var now = DateTime.UtcNow;
+        var since = now.AddHours(-24);
+        var jobQueryable = await _jobRepository.GetQueryableAsync();
         var recordQueryable = await _recordRepository.GetQueryableAsync();
-        var recentRecords = await _asyncQueryableExecuter.ToListAsync(
-            recordQueryable.Where(x => x.StartTime >= since));
 
         return new PlatformScheduledJobDashboardDto
         {
-            EnabledCount = jobs.Count(x => x.IsEnabled),
-            FailedLast24Hours = recentRecords.Count(x => x.Status == PlatformScheduledJobRecordStatus.Failed),
-            RunningCount = jobs.Count(x =>
-                RunningJobs.ContainsKey(x.JobKey) ||
-                (x.LockExpirationTime.HasValue && x.LockExpirationTime.Value > DateTime.Now)),
-            SlowLast24Hours = recentRecords.Count(x => x.DurationMilliseconds.HasValue && x.DurationMilliseconds.Value >= 60_000),
-            TotalCount = jobs.Count
+            EnabledCount = await _asyncQueryableExecuter.CountAsync(jobQueryable.Where(x => x.IsEnabled)),
+            FailedLast24Hours = await _asyncQueryableExecuter.CountAsync(recordQueryable.Where(x =>
+                x.StartTime >= since && x.Status == PlatformScheduledJobRecordStatus.Failed)),
+            RunningCount = await _asyncQueryableExecuter.CountAsync(jobQueryable.Where(x =>
+                x.LockExpirationTime.HasValue && x.LockExpirationTime.Value > now)) + RunningJobs.Count,
+            SlowLast24Hours = await _asyncQueryableExecuter.CountAsync(recordQueryable.Where(x =>
+                x.StartTime >= since &&
+                x.DurationMilliseconds.HasValue &&
+                x.DurationMilliseconds.Value >= 60_000)),
+            TotalCount = await _asyncQueryableExecuter.CountAsync(jobQueryable)
         };
     }
 
     public async Task<List<PlatformScheduledJobClusterNodeDto>> GetClusterNodesAsync()
     {
         await UpsertCurrentClusterNodeAsync(CancellationToken.None);
-        var now = DateTime.Now;
-        return (await _clusterNodeRepository.GetListAsync())
-            .OrderByDescending(x => x.LastHeartbeatTime)
+        var now = DateTime.UtcNow;
+        var queryable = await _clusterNodeRepository.GetQueryableAsync();
+        var nodes = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .OrderByDescending(x => x.LastHeartbeatTime)
+                .Take(200));
+        return nodes
             .Select(x => new PlatformScheduledJobClusterNodeDto
             {
                 Description = x.Description,
@@ -123,20 +132,12 @@ public class PlatformSchedulerService : ITransientDependency
     public async Task<List<PlatformScheduledJobTriggerDto>> GetTriggersAsync(string jobKey)
     {
         var job = await FindJobByKeyAsync(jobKey);
-        var triggers = (await _triggerRepository.GetListAsync())
-            .Where(x => x.JobId == job.Id)
-            .OrderBy(x => x.TriggerKey)
-            .Select(MapTrigger)
-            .ToList();
+        var triggers = await GetTriggersByJobIdAsync(job.Id);
 
         if (triggers.Count == 0)
         {
             await EnsureDefaultTriggerAsync(job, CancellationToken.None);
-            triggers = (await _triggerRepository.GetListAsync())
-                .Where(x => x.JobId == job.Id)
-                .OrderBy(x => x.TriggerKey)
-                .Select(MapTrigger)
-                .ToList();
+            triggers = await GetTriggersByJobIdAsync(job.Id);
         }
 
         return triggers;
@@ -187,12 +188,12 @@ public class PlatformSchedulerService : ITransientDependency
         ValidateCronExpression(input.CronExpression);
         EnsureHandlerExists(input.HandlerKey);
         var normalizedJobKey = NormalizeRequired(input.JobKey, 64, "任务键不能为空。");
-        if ((await _jobRepository.GetListAsync()).Any(x => x.JobKey.Equals(normalizedJobKey, StringComparison.OrdinalIgnoreCase)))
+        if (await JobKeyExistsAsync(normalizedJobKey))
         {
             throw new InvalidOperationException("任务键已存在。");
         }
 
-        var nextRunTime = input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.Now) : null;
+        var nextRunTime = input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.UtcNow) : null;
         var job = new PlatformScheduledJob(
             Guid.NewGuid(),
             normalizedJobKey,
@@ -228,7 +229,7 @@ public class PlatformSchedulerService : ITransientDependency
             throw new InvalidOperationException("定时任务正在执行中，不能编辑。");
         }
 
-        var nextRunTime = input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.Now) : null;
+        var nextRunTime = input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.UtcNow) : null;
         job.UpdateDefinition(
             input.Title,
             input.HandlerKey,
@@ -238,8 +239,7 @@ public class PlatformSchedulerService : ITransientDependency
             nextRunTime);
         await _jobRepository.UpdateAsync(job, autoSave: true);
 
-        var defaultTrigger = (await _triggerRepository.GetListAsync())
-            .FirstOrDefault(x => x.JobId == job.Id && x.TriggerKey.Equals(DefaultTriggerKey, StringComparison.OrdinalIgnoreCase));
+        var defaultTrigger = await FindTriggerOrNullAsync(job.Id, DefaultTriggerKey, CancellationToken.None);
         if (defaultTrigger == null)
         {
             await EnsureDefaultTriggerAsync(job, CancellationToken.None);
@@ -255,7 +255,7 @@ public class PlatformSchedulerService : ITransientDependency
             await _triggerRepository.UpdateAsync(defaultTrigger, autoSave: true);
         }
 
-        var triggerCount = (await _triggerRepository.GetListAsync()).Count(x => x.JobId == job.Id);
+        var triggerCount = await CountTriggersAsync(job.Id);
         return MapJob(job, triggerCount);
     }
 
@@ -264,8 +264,7 @@ public class PlatformSchedulerService : ITransientDependency
         ValidateCronExpression(input.CronExpression);
         var job = await FindJobByKeyAsync(jobKey);
         var normalizedTriggerKey = NormalizeRequired(input.TriggerKey, 64, "触发器键不能为空。");
-        if ((await _triggerRepository.GetListAsync()).Any(x =>
-                x.JobId == job.Id && x.TriggerKey.Equals(normalizedTriggerKey, StringComparison.OrdinalIgnoreCase)))
+        if (await TriggerKeyExistsAsync(job.Id, normalizedTriggerKey, CancellationToken.None))
         {
             throw new InvalidOperationException("触发器键已存在。");
         }
@@ -278,7 +277,7 @@ public class PlatformSchedulerService : ITransientDependency
             input.CronExpression,
             input.Description,
             input.IsEnabled,
-            input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.Now) : null);
+            input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.UtcNow) : null);
         await _triggerRepository.InsertAsync(trigger, autoSave: true);
         return MapTrigger(trigger);
     }
@@ -296,7 +295,7 @@ public class PlatformSchedulerService : ITransientDependency
             input.CronExpression,
             input.Description,
             input.IsEnabled,
-            input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.Now) : null);
+            input.IsEnabled ? CalculateNextRunTime(input.CronExpression, DateTime.UtcNow) : null);
         await _triggerRepository.UpdateAsync(trigger, autoSave: true);
         return MapTrigger(trigger);
     }
@@ -307,7 +306,7 @@ public class PlatformSchedulerService : ITransientDependency
         var trigger = await FindTriggerAsync(job.Id, triggerKey);
         trigger.Toggle(
             isEnabled,
-            isEnabled ? CalculateNextRunTime(trigger.CronExpression, DateTime.Now) : null);
+            isEnabled ? CalculateNextRunTime(trigger.CronExpression, DateTime.UtcNow) : null);
         await _triggerRepository.UpdateAsync(trigger, autoSave: true);
     }
 
@@ -352,7 +351,7 @@ public class PlatformSchedulerService : ITransientDependency
 
         job.UpdateSchedule(
             isEnabled,
-            isEnabled ? CalculateNextRunTime(job.CronExpression, DateTime.Now) : null);
+            isEnabled ? CalculateNextRunTime(job.CronExpression, DateTime.UtcNow) : null);
         await _jobRepository.UpdateAsync(job, autoSave: true);
     }
 
@@ -368,12 +367,12 @@ public class PlatformSchedulerService : ITransientDependency
     {
         var job = await FindJobByKeyAsync(jobKey);
 
-        if (!RunningJobCancellationSources.TryGetValue(job.JobKey, out var cancellationTokenSource))
+        if (!RunningJobs.TryGetValue(job.JobKey, out var runningJob))
         {
             return "定时任务当前未在执行。";
         }
 
-        await cancellationTokenSource.CancelAsync();
+        await runningJob.CancellationTokenSource.CancelAsync();
         return "已发送取消执行信号，任务将在响应取消后结束。";
     }
 
@@ -392,9 +391,9 @@ public class PlatformSchedulerService : ITransientDependency
             return;
         }
 
-        var triggers = (await _triggerRepository.GetListAsync())
-            .Where(x => x.JobId == job.Id)
-            .ToList();
+        var triggerQueryable = await _triggerRepository.GetQueryableAsync();
+        var triggers = await _asyncQueryableExecuter.ToListAsync(
+            triggerQueryable.Where(x => x.JobId == job.Id));
         if (triggers.Count > 0)
         {
             await _triggerRepository.DeleteManyAsync(triggers, autoSave: true);
@@ -494,7 +493,7 @@ public class PlatformSchedulerService : ITransientDependency
     public async Task ProcessDueJobsAsync(CancellationToken cancellationToken)
     {
         await UpsertCurrentClusterNodeAsync(cancellationToken);
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         var triggerQueryable = await _triggerRepository.GetQueryableAsync();
         var dueTriggers = await _asyncQueryableExecuter.ToListAsync(
             triggerQueryable
@@ -535,7 +534,7 @@ public class PlatformSchedulerService : ITransientDependency
             HandlerKey = item.HandlerKey,
             IsEnabled = item.IsEnabled,
             IsRunning = RunningJobs.ContainsKey(item.JobKey) ||
-                        (item.LockExpirationTime.HasValue && item.LockExpirationTime.Value > DateTime.Now),
+                        (item.LockExpirationTime.HasValue && item.LockExpirationTime.Value > DateTime.UtcNow),
             JobKey = item.JobKey,
             LastRunResult = item.LastRunResult,
             LastRunTime = item.LastRunTime,
@@ -597,8 +596,11 @@ public class PlatformSchedulerService : ITransientDependency
             ["SchedulerInstanceId"] = SchedulerInstanceId
         });
 
-        if (!RunningJobs.TryAdd(job.JobKey, 0))
+        using var executionCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var runningJob = new RunningJobState(executionCancellationSource);
+        if (!RunningJobs.TryAdd(job.JobKey, runningJob))
         {
+            executionCancellationSource.Dispose();
             _logger.LogWarning("Skipped scheduled job execution because the job is already running.");
             await InsertSkippedRecordAsync(
                 job,
@@ -614,8 +616,8 @@ public class PlatformSchedulerService : ITransientDependency
             return "定时任务正在执行中，已跳过本次触发。";
         }
 
-        var executedAt = DateTime.Now;
-        var startedAt = DateTimeOffset.Now;
+        var executedAt = DateTime.UtcNow;
+        var startedAt = DateTimeOffset.UtcNow;
         AppScheduledJobRecord? record = null;
         var lockAcquired = false;
 
@@ -638,86 +640,55 @@ public class PlatformSchedulerService : ITransientDependency
                 throw new InvalidOperationException("未找到对应的定时任务执行器。");
             }
 
-            using var executionCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            RunningJobCancellationSources[job.JobKey] = executionCancellationSource;
             var result = await handler.ExecuteAsync(executionCancellationSource.Token);
             var message = $"{(manualTrigger ? "手动" : "自动")}执行成功：{result}";
-            job.MarkRun(
+            await SaveExecutionResultAsync(
+                job,
+                trigger,
+                record,
                 executedAt,
                 message,
-                job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
-            trigger?.MarkRun(
-                executedAt,
-                message,
-                trigger.IsEnabled ? CalculateNextRunTime(trigger.CronExpression, executedAt) : null);
-            job.ReleaseExecutionLock(SchedulerInstanceId);
-            record.MarkSuccess(DateTime.Now, message);
-            await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: cancellationToken);
-            if (trigger != null)
-            {
-                await _triggerRepository.UpdateAsync(trigger, autoSave: true, cancellationToken: cancellationToken);
-            }
-            await _recordRepository.UpdateAsync(record, autoSave: true, cancellationToken: cancellationToken);
+                ScheduledJobExecutionOutcome.Success,
+                null,
+                cancellationToken);
             _logger.LogInformation(
                 "Scheduled job execution completed successfully in {ElapsedMilliseconds}ms.",
-                (DateTimeOffset.Now - startedAt).TotalMilliseconds);
+                (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             return message;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             var message = $"{(manualTrigger ? "手动" : "自动")}执行已取消。";
-            job.MarkRun(
+            await SaveExecutionResultAsync(
+                job,
+                trigger,
+                record,
                 executedAt,
                 message,
-                job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
-            trigger?.MarkRun(
-                executedAt,
-                message,
-                trigger.IsEnabled ? CalculateNextRunTime(trigger.CronExpression, executedAt) : null);
-            job.ReleaseExecutionLock(SchedulerInstanceId);
-            if (record != null)
-            {
-                record.MarkCancelled(DateTime.Now, message);
-                await _recordRepository.UpdateAsync(record, autoSave: true, cancellationToken: CancellationToken.None);
-            }
-
-            await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: CancellationToken.None);
-            if (trigger != null)
-            {
-                await _triggerRepository.UpdateAsync(trigger, autoSave: true, cancellationToken: CancellationToken.None);
-            }
+                ScheduledJobExecutionOutcome.Cancelled,
+                null,
+                CancellationToken.None);
             _logger.LogWarning(
                 "Scheduled job execution cancelled after {ElapsedMilliseconds}ms.",
-                (DateTimeOffset.Now - startedAt).TotalMilliseconds);
+                (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             return message;
         }
         catch (Exception ex)
         {
             var message = $"{(manualTrigger ? "手动" : "自动")}执行失败：{ex.GetBaseException().Message}";
-            job.MarkRun(
+            await SaveExecutionResultAsync(
+                job,
+                trigger,
+                record,
                 executedAt,
                 message,
-                job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
-            trigger?.MarkRun(
-                executedAt,
-                message,
-                trigger.IsEnabled ? CalculateNextRunTime(trigger.CronExpression, executedAt) : null);
-            job.ReleaseExecutionLock(SchedulerInstanceId);
-            if (record != null)
-            {
-                record.MarkFailed(DateTime.Now, message, ex.ToString());
-                await _recordRepository.UpdateAsync(record, autoSave: true, cancellationToken: cancellationToken);
-            }
-
-            await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: cancellationToken);
-            if (trigger != null)
-            {
-                await _triggerRepository.UpdateAsync(trigger, autoSave: true, cancellationToken: cancellationToken);
-            }
+                ScheduledJobExecutionOutcome.Failed,
+                ex.ToString(),
+                cancellationToken);
             _logger.LogError(
                 ex,
                 "Scheduled job execution failed after {ElapsedMilliseconds}ms.",
-                (DateTimeOffset.Now - startedAt).TotalMilliseconds);
+                (DateTimeOffset.UtcNow - startedAt).TotalMilliseconds);
             return message;
         }
         finally
@@ -727,17 +698,72 @@ public class PlatformSchedulerService : ITransientDependency
                 job.ReleaseExecutionLock(SchedulerInstanceId);
             }
 
-            RunningJobs.TryRemove(job.JobKey, out _);
-            if (RunningJobCancellationSources.TryRemove(job.JobKey, out var cancellationTokenSource))
+            if (RunningJobs.TryRemove(job.JobKey, out var removedRunningJob))
             {
-                cancellationTokenSource.Dispose();
+                removedRunningJob.CancellationTokenSource.Dispose();
             }
+        }
+    }
+
+    private async Task SaveExecutionResultAsync(
+        PlatformScheduledJob job,
+        PlatformScheduledJobTrigger? trigger,
+        AppScheduledJobRecord? record,
+        DateTime executedAt,
+        string message,
+        ScheduledJobExecutionOutcome outcome,
+        string? errorMessage,
+        CancellationToken cancellationToken)
+    {
+        job.MarkRun(
+            executedAt,
+            message,
+            job.IsEnabled ? CalculateNextRunTime(job.CronExpression, executedAt) : null);
+        trigger?.MarkRun(
+            executedAt,
+            message,
+            trigger.IsEnabled ? CalculateNextRunTime(trigger.CronExpression, executedAt) : null);
+        job.ReleaseExecutionLock(SchedulerInstanceId);
+
+        if (record != null)
+        {
+            MarkExecutionRecord(record, outcome, message, errorMessage);
+            await _recordRepository.UpdateAsync(record, autoSave: true, cancellationToken: cancellationToken);
+        }
+
+        await _jobRepository.UpdateAsync(job, autoSave: true, cancellationToken: cancellationToken);
+        if (trigger != null)
+        {
+            await _triggerRepository.UpdateAsync(trigger, autoSave: true, cancellationToken: cancellationToken);
+        }
+    }
+
+    private static void MarkExecutionRecord(
+        AppScheduledJobRecord record,
+        ScheduledJobExecutionOutcome outcome,
+        string message,
+        string? errorMessage)
+    {
+        var completedAt = DateTime.UtcNow;
+        switch (outcome)
+        {
+            case ScheduledJobExecutionOutcome.Success:
+                record.MarkSuccess(completedAt, message);
+                break;
+            case ScheduledJobExecutionOutcome.Cancelled:
+                record.MarkCancelled(completedAt, message);
+                break;
+            case ScheduledJobExecutionOutcome.Failed:
+                record.MarkFailed(completedAt, message, errorMessage ?? message);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null);
         }
     }
 
     private async Task<bool> TryAcquireExecutionLockAsync(PlatformScheduledJob job, CancellationToken cancellationToken)
     {
-        if (!job.TryAcquireExecutionLock(SchedulerInstanceId, DateTime.Now, ExecutionLockLease))
+        if (!job.TryAcquireExecutionLock(SchedulerInstanceId, DateTime.UtcNow, ExecutionLockLease))
         {
             return false;
         }
@@ -778,7 +804,7 @@ public class PlatformSchedulerService : ITransientDependency
         string message,
         CancellationToken cancellationToken)
     {
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         var record = new AppScheduledJobRecord(
             Guid.NewGuid(),
             job.JobKey,
@@ -802,8 +828,7 @@ public class PlatformSchedulerService : ITransientDependency
 
     private async Task EnsureDefaultTriggerAsync(PlatformScheduledJob job, CancellationToken cancellationToken)
     {
-        var exists = (await _triggerRepository.GetListAsync(cancellationToken: cancellationToken))
-            .Any(x => x.JobId == job.Id && x.TriggerKey.Equals(DefaultTriggerKey, StringComparison.OrdinalIgnoreCase));
+        var exists = await TriggerKeyExistsAsync(job.Id, DefaultTriggerKey, cancellationToken);
         if (exists)
         {
             return;
@@ -833,16 +858,60 @@ public class PlatformSchedulerService : ITransientDependency
     private async Task<PlatformScheduledJob?> FindJobByKeyOrNullAsync(string jobKey)
     {
         var normalizedKey = NormalizeRequired(jobKey, 64, "任务键不能为空。");
-        return (await _jobRepository.GetListAsync())
-            .FirstOrDefault(x => x.JobKey.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase));
+        var queryable = await _jobRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.FirstOrDefaultAsync(
+            queryable.Where(x => x.JobKey == normalizedKey));
     }
 
     private async Task<PlatformScheduledJobTrigger> FindTriggerAsync(Guid jobId, string triggerKey)
     {
         var normalizedTriggerKey = NormalizeRequired(triggerKey, 64, "触发器键不能为空。");
-        var trigger = (await _triggerRepository.GetListAsync())
-            .FirstOrDefault(x => x.JobId == jobId && x.TriggerKey.Equals(normalizedTriggerKey, StringComparison.OrdinalIgnoreCase));
+        var trigger = await FindTriggerOrNullAsync(jobId, normalizedTriggerKey, CancellationToken.None);
         return trigger ?? throw new InvalidOperationException("触发器不存在。");
+    }
+
+    private async Task<List<PlatformScheduledJobTriggerDto>> GetTriggersByJobIdAsync(Guid jobId)
+    {
+        var queryable = await _triggerRepository.GetQueryableAsync();
+        var triggers = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .Where(x => x.JobId == jobId)
+                .OrderBy(x => x.TriggerKey));
+        return triggers.Select(MapTrigger).ToList();
+    }
+
+    private async Task<int> CountTriggersAsync(Guid jobId)
+    {
+        var queryable = await _triggerRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.CountAsync(queryable.Where(x => x.JobId == jobId));
+    }
+
+    private async Task<bool> JobKeyExistsAsync(string normalizedJobKey)
+    {
+        var queryable = await _jobRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.AnyAsync(queryable.Where(x => x.JobKey == normalizedJobKey));
+    }
+
+    private async Task<bool> TriggerKeyExistsAsync(
+        Guid jobId,
+        string normalizedTriggerKey,
+        CancellationToken cancellationToken)
+    {
+        var queryable = await _triggerRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.AnyAsync(
+            queryable.Where(x => x.JobId == jobId && x.TriggerKey == normalizedTriggerKey),
+            cancellationToken);
+    }
+
+    private async Task<PlatformScheduledJobTrigger?> FindTriggerOrNullAsync(
+        Guid jobId,
+        string normalizedTriggerKey,
+        CancellationToken cancellationToken)
+    {
+        var queryable = await _triggerRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.FirstOrDefaultAsync(
+            queryable.Where(x => x.JobId == jobId && x.TriggerKey == normalizedTriggerKey),
+            cancellationToken);
     }
 
     private static string NormalizeRequired(string value, int maxLength, string errorMessage)
@@ -863,7 +932,7 @@ public class PlatformSchedulerService : ITransientDependency
 
     private async Task UpsertCurrentClusterNodeAsync(CancellationToken cancellationToken)
     {
-        var now = DateTime.Now;
+        var now = DateTime.UtcNow;
         await CleanupExpiredClusterNodesAsync(now, cancellationToken);
         var nodeQueryable = await _clusterNodeRepository.GetQueryableAsync();
         var node = await _asyncQueryableExecuter.FirstOrDefaultAsync(
@@ -924,9 +993,18 @@ public class PlatformSchedulerService : ITransientDependency
 
         var expression = new CronExpression(cronExpression)
         {
-            TimeZone = TimeZoneInfo.Local
+            TimeZone = TimeZoneInfo.Utc
         };
 
-        return expression.GetNextValidTimeAfter(new DateTimeOffset(baseTime))?.LocalDateTime;
+        return expression.GetNextValidTimeAfter(new DateTimeOffset(DateTime.SpecifyKind(baseTime, DateTimeKind.Utc)))?.UtcDateTime;
+    }
+
+    private sealed record RunningJobState(CancellationTokenSource CancellationTokenSource);
+
+    private enum ScheduledJobExecutionOutcome
+    {
+        Success,
+        Cancelled,
+        Failed
     }
 }

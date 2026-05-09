@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { OnlineUserApi, OrganizationApi, RoleApi, UserApi } from '#/api/core';
 
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
@@ -34,21 +34,23 @@ import {
   resetUserPasswordApi,
   updateUserApi,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import { normalizePlatformTreeSelect, type PlatformTreeNode } from '#/composables/platform/use-tree-normalization';
 
 defineOptions({ name: 'PlatformUserPage' });
 
 const columns = [
-  { dataIndex: 'displayName', key: 'displayName', title: '姓名', width: 140 },
-  { dataIndex: 'username', key: 'username', title: '账号', width: 160 },
-  { dataIndex: 'employeeNo', key: 'employeeNo', title: '工号', width: 120 },
-  { dataIndex: 'phoneNumber', key: 'phoneNumber', title: '手机号', width: 140 },
-  { dataIndex: 'email', key: 'email', title: '邮箱', width: 220 },
-  { dataIndex: 'tenantName', key: 'tenantName', title: '租户', width: 120 },
-  { dataIndex: 'externalSource', key: 'externalSource', title: '外部来源', width: 120 },
+  { dataIndex: 'displayName', key: 'displayName', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.displayName.localeCompare(right.displayName, 'zh-CN'), title: '姓名', width: 140 },
+  { dataIndex: 'username', key: 'username', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.username.localeCompare(right.username, 'zh-CN'), title: '账号', width: 160 },
+  { dataIndex: 'employeeNo', key: 'employeeNo', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.employeeNo || '').localeCompare(right.employeeNo || '', 'zh-CN'), title: '工号', width: 120 },
+  { dataIndex: 'phoneNumber', key: 'phoneNumber', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.phoneNumber || '').localeCompare(right.phoneNumber || '', 'zh-CN'), title: '手机号', width: 140 },
+  { dataIndex: 'email', key: 'email', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.email.localeCompare(right.email, 'zh-CN'), title: '邮箱', width: 220 },
+  { dataIndex: 'tenantName', key: 'tenantName', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.tenantName || '').localeCompare(right.tenantName || '', 'zh-CN'), title: '租户', width: 120 },
+  { dataIndex: 'externalSource', key: 'externalSource', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.externalSource || '').localeCompare(right.externalSource || '', 'zh-CN'), title: '外部来源', width: 120 },
   { dataIndex: 'roles', key: 'roles', title: '角色', width: 180 },
   { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门', width: 200 },
-  { dataIndex: 'isOnline', key: 'isOnline', title: '在线', width: 90 },
-  { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
+  { dataIndex: 'isOnline', key: 'isOnline', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => Number(left.isOnline) - Number(right.isOnline), title: '在线', width: 90 },
+  { dataIndex: 'isActive', key: 'isActive', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => Number(left.isActive) - Number(right.isActive), title: '状态', width: 100 },
   { key: 'actions', title: '操作', width: 210 },
 ];
 
@@ -62,12 +64,6 @@ const onlineColumns = [
   { dataIndex: 'lastAccessedAt', key: 'lastAccessedAt', title: '最近活动', width: 200 },
   { key: 'actions', title: '操作', width: 120 },
 ];
-
-interface TreeSelectNode {
-  children?: TreeSelectNode[];
-  title: string;
-  value: string;
-}
 
 const keyword = ref('');
 const loading = ref(false);
@@ -83,6 +79,9 @@ const statusFilter = ref<string>();
 const roleName = ref<string>();
 const roleItems = ref<RoleApi.RoleItem[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
+const totalCount = ref(0);
+const pageIndex = ref(1);
+const pageSize = ref(20);
 const onlineUsers = ref<OnlineUserApi.OnlineUserItem[]>([]);
 const onlineVisible = ref(false);
 const onlineLoading = ref(false);
@@ -91,25 +90,46 @@ const activeMappingUser = ref<null | UserApi.UserListItem>(null);
 const activeResetUser = ref<null | UserApi.UserListItem>(null);
 const phoneNumberPattern = /^1[3-9]\d{9}$/;
 const usernamePattern = /^[A-Za-z][A-Za-z0-9._-]{2,63}$/;
+let keywordSearchTimer: ReturnType<typeof setTimeout> | undefined;
+let suppressFilterWatch = false;
+const { actionLoadingKey, runAction } = useActionLoading();
 
-const formState = reactive<any>({
+interface UserFormState {
+  displayName: string;
+  email: string;
+  employeeNo: string;
+  externalSource: string;
+  externalUserId: string;
+  isActive: boolean;
+  organizationUnitId?: string;
+  password: string;
+  phoneNumber: string;
+  roleNames: string[];
+  username: string;
+}
+
+const formState = reactive<UserFormState>({
   displayName: '',
   email: '',
+  employeeNo: '',
+  externalSource: '',
+  externalUserId: '',
   isActive: true,
   organizationUnitId: undefined,
   password: '',
+  phoneNumber: '',
   roleNames: [],
   username: '',
 });
 
 const metrics = computed(() => [
-  { label: '用户总数', value: users.value.length },
+  { label: '用户总数', value: totalCount.value },
   {
-    label: '启用账号',
+    label: '当前页启用',
     value: users.value.filter((item) => item.isActive).length,
   },
   {
-    label: '涉及部门',
+    label: '当前页部门',
     value: new Set(users.value.flatMap((item) => item.organizationUnitNames)).size,
   },
   {
@@ -122,12 +142,8 @@ const roleOptions = computed(() =>
   roleItems.value.map((item) => ({ label: item.name, value: item.name })),
 );
 
-function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): TreeSelectNode[] {
-  return items.map((item) => ({
-    children: normalizeTree(item.children || []),
-    title: item.displayName,
-    value: item.id,
-  }));
+function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTreeSelect(items, (item) => item.displayName);
 }
 
 async function loadFilters() {
@@ -149,17 +165,22 @@ async function loadFilters() {
 async function loadUsers() {
   loading.value = true;
   try {
-    users.value = await getUserListApi({
+    const result = await getUserListApi({
       keyword: keyword.value || undefined,
       isActive:
         statusFilter.value === undefined
           ? undefined
           : statusFilter.value === 'true',
+      maxResultCount: pageSize.value,
       organizationUnitId: organizationUnitId.value || undefined,
       roleName: roleName.value || undefined,
+      skipCount: (pageIndex.value - 1) * pageSize.value,
     });
+    users.value = result.items;
+    totalCount.value = result.totalCount;
   } catch {
     users.value = [];
+    totalCount.value = 0;
     message.error('用户列表加载失败');
   } finally {
     loading.value = false;
@@ -183,9 +204,11 @@ async function refreshUserData() {
 }
 
 async function handleForceLogout(record: OnlineUserApi.OnlineUserItem) {
-  await forceLogoutOnlineUserApi(record.userId);
-  message.success(`已强制下线账号 ${record.userName}`);
-  await refreshUserData();
+  await runAction(`force-logout:${record.userId}`, async () => {
+    await forceLogoutOnlineUserApi(record.userId);
+    message.success(`已强制下线账号 ${record.userName}`);
+    await refreshUserData();
+  });
 }
 
 function openOnlineDrawer() {
@@ -298,9 +321,14 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: string) {
-  await deleteUserApi(id);
-  message.success('用户已删除');
-  await refreshUserData();
+  await runAction(`delete:${id}`, async () => {
+    await deleteUserApi(id);
+    message.success('用户已删除');
+    if (users.value.length === 1 && pageIndex.value > 1) {
+      pageIndex.value -= 1;
+    }
+    await refreshUserData();
+  });
 }
 
 async function handleResetPassword() {
@@ -339,22 +367,74 @@ async function handleToggleStatus(record: UserApi.UserListItem, checked: boolean
     username: record.username,
   };
 
-  await updateUserApi(record.id, payload);
-  message.success(`账号已${checked ? '启用' : '停用'}`);
-  await refreshUserData();
+  await runAction(`toggle:${record.id}`, async () => {
+    await updateUserApi(record.id, payload);
+    message.success(`账号已${checked ? '启用' : '停用'}`);
+    await refreshUserData();
+  });
+}
+
+function handleTableChange(
+  pagination: { current?: number; pageSize?: number },
+  _filters?: unknown,
+  _sorter?: unknown,
+  extra?: { action?: string },
+) {
+  if (extra?.action === 'sort') {
+    return;
+  }
+
+  pageIndex.value = pagination.current || 1;
+  pageSize.value = pagination.pageSize || pageSize.value;
+  void loadUsers();
+}
+
+function searchUsers() {
+  if (keywordSearchTimer) {
+    clearTimeout(keywordSearchTimer);
+    keywordSearchTimer = undefined;
+  }
+  pageIndex.value = 1;
+  void loadUsers();
 }
 
 async function resetFilters() {
+  suppressFilterWatch = true;
   keyword.value = '';
   organizationUnitId.value = undefined;
   roleName.value = undefined;
   statusFilter.value = undefined;
+  suppressFilterWatch = false;
+  pageIndex.value = 1;
   await loadUsers();
 }
+
+watch([organizationUnitId, roleName, statusFilter], () => {
+  if (suppressFilterWatch) {
+    return;
+  }
+  searchUsers();
+});
+
+watch(keyword, () => {
+  if (suppressFilterWatch) {
+    return;
+  }
+  if (keywordSearchTimer) {
+    clearTimeout(keywordSearchTimer);
+  }
+  keywordSearchTimer = setTimeout(searchUsers, 350);
+});
 
 onMounted(async () => {
   await loadFilters();
   await refreshUserData();
+});
+
+onBeforeUnmount(() => {
+  if (keywordSearchTimer) {
+    clearTimeout(keywordSearchTimer);
+  }
 });
 </script>
 
@@ -382,7 +462,7 @@ onMounted(async () => {
               v-model:value="keyword"
               allow-clear
               placeholder="按账号/姓名/邮箱筛选"
-              @pressEnter="loadUsers"
+              @pressEnter="searchUsers"
             />
             <TreeSelect
               v-model:value="organizationUnitId"
@@ -409,7 +489,7 @@ onMounted(async () => {
                 { label: '停用', value: 'false' },
               ]"
             />
-            <Button type="primary" @click="loadUsers">查询</Button>
+            <Button type="primary" @click="searchUsers">查询</Button>
             <Button @click="resetFilters">重置</Button>
             <Button @click="openOnlineDrawer">在线会话</Button>
             <Button type="primary" @click="openCreate">新增用户</Button>
@@ -424,9 +504,16 @@ onMounted(async () => {
           :columns="columns"
           :data-source="users"
           :loading="loading"
-          :pagination="{ pageSize: 10 }"
+          :pagination="{
+            current: pageIndex,
+            pageSize,
+            showSizeChanger: true,
+            showTotal: (total: number) => `共 ${total} 条`,
+            total: totalCount,
+          }"
           row-key="id"
           :scroll="{ x: 1480 }"
+          @change="handleTableChange"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'roles'">
@@ -456,6 +543,7 @@ onMounted(async () => {
               <Switch
                 :checked="record.isActive"
                 checked-children="启用"
+                :loading="actionLoadingKey === `toggle:${(record as UserApi.UserListItem).id}`"
                 un-checked-children="停用"
                 @change="(checked) => handleToggleStatus(record as UserApi.UserListItem, checked === true)"
               />
@@ -485,7 +573,14 @@ onMounted(async () => {
                   重置密码
                 </Button>
                 <Popconfirm title="确认删除该用户？" @confirm="handleDelete(record.id)">
-                  <Button danger size="small" type="link">删除</Button>
+                  <Button
+                    danger
+                    :loading="actionLoadingKey === `delete:${(record as UserApi.UserListItem).id}`"
+                    size="small"
+                    type="link"
+                  >
+                    删除
+                  </Button>
                 </Popconfirm>
               </div>
             </template>
@@ -531,6 +626,7 @@ onMounted(async () => {
               <Button
                 :disabled="!(record as OnlineUserApi.OnlineUserItem).canForceLogout"
                 danger
+                :loading="actionLoadingKey === `force-logout:${(record as OnlineUserApi.OnlineUserItem).userId}`"
                 size="small"
                 type="link"
               >

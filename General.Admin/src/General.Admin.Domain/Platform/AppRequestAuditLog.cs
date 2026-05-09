@@ -20,9 +20,15 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
 
     public bool HasException { get; private set; }
 
+    public Guid? HostOperatorUserId { get; private set; }
+
+    public string? HostOperatorUserName { get; private set; }
+
     public string? HttpMethod { get; private set; }
 
     public int? HttpStatusCode { get; private set; }
+
+    public bool IsHostTenantOperation { get; private set; }
 
     public string? MenuTitle { get; private set; }
 
@@ -47,6 +53,9 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
         string? url,
         string? userName,
         string? tenantName,
+        bool isHostTenantOperation,
+        Guid? hostOperatorUserId,
+        string? hostOperatorUserName,
         string? clientIpAddress,
         string? browserInfo,
         string? actionSummary,
@@ -62,6 +71,9 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
         Url = Normalize(url);
         UserName = Normalize(userName);
         TenantName = Normalize(tenantName);
+        IsHostTenantOperation = isHostTenantOperation;
+        HostOperatorUserId = hostOperatorUserId;
+        HostOperatorUserName = Normalize(hostOperatorUserName);
         ClientIpAddress = Normalize(clientIpAddress);
         BrowserInfo = Normalize(browserInfo);
         ActionSummary = Normalize(actionSummary);

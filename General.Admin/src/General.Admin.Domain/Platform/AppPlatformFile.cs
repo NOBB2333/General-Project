@@ -63,8 +63,8 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         FileName = Check.NotNullOrWhiteSpace(fileName, nameof(fileName), 256);
         ContentType = Check.NotNullOrWhiteSpace(contentType, nameof(contentType), 256);
         Size = size;
-        Category = Normalize(category, 64) ?? "default";
-        ParentPath = Normalize(parentPath, 256);
+        Category = PlatformFilePathPolicy.NormalizeCategory(category);
+        ParentPath = PlatformFilePathPolicy.NormalizeParentPath(parentPath);
         StorageLocation = Check.NotNullOrWhiteSpace(storageLocation, nameof(storageLocation), 512);
         StorageProvider = Check.NotNullOrWhiteSpace(storageProvider, nameof(storageProvider), 32);
         UploadedByUserId = uploadedByUserId;
@@ -77,12 +77,13 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
 
     public void UpdateCategory(string category, string? parentPath)
     {
-        Category = Normalize(category, 64) ?? "default";
-        ParentPath = Normalize(parentPath, 256);
+        Category = PlatformFilePathPolicy.NormalizeCategory(category);
+        ParentPath = PlatformFilePathPolicy.NormalizeParentPath(parentPath);
     }
 
-    public void UpdateMetadata(bool isPublic, string? businessType, string? businessId)
+    public void UpdateMetadata(string fileName, bool isPublic, string? businessType, string? businessId)
     {
+        FileName = Check.NotNullOrWhiteSpace(fileName, nameof(fileName), 256);
         IsPublic = isPublic;
         BusinessType = Normalize(businessType, 64);
         BusinessId = Normalize(businessId, 128);
@@ -96,6 +97,12 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         }
 
         var trimmed = value.Trim();
-        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+        if (trimmed.Length > maxLength)
+        {
+            throw new BusinessException("Platform:FileMetadataTooLong")
+                .WithData("MaxLength", maxLength);
+        }
+
+        return trimmed;
     }
 }

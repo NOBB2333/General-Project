@@ -57,6 +57,7 @@ public class PlatformRequestAuditStore : ITransientDependency
                     (x.TenantName != null && x.TenantName.Contains(keyword)) ||
                     (x.Url != null && x.Url.Contains(keyword)) ||
                     (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
+                    (x.HostOperatorUserName != null && x.HostOperatorUserName.Contains(keyword)) ||
                     (x.ActionSummary != null && x.ActionSummary.Contains(keyword)) ||
                     (x.MenuTitle != null && x.MenuTitle.Contains(keyword)));
             }
@@ -103,7 +104,10 @@ public class PlatformRequestAuditStore : ITransientDependency
             HasException = log.HasException,
             HttpMethod = log.HttpMethod,
             HttpStatusCode = log.HttpStatusCode,
+            HostOperatorUserId = log.HostOperatorUserId,
+            HostOperatorUserName = log.HostOperatorUserName,
             Id = log.Id,
+            IsHostTenantOperation = log.IsHostTenantOperation,
             MenuTitle = log.MenuTitle,
             TenantName = log.TenantName,
             Url = log.Url,
@@ -134,7 +138,13 @@ public class PlatformRequestAuditEntry
 
     public int? HttpStatusCode { get; set; }
 
+    public Guid? HostOperatorUserId { get; set; }
+
+    public string? HostOperatorUserName { get; set; }
+
     public Guid Id { get; set; }
+
+    public bool IsHostTenantOperation { get; set; }
 
     public string? MenuTitle { get; set; } // populated for pagevisit category
 

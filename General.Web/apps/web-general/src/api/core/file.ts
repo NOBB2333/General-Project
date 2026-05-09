@@ -5,6 +5,9 @@ export namespace FileApi {
     businessType?: string;
     category?: string;
     keyword?: string;
+    maxResultCount?: number;
+    parentPath?: string;
+    skipCount?: number;
     storageSourceId?: string;
     uploadedBy?: string;
     uploadedFrom?: string;
@@ -29,6 +32,16 @@ export namespace FileApi {
     storageSourceName?: null | string;
     uploadedAt: string;
     uploadedBy?: null | string;
+  }
+
+  export interface TreeItem {
+    category: string;
+    parentPath?: null | string;
+  }
+
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
   }
 
   export interface StorageSourceItem {
@@ -66,10 +79,21 @@ export namespace FileApi {
     secretKey?: null | string;
     useSsl: boolean;
   }
+
+  export interface FileMetadataInput {
+    businessId?: null | string;
+    businessType?: null | string;
+    fileName: string;
+    isPublic: boolean;
+  }
 }
 
 export async function getFileListApi(params: FileApi.FileListQuery = {}) {
-  return requestClient.get<FileApi.FileItem[]>('/app/file/list', { params });
+  return requestClient.get<FileApi.PagedResult<FileApi.FileItem>>('/app/file/list', { params });
+}
+
+export async function getFileTreeApi(params: FileApi.FileListQuery = {}) {
+  return requestClient.get<FileApi.TreeItem[]>('/app/file/tree', { params });
 }
 
 export async function uploadFileApi(
@@ -98,10 +122,24 @@ export async function deleteFileApi(fileKey: string) {
   return requestClient.delete<boolean>(`/app/file/${fileKey}`);
 }
 
+export async function batchDeleteFileApi(fileKeys: string[]) {
+  return requestClient.post<boolean>('/app/file/batch-delete', { fileKeys });
+}
+
 export async function downloadFileApi(fileKey: string) {
   return requestClient.get<Blob>(`/app/file/download/${fileKey}`, {
     responseType: 'blob',
   });
+}
+
+export async function previewFileApi(fileKey: string) {
+  return requestClient.get<Blob>(`/app/file/preview/${fileKey}`, {
+    responseType: 'blob',
+  });
+}
+
+export async function updateFileMetadataApi(fileKey: string, data: FileApi.FileMetadataInput) {
+  return requestClient.put<boolean>(`/app/file/${fileKey}/metadata`, data);
 }
 
 export async function getFileStorageSourcesApi(enabledOnly = false) {

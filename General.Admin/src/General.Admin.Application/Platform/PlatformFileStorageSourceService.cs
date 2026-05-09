@@ -2,7 +2,6 @@ using Volo.Abp.DependencyInjection;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Linq;
-using Volo.Abp.Security.Encryption;
 
 namespace General.Admin.Platform;
 
@@ -17,22 +16,22 @@ public class PlatformFileStorageSourceService : ITransientDependency
         PlatformFileStorageNames.Minio
     };
 
-    private readonly IStringEncryptionService _encryptionService;
     private readonly IAbpDistributedLock _distributedLock;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
+    private readonly PlatformFileStorageSourceManager _sourceManager;
     private readonly IRepository<AppFileStorageSource, Guid> _sourceRepository;
     private readonly IRepository<AppPlatformFile, Guid> _fileRepository;
 
     public PlatformFileStorageSourceService(
-        IStringEncryptionService encryptionService,
         IAbpDistributedLock distributedLock,
         IAsyncQueryableExecuter asyncQueryableExecuter,
+        PlatformFileStorageSourceManager sourceManager,
         IRepository<AppFileStorageSource, Guid> sourceRepository,
         IRepository<AppPlatformFile, Guid> fileRepository)
     {
-        _encryptionService = encryptionService;
         _distributedLock = distributedLock;
         _asyncQueryableExecuter = asyncQueryableExecuter;
+        _sourceManager = sourceManager;
         _sourceRepository = sourceRepository;
         _fileRepository = fileRepository;
     }
@@ -73,7 +72,7 @@ public class PlatformFileStorageSourceService : ITransientDependency
             input.Endpoint,
             input.RootPath,
             input.AccessKeyId,
-            EncryptSecret(input.SecretKey),
+            _sourceManager.EncryptSecret(input.SecretKey),
             input.BucketName,
             input.Region,
             input.CustomDomain,
@@ -113,7 +112,7 @@ public class PlatformFileStorageSourceService : ITransientDependency
             input.Endpoint,
             input.RootPath,
             input.AccessKeyId,
-            EncryptSecret(input.SecretKey),
+            _sourceManager.EncryptSecret(input.SecretKey),
             input.BucketName,
             input.Region,
             input.CustomDomain,
@@ -200,22 +199,7 @@ public class PlatformFileStorageSourceService : ITransientDependency
             throw new InvalidOperationException("文件存储源已停用。");
         }
 
-        return new PlatformFileStorageSourceDescriptor
-        {
-            AccessKeyId = source.AccessKeyId,
-            AccessKeySecret = DecryptSecret(source.EncryptedSecret),
-            BucketName = source.BucketName,
-            CustomDomain = source.CustomDomain,
-            Endpoint = source.Endpoint,
-            IsPublic = source.IsPublic,
-            Name = source.Name,
-            PathTemplate = source.PathTemplate,
-            ProviderName = source.ProviderName,
-            Region = source.Region,
-            RootPath = source.RootPath,
-            SourceId = source.Id,
-            UseSsl = source.UseSsl
-        };
+        return _sourceManager.ToDescriptor(source);
     }
 
     public async Task<string?> ResolveSourceNameAsync(Guid? sourceId)
@@ -251,9 +235,9 @@ public class PlatformFileStorageSourceService : ITransientDependency
 
     private async Task ClearDefaultAsync(Guid? exceptId = null)
     {
-        var defaults = (await _sourceRepository.GetListAsync())
-            .Where(x => x.IsDefault && x.Id != exceptId)
-            .ToList();
+        var queryable = await _sourceRepository.GetQueryableAsync();
+        var defaults = await _asyncQueryableExecuter.ToListAsync(
+            queryable.Where(x => x.IsDefault && (!exceptId.HasValue || x.Id != exceptId.Value)));
         foreach (var source in defaults)
         {
             source.SetDefault(false);
@@ -294,20 +278,6 @@ public class PlatformFileStorageSourceService : ITransientDependency
         {
             throw new InvalidOperationException("云文件存储源配置不完整。");
         }
-    }
-
-    private string? EncryptSecret(string? secret)
-    {
-        return string.IsNullOrWhiteSpace(secret)
-            ? null
-            : _encryptionService.Encrypt(secret.Trim());
-    }
-
-    private string DecryptSecret(string? encryptedSecret)
-    {
-        return string.IsNullOrWhiteSpace(encryptedSecret)
-            ? string.Empty
-            : _encryptionService.Decrypt(encryptedSecret) ?? string.Empty;
     }
 
     private static PlatformFileStorageSourceDto Map(AppFileStorageSource item)

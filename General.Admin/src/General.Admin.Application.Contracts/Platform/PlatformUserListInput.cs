@@ -9,4 +9,8 @@ public class PlatformUserListInput
     public bool? IsActive { get; set; }
 
     public string? RoleName { get; set; }
+
+    public int MaxResultCount { get; set; } = 20;
+
+    public int SkipCount { get; set; }
 }

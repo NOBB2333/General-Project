@@ -1,10 +1,15 @@
 using System.IO;
 using System.Text.RegularExpressions;
+using General.Admin.Permissions;
+using Volo.Abp.Authorization;
+using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Data;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Guids;
 using Volo.Abp.Identity;
 using Volo.Abp.MultiTenancy;
+using Volo.Abp.PermissionManagement;
 using Volo.Abp.TenantManagement;
 
 namespace General.Admin.Platform;
@@ -12,26 +17,47 @@ namespace General.Admin.Platform;
 public class PlatformTenantService : ITransientDependency
 {
     private readonly ICurrentTenant _currentTenant;
+    private readonly IGuidGenerator _guidGenerator;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
+    private readonly IPermissionManager _permissionManager;
+    private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
     private readonly IRepository<AppTenantAuthorization, Guid> _tenantAuthorizationRepository;
+    private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
+    private readonly IdentityRoleManager _roleManager;
+    private readonly IdentityUserManager _userManager;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
+    private readonly OrganizationUnitManager _organizationUnitManager;
     private readonly PlatformCacheService _platformCacheService;
     private readonly TenantManager _tenantManager;
     private readonly ITenantRepository _tenantRepository;
 
     public PlatformTenantService(
         ICurrentTenant currentTenant,
+        IGuidGenerator guidGenerator,
         IRepository<AppMenu, Guid> menuRepository,
+        IPermissionManager permissionManager,
+        IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<AppTenantAuthorization, Guid> tenantAuthorizationRepository,
+        IRepository<OrganizationUnit, Guid> organizationUnitRepository,
+        IdentityRoleManager roleManager,
+        IdentityUserManager userManager,
         IRepository<IdentityUser, Guid> userRepository,
+        OrganizationUnitManager organizationUnitManager,
         PlatformCacheService platformCacheService,
         TenantManager tenantManager,
         ITenantRepository tenantRepository)
     {
         _currentTenant = currentTenant;
+        _guidGenerator = guidGenerator;
         _menuRepository = menuRepository;
+        _permissionManager = permissionManager;
+        _roleMenuRepository = roleMenuRepository;
         _tenantAuthorizationRepository = tenantAuthorizationRepository;
+        _organizationUnitRepository = organizationUnitRepository;
+        _roleManager = roleManager;
+        _userManager = userManager;
         _userRepository = userRepository;
+        _organizationUnitManager = organizationUnitManager;
         _platformCacheService = platformCacheService;
         _tenantManager = tenantManager;
         _tenantRepository = tenantRepository;
@@ -39,6 +65,7 @@ public class PlatformTenantService : ITransientDependency
 
     public async Task<List<PlatformTenantListItemDto>> GetListAsync()
     {
+        EnsureHostTenantManagement();
         var tenants = (await _tenantRepository.GetListAsync(includeDetails: true))
             .OrderBy(x => x.Name)
             .ToList();
@@ -100,6 +127,8 @@ public class PlatformTenantService : ITransientDependency
 
     public async Task CreateAsync(PlatformTenantSaveInput input)
     {
+        EnsureHostTenantManagement();
+        ValidateTenantCreateInput(input);
         var tenant = await _tenantManager.CreateAsync(input.Name.Trim());
         if (!string.IsNullOrWhiteSpace(input.DefaultConnectionString))
         {
@@ -108,21 +137,29 @@ public class PlatformTenantService : ITransientDependency
 
         await _tenantRepository.InsertAsync(tenant, autoSave: true);
 
-        if (input.AdminUserId.HasValue || !string.IsNullOrWhiteSpace(input.Remark))
+        var adminUserId = input.AdminUserId;
+        if (!adminUserId.HasValue)
         {
-            await SaveAuthorizationAsync(tenant.Id, new PlatformTenantAuthorizationSaveInput
-            {
-                AdminUserId = input.AdminUserId,
-                ApiBlacklist = [],
-                IsActive = true,
-                MenuIds = await ResolveDefaultMenuIdsAsync(),
-                Remark = input.Remark
-            });
+            adminUserId = await InitializeTenantAdminAsync(tenant, input);
         }
+        else
+        {
+            await EnsureAdminUserBelongsToTenantAsync(tenant.Id, adminUserId.Value);
+        }
+
+        await SaveAuthorizationAsync(tenant.Id, new PlatformTenantAuthorizationSaveInput
+        {
+            AdminUserId = adminUserId,
+            ApiBlacklist = [],
+            IsActive = true,
+            MenuIds = await ResolveDefaultMenuIdsAsync(),
+            Remark = input.Remark
+        });
     }
 
     public async Task UpdateAsync(Guid id, PlatformTenantSaveInput input)
     {
+        EnsureHostTenantManagement();
         var tenant = await _tenantRepository.GetAsync(id);
         await _tenantManager.ChangeNameAsync(tenant, input.Name.Trim());
         if (!string.IsNullOrWhiteSpace(input.DefaultConnectionString))
@@ -145,6 +182,7 @@ public class PlatformTenantService : ITransientDependency
 
     public async Task DeleteAsync(Guid id)
     {
+        EnsureHostTenantManagement();
         var tenant = await _tenantRepository.GetAsync(id);
         if (tenant.Name.Equals(PlatformSeedIds.DefaultTenantName, StringComparison.OrdinalIgnoreCase))
         {
@@ -162,6 +200,7 @@ public class PlatformTenantService : ITransientDependency
 
     public async Task<PlatformTenantAuthorizationDto> GetAuthorizationAsync(Guid tenantId)
     {
+        EnsureHostTenantManagement();
         await _tenantRepository.GetAsync(tenantId);
         var authorization = await _tenantAuthorizationRepository.FindAsync(x => x.TenantId == tenantId);
         var defaultMenuIds = await ResolveDefaultMenuIdsAsync();
@@ -181,7 +220,13 @@ public class PlatformTenantService : ITransientDependency
 
     public async Task SaveAuthorizationAsync(Guid tenantId, PlatformTenantAuthorizationSaveInput input)
     {
+        EnsureHostTenantManagement();
         await _tenantRepository.GetAsync(tenantId);
+        if (input.AdminUserId.HasValue)
+        {
+            await EnsureAdminUserBelongsToTenantAsync(tenantId, input.AdminUserId.Value);
+        }
+
         var authorization = await _tenantAuthorizationRepository.FindAsync(x => x.TenantId == tenantId);
         var normalizedMenuIds = PlatformSerializationHelper.SerializeGuids(input.MenuIds);
         var normalizedApiBlacklist = PlatformSerializationHelper.SerializeStrings(input.ApiBlacklist);
@@ -206,8 +251,21 @@ public class PlatformTenantService : ITransientDependency
         await _platformCacheService.InvalidateAsync("menu");
     }
 
+    private async Task EnsureAdminUserBelongsToTenantAsync(Guid tenantId, Guid adminUserId)
+    {
+        using (_currentTenant.Change(tenantId))
+        {
+            var adminUser = await _userRepository.FindAsync(adminUserId);
+            if (adminUser == null)
+            {
+                throw new InvalidOperationException("租户管理员必须是当前租户下的用户。");
+            }
+        }
+    }
+
     public async Task SetStatusAsync(Guid tenantId, bool isActive)
     {
+        EnsureHostTenantManagement();
         await _tenantRepository.GetAsync(tenantId);
         var authorization = await _tenantAuthorizationRepository.FindAsync(x => x.TenantId == tenantId);
         if (authorization == null)
@@ -238,8 +296,174 @@ public class PlatformTenantService : ITransientDependency
             .ToList();
     }
 
+    private async Task<Guid> InitializeTenantAdminAsync(Tenant tenant, PlatformTenantSaveInput input)
+    {
+        using (_currentTenant.Change(tenant.Id, tenant.Name))
+        {
+            var role = await _roleManager.FindByNameAsync(PlatformRoleNames.Admin);
+            if (role == null)
+            {
+                role = new IdentityRole(_guidGenerator.Create(), PlatformRoleNames.Admin, tenant.Id);
+                EnsureSucceeded(await _roleManager.CreateAsync(role));
+            }
+
+            await EnsureTenantAdminAuthorizationAsync(role);
+
+            var adminUserName = input.AdminUserName!.Trim();
+            var adminEmail = NormalizeAdminEmail(input.AdminEmail, tenant.Name, adminUserName);
+            var existingUser = await _userManager.FindByNameAsync(adminUserName);
+            if (existingUser != null)
+            {
+                if (!await _userManager.IsInRoleAsync(existingUser, PlatformRoleNames.Admin))
+                {
+                    EnsureSucceeded(await _userManager.AddToRoleAsync(existingUser, PlatformRoleNames.Admin));
+                }
+
+                var existingOrganizationUnitId = await EnsureTenantRootOrganizationAsync(tenant.Name);
+                await _userManager.AddToOrganizationUnitAsync(existingUser.Id, existingOrganizationUnitId);
+                return existingUser.Id;
+            }
+
+            var user = new IdentityUser(_guidGenerator.Create(), adminUserName, adminEmail, tenant.Id)
+            {
+                Name = "租户管理员",
+                Surname = string.Empty
+            };
+            user.AddRole(role.Id);
+            EnsureSucceeded(await _userManager.CreateAsync(user, input.AdminPassword!.Trim()));
+
+            var organizationUnitId = await EnsureTenantRootOrganizationAsync(tenant.Name);
+            await _userManager.AddToOrganizationUnitAsync(user.Id, organizationUnitId);
+            return user.Id;
+        }
+    }
+
+    private async Task<Guid> EnsureTenantRootOrganizationAsync(string tenantName)
+    {
+        var existing = await _organizationUnitRepository.FindAsync(x => x.ParentId == null && x.DisplayName == tenantName);
+        if (existing != null)
+        {
+            return existing.Id;
+        }
+
+        var organizationUnit = new OrganizationUnit(_guidGenerator.Create(), tenantName, null);
+        await _organizationUnitManager.CreateAsync(organizationUnit);
+        return organizationUnit.Id;
+    }
+
+    private async Task EnsureTenantAdminAuthorizationAsync(IdentityRole role)
+    {
+        var allMenus = await _menuRepository.GetListAsync();
+        var defaultAdminMenuIds = ResolveTenantAdminMenuIds(allMenus);
+        var existingRoleMenus = await _roleMenuRepository.GetListAsync();
+        var existingMenuIds = existingRoleMenus
+            .Where(x => x.RoleId == role.Id)
+            .Select(x => x.MenuId)
+            .ToHashSet();
+        var excludedRoleMenus = existingRoleMenus
+            .Where(x => x.RoleId == role.Id && IsTenantManagementMenu(x.MenuId))
+            .ToList();
+        if (excludedRoleMenus.Count > 0)
+        {
+            await _roleMenuRepository.DeleteManyAsync(excludedRoleMenus, autoSave: true);
+        }
+
+        var roleMenusToCreate = defaultAdminMenuIds
+            .Where(menuId => !existingMenuIds.Contains(menuId))
+            .Select(menuId => new AppRoleMenu(_guidGenerator.Create(), role.Id, menuId))
+            .ToList();
+        if (roleMenusToCreate.Count > 0)
+        {
+            await _roleMenuRepository.InsertManyAsync(roleMenusToCreate, autoSave: true);
+        }
+
+        var grantedMenuIdSet = defaultAdminMenuIds.ToHashSet();
+        var managedPermissionCodes = AdminPermissions.All.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var permissionCodes = allMenus
+            .Where(x => grantedMenuIdSet.Contains(x.Id) && x.IsEnabled && !string.IsNullOrWhiteSpace(x.PermissionCode))
+            .Select(x => x.PermissionCode!.Trim())
+            .Where(x => managedPermissionCodes.Contains(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var permissionCode in permissionCodes)
+        {
+            await _permissionManager.SetAsync(
+                permissionCode,
+                RolePermissionValueProvider.ProviderName,
+                role.Name,
+                true);
+        }
+
+        await _permissionManager.SetAsync(
+            AdminPermissions.Platform.TenantManage,
+            RolePermissionValueProvider.ProviderName,
+            role.Name,
+            false);
+    }
+
+    private static List<Guid> ResolveTenantAdminMenuIds(IReadOnlyCollection<AppMenu> allMenus)
+    {
+        return allMenus
+            .Where(x => x.IsEnabled && !IsTenantManagementMenu(x.Id))
+            .Select(x => x.Id)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+    }
+
+    private static bool IsTenantManagementMenu(Guid menuId)
+    {
+        return menuId == PlatformSeedIds.PlatformTenants ||
+               menuId == PlatformSeedIds.PlatformTenantsManage;
+    }
+
+    private static void ValidateTenantCreateInput(PlatformTenantSaveInput input)
+    {
+        if (input.AdminUserId.HasValue)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(input.AdminUserName))
+        {
+            throw new InvalidOperationException("创建租户时必须填写租户管理员账号。");
+        }
+
+        if (string.IsNullOrWhiteSpace(input.AdminPassword))
+        {
+            throw new InvalidOperationException("创建租户时必须填写租户管理员初始密码。");
+        }
+    }
+
+    private static string NormalizeAdminEmail(string? email, string tenantName, string userName)
+    {
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            return email.Trim();
+        }
+
+        var normalizedTenantName = Regex.Replace(tenantName.Trim().ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+        if (string.IsNullOrWhiteSpace(normalizedTenantName))
+        {
+            normalizedTenantName = "tenant";
+        }
+
+        return $"{userName}@{normalizedTenantName}.local";
+    }
+
+    private static void EnsureSucceeded(Microsoft.AspNetCore.Identity.IdentityResult result)
+    {
+        if (result.Succeeded)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(string.Join("; ", result.Errors.Select(x => x.Description)));
+    }
+
     public async Task<List<PlatformTenantUserDto>> GetUsersAsync(Guid tenantId)
     {
+        EnsureHostTenantManagement();
         await _tenantRepository.GetAsync(tenantId);
 
         using (_currentTenant.Change(tenantId))
@@ -257,6 +481,14 @@ public class PlatformTenantService : ITransientDependency
                     Username = x.UserName ?? string.Empty
                 })
                 .ToList();
+        }
+    }
+
+    private void EnsureHostTenantManagement()
+    {
+        if (_currentTenant.Id.HasValue)
+        {
+            throw new AbpAuthorizationException("租户管理只能在宿主上下文执行。");
         }
     }
 

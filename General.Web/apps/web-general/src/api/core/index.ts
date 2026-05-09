@@ -1,6 +1,7 @@
 export * from './audit-log';
 export * from './business';
 export * from './auth';
+export * from './cache';
 export * from './config';
 export * from './dict';
 export * from './file';

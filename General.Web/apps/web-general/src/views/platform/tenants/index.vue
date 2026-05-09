@@ -2,6 +2,7 @@
 import type { PlatformEndpointApi, TenantApi } from '#/api/core';
 
 import { computed, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 
@@ -36,19 +37,19 @@ import {
   saveTenantAuthorizationApi,
   setTenantStatusApi,
   updateTenantApi,
-  getUserListApi,
   type MenuApi as MenuApiNamespace,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import {
+  collectPlatformLeafKeys,
+  normalizePlatformTree,
+  type PlatformTreeNode,
+} from '#/composables/platform/use-tree-normalization';
+import { useAuthStore } from '#/store';
 
 defineOptions({ name: 'PlatformTenantPage' });
 
 type DrawerType = 'api' | 'edit' | 'menu' | 'users';
-
-interface UiTreeNode {
-  children?: UiTreeNode[];
-  key: string;
-  title: string;
-}
 
 const columns = [
   { dataIndex: 'name', key: 'name', title: '租户名称', width: 180 },
@@ -69,10 +70,13 @@ const drawerVisible = ref(false);
 const drawerLoading = ref(false);
 const drawerType = ref<DrawerType>('menu');
 const activeTenant = ref<null | TenantApi.TenantItem>(null);
-const treeData = ref<UiTreeNode[]>([]);
+const treeData = ref<PlatformTreeNode[]>([]);
 const endpointGroups = ref<PlatformEndpointApi.EndpointGroup[]>([]);
 const userOptions = ref<Array<{ label: string; value: string }>>([]);
 const tenantUsers = ref<TenantApi.TenantUserItem[]>([]);
+const { actionLoadingKey, runAction } = useActionLoading();
+const authStore = useAuthStore();
+const router = useRouter();
 
 const tenantUserColumns = [
   { dataIndex: 'username', key: 'username', title: '账号', width: 160 },
@@ -82,7 +86,10 @@ const tenantUserColumns = [
 ];
 
 const formState = reactive({
+  adminEmail: '',
+  adminPassword: '',
   adminUserId: undefined as string | undefined,
+  adminUserName: '',
   defaultConnectionString: '',
   name: '',
   remark: '',
@@ -105,57 +112,30 @@ const metrics = computed(() => [
   },
 ]);
 
-function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): UiTreeNode[] {
-  return items.map((item) => ({
-    children: normalizeMenuTree(item.children || []),
-    key: item.id,
-    title: `[${item.appCode}] ${item.title}`,
-  }));
-}
-
-function collectLeafKeys(nodes: UiTreeNode[]): Set<string> {
-  const keys = new Set<string>();
-  for (const node of nodes) {
-    if (node.children && node.children.length > 0) {
-      for (const key of collectLeafKeys(node.children)) {
-        keys.add(key);
-      }
-    } else {
-      keys.add(node.key);
-    }
-  }
-  return keys;
+function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTree(items, (item) => `[${item.appCode}] ${item.title}`);
 }
 
 function filterLeafMenuIds(menuIds: string[]) {
-  const leafKeys = collectLeafKeys(treeData.value);
+  const leafKeys = collectPlatformLeafKeys(treeData.value);
   return menuIds.filter((id) => leafKeys.has(id));
 }
 
 async function loadTenants() {
   loading.value = true;
   try {
-    const [tenantResult, menuResult, userResult, endpointResult] = await Promise.allSettled([
+    const [tenantResult, menuResult, endpointResult] = await Promise.allSettled([
       getTenantListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
-      getUserListApi(),
       getPlatformEndpointOptionsApi(),
     ]);
     items.value = tenantResult.status === 'fulfilled' ? tenantResult.value : [];
     treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
     endpointGroups.value = endpointResult.status === 'fulfilled' ? endpointResult.value : [];
-    userOptions.value =
-      userResult.status === 'fulfilled'
-        ? userResult.value.map((item) => ({
-            label: `${item.username} · ${item.displayName}`,
-            value: item.id,
-          }))
-        : [];
 
     if (
       tenantResult.status === 'rejected' ||
       menuResult.status === 'rejected' ||
-      userResult.status === 'rejected' ||
       endpointResult.status === 'rejected'
     ) {
       message.warning('租户页面部分数据加载失败，已展示可用内容。');
@@ -166,7 +146,10 @@ async function loadTenants() {
 }
 
 function openCreate() {
+  formState.adminEmail = '';
+  formState.adminPassword = '';
   formState.adminUserId = undefined;
+  formState.adminUserName = '';
   formState.name = '';
   formState.defaultConnectionString = '';
   formState.remark = '';
@@ -174,7 +157,10 @@ function openCreate() {
 }
 
 function fillEditForm(tenant: TenantApi.TenantItem) {
+  formState.adminEmail = '';
+  formState.adminPassword = '';
   formState.adminUserId = tenant.adminUserId || undefined;
+  formState.adminUserName = '';
   formState.name = tenant.name;
   formState.defaultConnectionString = '';
   formState.remark = tenant.remark || '';
@@ -185,11 +171,22 @@ async function handleSubmit() {
     message.warning('请输入租户名称');
     return;
   }
+  if (!formState.adminUserName.trim()) {
+    message.warning('请输入租户管理员账号');
+    return;
+  }
+  if (!formState.adminPassword.trim()) {
+    message.warning('请输入租户管理员初始密码');
+    return;
+  }
 
   saving.value = true;
   try {
     await createTenantApi({
-      adminUserId: formState.adminUserId || null,
+      adminEmail: formState.adminEmail.trim() || null,
+      adminPassword: formState.adminPassword.trim(),
+      adminUserId: null,
+      adminUserName: formState.adminUserName.trim(),
       defaultConnectionString: formState.defaultConnectionString || null,
       name: formState.name.trim(),
       remark: formState.remark || null,
@@ -203,15 +200,27 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id: string) {
-  await deleteTenantApi(id);
-  message.success('租户已删除');
-  await loadTenants();
+  await runAction(`delete:${id}`, async () => {
+    await deleteTenantApi(id);
+    message.success('租户已删除');
+    await loadTenants();
+  });
 }
 
 async function handleToggleStatus(record: TenantApi.TenantItem) {
-  await setTenantStatusApi(record.id, !record.isActive);
-  message.success(`租户已${record.isActive ? '停用' : '启用'}`);
-  await loadTenants();
+  await runAction(`toggle:${record.id}`, async () => {
+    await setTenantStatusApi(record.id, !record.isActive);
+    message.success(`租户已${record.isActive ? '停用' : '启用'}`);
+    await loadTenants();
+  });
+}
+
+async function handleEnterTenant(record: TenantApi.TenantItem) {
+  await runAction(`enter:${record.id}`, async () => {
+    await authStore.enterTenantOperation(record.id);
+    message.success(`已进入租户【${record.name}】运维模式`);
+    await router.replace('/platform/organization');
+  });
 }
 
 async function openDrawer(type: DrawerType, tenant: TenantApi.TenantItem) {
@@ -222,9 +231,19 @@ async function openDrawer(type: DrawerType, tenant: TenantApi.TenantItem) {
   try {
     if (type === 'edit') {
       fillEditForm(tenant);
+      tenantUsers.value = await getTenantUsersApi(tenant.id);
+      userOptions.value = tenantUsers.value.map((item) => ({
+        label: `${item.username} · ${item.displayName}`,
+        value: item.id,
+      }));
     } else if (type === 'users') {
       tenantUsers.value = await getTenantUsersApi(tenant.id);
     } else {
+      tenantUsers.value = await getTenantUsersApi(tenant.id);
+      userOptions.value = tenantUsers.value.map((item) => ({
+        label: `${item.username} · ${item.displayName}`,
+        value: item.id,
+      }));
       const authorization = await getTenantAuthorizationApi(tenant.id);
       authorizationState.adminUserId = authorization.adminUserId || undefined;
       authorizationState.apiBlacklist = [...authorization.apiBlacklist];
@@ -250,7 +269,10 @@ async function saveDrawer() {
         return;
       }
       await updateTenantApi(activeTenant.value.id, {
+        adminEmail: null,
+        adminPassword: null,
         adminUserId: formState.adminUserId || null,
+        adminUserName: null,
         defaultConnectionString: formState.defaultConnectionString.trim() || null,
         name: formState.name.trim(),
         remark: formState.remark || null,
@@ -339,15 +361,32 @@ loadTenants();
                     :title="`确认${record.isActive ? '停用' : '启用'}租户【${record.name}】？`"
                     @confirm="handleToggleStatus(record as TenantApi.TenantItem)"
                   >
-                    <Button size="small">
+                    <Button
+                      :loading="actionLoadingKey === `toggle:${(record as TenantApi.TenantItem).id}`"
+                      size="small"
+                    >
                       {{ record.isActive ? '停用' : '启用' }}
                     </Button>
                   </Popconfirm>
                   <Button size="small" @click="openDrawer('edit', record as TenantApi.TenantItem)">编辑信息</Button>
+                  <Button
+                    :loading="actionLoadingKey === `enter:${(record as TenantApi.TenantItem).id}`"
+                    size="small"
+                    type="primary"
+                    @click="handleEnterTenant(record as TenantApi.TenantItem)"
+                  >
+                    进入
+                  </Button>
                   <Button size="small" @click="openDrawer('users', record as TenantApi.TenantItem)">查看账号</Button>
                   <Button size="small" @click="openDrawer('menu', record as TenantApi.TenantItem)">菜单授权</Button>
                   <Button size="small" @click="openDrawer('api', record as TenantApi.TenantItem)">接口黑名单</Button>
-                  <Button danger size="small" type="link" @click="handleDelete((record as TenantApi.TenantItem).id)">
+                  <Button
+                    danger
+                    :loading="actionLoadingKey === `delete:${(record as TenantApi.TenantItem).id}`"
+                    size="small"
+                    type="link"
+                    @click="handleDelete((record as TenantApi.TenantItem).id)"
+                  >
                     删除
                   </Button>
                 </Space>
@@ -375,11 +414,24 @@ loadTenants();
             />
           </Form.Item>
           <Form.Item label="管理员账号">
-            <Select
-              v-model:value="formState.adminUserId"
-              allow-clear
-              placeholder="选择该租户管理员"
-              :options="userOptions"
+            <Input
+              v-model:value="formState.adminUserName"
+              :maxlength="64"
+              placeholder="英文账号，例如 tenant.admin"
+            />
+          </Form.Item>
+          <Form.Item label="管理员邮箱">
+            <Input
+              v-model:value="formState.adminEmail"
+              :maxlength="256"
+              placeholder="可选，留空自动生成"
+            />
+          </Form.Item>
+          <Form.Item label="初始密码" required>
+            <Input.Password
+              v-model:value="formState.adminPassword"
+              :maxlength="128"
+              placeholder="请输入租户管理员初始密码"
             />
           </Form.Item>
           <Form.Item label="备注">

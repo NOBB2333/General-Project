@@ -2,16 +2,28 @@ import { requestClient } from '#/api/request';
 
 export namespace RecycleBinApi {
   export interface RecycleBinItem {
+    deleterId?: null | string;
+    deleterName?: null | string;
     deletionTime?: string;
     displayName: string;
     entityType: string;
     id: string;
+    originalLocation: string;
+  }
+
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
   }
 }
 
-export async function getRecycleBinItemsApi(entityType?: string) {
-  return requestClient.get<RecycleBinApi.RecycleBinItem[]>('/app/platform/recycle-bin/items', {
-    params: { entityType },
+export async function getRecycleBinItemsApi(params?: {
+  entityType?: string;
+  maxResultCount?: number;
+  skipCount?: number;
+}) {
+  return requestClient.get<RecycleBinApi.PagedResult<RecycleBinApi.RecycleBinItem>>('/app/platform/recycle-bin/items', {
+    params,
   });
 }
 

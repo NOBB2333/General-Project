@@ -1,7 +1,9 @@
+using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
 using Volo.Abp.Linq;
+using Volo.Abp.MultiTenancy;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.Users;
 using System.Net.Mail;
@@ -20,22 +22,27 @@ public class PlatformUserService : ITransientDependency
     private readonly IRepository<AppExternalAccountMapping, Guid> _externalAccountMappingRepository;
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
+    private readonly ICurrentTenant _currentTenant;
     private readonly ICurrentUser _currentUser;
     private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly CurrentUserDataScopeService _dataScopeService;
+    private readonly IPlatformIdentityLookupService _identityLookupService;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
     private readonly IRepository<IdentityUser, Guid> _userRepository;
     private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
     private readonly IdentityUserManager _userManager;
-    private readonly ITenantRepository _tenantRepository;
+    private readonly IDataFilter<IMultiTenant> _multiTenantFilter;
+    private readonly IRepository<Tenant, Guid> _tenantRepository;
     private readonly PlatformCacheService _platformCacheService;
     private readonly ILogger<PlatformUserService> _logger;
 
     public PlatformUserService(
         ICurrentUser currentUser,
+        ICurrentTenant currentTenant,
         IAsyncQueryableExecuter asyncQueryableExecuter,
         CurrentUserDataScopeService dataScopeService,
+        IPlatformIdentityLookupService identityLookupService,
         IRepository<AppExternalAccountMapping, Guid> externalAccountMappingRepository,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppUserProfile, Guid> userProfileRepository,
@@ -44,13 +51,16 @@ public class PlatformUserService : ITransientDependency
         IRepository<IdentityUser, Guid> userRepository,
         IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository,
         IdentityUserManager userManager,
-        ITenantRepository tenantRepository,
+        IDataFilter<IMultiTenant> multiTenantFilter,
+        IRepository<Tenant, Guid> tenantRepository,
         PlatformCacheService platformCacheService,
         ILogger<PlatformUserService> logger)
     {
         _currentUser = currentUser;
+        _currentTenant = currentTenant;
         _asyncQueryableExecuter = asyncQueryableExecuter;
         _dataScopeService = dataScopeService;
+        _identityLookupService = identityLookupService;
         _externalAccountMappingRepository = externalAccountMappingRepository;
         _roleAuthorizationRepository = roleAuthorizationRepository;
         _organizationUnitRepository = organizationUnitRepository;
@@ -59,6 +69,7 @@ public class PlatformUserService : ITransientDependency
         _userRepository = userRepository;
         _userOrganizationUnitRepository = userOrganizationUnitRepository;
         _userManager = userManager;
+        _multiTenantFilter = multiTenantFilter;
         _tenantRepository = tenantRepository;
         _platformCacheService = platformCacheService;
         _logger = logger;
@@ -71,28 +82,41 @@ public class PlatformUserService : ITransientDependency
             throw new InvalidOperationException("Current user is not available.");
         }
 
-        var user = await _userManager.GetByIdAsync(_currentUser.Id.Value);
-        var roles = (await _userManager.GetRolesAsync(user))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x)
-            .ToList();
-        var organizationUnitIds = (await _userOrganizationUnitRepository.GetListAsync())
-            .Where(x => x.UserId == user.Id)
-            .Select(x => x.OrganizationUnitId)
-            .ToHashSet();
-        var organizationUnitNames = (await _organizationUnitRepository.GetListAsync())
-            .Where(x => organizationUnitIds.Contains(x.Id))
-            .Select(x => x.DisplayName)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToList();
+        var isHostTenantOperation = IsHostTenantOperation();
+        var user = await GetCurrentIdentityUserAsync(isHostTenantOperation);
+        var roles = isHostTenantOperation
+            ? (_currentUser.Roles ?? [])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList()
+            : (await _userManager.GetRolesAsync(user))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToList();
+        var userOrganizationUnitQueryable = await _userOrganizationUnitRepository.GetQueryableAsync();
+        var organizationUnitIds = await _asyncQueryableExecuter.ToListAsync(
+            userOrganizationUnitQueryable
+                .Where(x => x.UserId == user.Id)
+                .Select(x => x.OrganizationUnitId));
+        var organizationUnitQueryable = await _organizationUnitRepository.GetQueryableAsync();
+        var organizationUnitNames = await _asyncQueryableExecuter.ToListAsync(
+            organizationUnitQueryable
+                .Where(x => organizationUnitIds.Contains(x.Id))
+                .Select(x => x.DisplayName)
+                .Distinct()
+                .OrderBy(x => x));
         var profile = await _userProfileRepository.FindAsync(x => x.UserId == user.Id);
 
         return new CurrentUserInfoDto
         {
             Desc = BuildUserDescription(roles),
             HomePath = ResolveHomePath(roles),
+            IsHostTenantOperation = isHostTenantOperation,
             LastLoginTime = profile?.LastLoginTime,
+            OperationTenantId = isHostTenantOperation ? _currentTenant.Id : null,
+            OperationTenantName = isHostTenantOperation
+                ? GetClaimValue(PlatformTenantOperationClaimTypes.OperationTenantName)
+                : null,
             OrganizationUnitNames = organizationUnitNames,
             RealName = string.IsNullOrWhiteSpace($"{user.Name}{user.Surname}".Trim())
                 ? user.UserName ?? string.Empty
@@ -103,11 +127,39 @@ public class PlatformUserService : ITransientDependency
         };
     }
 
-    public async Task<List<PlatformUserListItemDto>> GetListAsync(PlatformUserListInput input)
+    private async Task<IdentityUser> GetCurrentIdentityUserAsync(bool disableTenantFilter)
+    {
+        if (!disableTenantFilter)
+        {
+            return await _userManager.GetByIdAsync(_currentUser.Id!.Value);
+        }
+
+        using (_multiTenantFilter.Disable())
+        {
+            return await _userManager.GetByIdAsync(_currentUser.Id!.Value);
+        }
+    }
+
+    private string? GetClaimValue(string claimType)
+    {
+        return _currentUser.FindClaim(claimType)?.Value;
+    }
+
+    private bool IsHostTenantOperation()
+    {
+        return string.Equals(
+            GetClaimValue(PlatformTenantOperationClaimTypes.HostTenantOperation),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<PlatformPagedResultDto<PlatformUserListItemDto>> GetListAsync(PlatformUserListInput input)
     {
         try
         {
             var keyword = input.Keyword?.Trim();
+            var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 100);
+            var skipCount = Math.Max(0, input.SkipCount);
             var organizationUnits = (await _organizationUnitRepository.GetListAsync())
                 .OrderBy(x => x.Code)
                 .ToList();
@@ -125,7 +177,17 @@ public class PlatformUserService : ITransientDependency
             var visibleUserIds = await ResolveVisibleUserIdsAsync(dataScopedUserIds);
             if (visibleUserIds.Count == 0)
             {
-                return [];
+                return new PlatformPagedResultDto<PlatformUserListItemDto>();
+            }
+
+            if (!string.IsNullOrWhiteSpace(input.RoleName))
+            {
+                var roleUserIds = await _identityLookupService.GetUserIdsByRoleNameAsync(input.RoleName);
+                visibleUserIds.IntersectWith(roleUserIds);
+                if (visibleUserIds.Count == 0)
+                {
+                    return new PlatformPagedResultDto<PlatformUserListItemDto>();
+                }
             }
 
             var usersQueryable = await _userRepository.GetQueryableAsync();
@@ -144,10 +206,18 @@ public class PlatformUserService : ITransientDependency
                 usersQueryable = usersQueryable.Where(x => x.IsActive == input.IsActive.Value);
             }
 
-            var users = await _asyncQueryableExecuter.ToListAsync(usersQueryable.OrderBy(x => x.UserName));
+            var totalCount = await _asyncQueryableExecuter.CountAsync(usersQueryable);
+            var users = await _asyncQueryableExecuter.ToListAsync(
+                usersQueryable
+                    .OrderBy(x => x.UserName)
+                    .Skip(skipCount)
+                    .Take(maxResultCount));
             if (users.Count == 0)
             {
-                return [];
+                return new PlatformPagedResultDto<PlatformUserListItemDto>
+                {
+                    TotalCount = totalCount
+                };
             }
 
             var userIds = users.Select(x => x.Id).ToList();
@@ -192,23 +262,19 @@ public class PlatformUserService : ITransientDependency
                         .OrderBy(name => name)
                         .ToList());
 
-            var userRoleMap = await BuildUserRoleMapAsync(users);
+            var userRoleMap = await _identityLookupService.GetRoleNamesByUserIdsAsync(userIds);
 
             var distinctTenantIds = users.Select(x => x.TenantId).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList();
             var tenants = distinctTenantIds.Count > 0
-                ? (await _tenantRepository.GetListAsync()).Where(t => distinctTenantIds.Contains(t.Id)).ToDictionary(t => t.Id, t => t.Name)
+                ? (await _asyncQueryableExecuter.ToListAsync(
+                        (await _tenantRepository.GetQueryableAsync()).Where(t => distinctTenantIds.Contains(t.Id))))
+                    .ToDictionary(t => t.Id, t => t.Name)
                 : [];
 
             var result = new List<PlatformUserListItemDto>();
             foreach (var user in users)
             {
                 var roles = userRoleMap.GetValueOrDefault(user.Id) ?? [];
-
-                if (!string.IsNullOrWhiteSpace(input.RoleName) &&
-                    !roles.Contains(input.RoleName, StringComparer.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
 
                 result.Add(new PlatformUserListItemDto
                 {
@@ -227,12 +293,18 @@ public class PlatformUserService : ITransientDependency
                     OrganizationUnitNames = userOrganizationMap.GetValueOrDefault(user.Id) ?? [],
                     PhoneNumber = profiles.GetValueOrDefault(user.Id)?.PhoneNumber,
                     Roles = roles,
-                    TenantName = user.TenantId.HasValue && tenants.TryGetValue(user.TenantId.Value, out var tenantName) ? tenantName : null,
+                    TenantName = user.TenantId.HasValue
+                        ? tenants.GetValueOrDefault(user.TenantId.Value) ?? "未知租户"
+                        : "宿主",
                     Username = user.UserName ?? string.Empty
                 });
             }
 
-            return result;
+            return new PlatformPagedResultDto<PlatformUserListItemDto>
+            {
+                Items = result,
+                TotalCount = totalCount
+            };
         }
         catch (Exception ex)
         {
@@ -247,22 +319,6 @@ public class PlatformUserService : ITransientDependency
                 input.RoleName);
             throw;
         }
-    }
-
-    private async Task<Dictionary<Guid, List<string>>> BuildUserRoleMapAsync(List<IdentityUser> users)
-    {
-        var rolePairs = new List<KeyValuePair<Guid, List<string>>>(users.Count);
-        foreach (var user in users)
-        {
-            var roleNames = (await _userManager.GetRolesAsync(user))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(name => name)
-                .ToList();
-
-            rolePairs.Add(new KeyValuePair<Guid, List<string>>(user.Id, roleNames));
-        }
-
-        return rolePairs.ToDictionary(x => x.Key, x => x.Value);
     }
 
     private async Task<HashSet<Guid>> ResolveVisibleUserIdsAsync(HashSet<Guid> dataScopedUserIds)
@@ -283,9 +339,15 @@ public class PlatformUserService : ITransientDependency
             return new HashSet<Guid> { _currentUser.Id.Value };
         }
 
-        var roleIds = (await _roleRepository.GetListAsync())
-            .Where(x => currentRoleNames.Contains(x.Name, StringComparer.OrdinalIgnoreCase))
-            .Select(x => x.Id)
+        var normalizedRoleNames = currentRoleNames
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var roleQueryable = await _roleRepository.GetQueryableAsync();
+        var roleIds = (await _asyncQueryableExecuter.ToListAsync(
+                roleQueryable
+                    .Where(x => x.NormalizedName != null && normalizedRoleNames.Contains(x.NormalizedName))
+                    .Select(x => x.Id)))
             .ToHashSet();
 
         if (roleIds.Count == 0)
@@ -293,9 +355,9 @@ public class PlatformUserService : ITransientDependency
             return new HashSet<Guid> { _currentUser.Id.Value };
         }
 
-        var authorizations = (await _roleAuthorizationRepository.GetListAsync())
-            .Where(x => roleIds.Contains(x.RoleId))
-            .ToList();
+        var authorizationQueryable = await _roleAuthorizationRepository.GetQueryableAsync();
+        var authorizations = await _asyncQueryableExecuter.ToListAsync(
+            authorizationQueryable.Where(x => roleIds.Contains(x.RoleId)));
 
         if (authorizations.Count == 0)
         {
@@ -306,8 +368,8 @@ public class PlatformUserService : ITransientDependency
 
         if (authorizations.Any(x => x.AccountScopeMode == PlatformAuthorizationDefaults.AccountScopeAll))
         {
-            return (await _userRepository.GetListAsync())
-                .Select(x => x.Id)
+            var userQueryable = await _userRepository.GetQueryableAsync();
+            return (await _asyncQueryableExecuter.ToListAsync(userQueryable.Select(x => x.Id)))
                 .ToHashSet();
         }
 
@@ -343,7 +405,7 @@ public class PlatformUserService : ITransientDependency
 
         await EnsureOrganizationUnitAccessibleAsync(input.OrganizationUnitId);
 
-        var user = new IdentityUser(Guid.NewGuid(), input.Username.Trim(), input.Email.Trim())
+        var user = new IdentityUser(Guid.NewGuid(), input.Username.Trim(), input.Email.Trim(), _currentTenant.Id)
         {
             Name = input.DisplayName.Trim(),
             Surname = string.Empty
@@ -389,9 +451,9 @@ public class PlatformUserService : ITransientDependency
         }
 
         var user = await _userManager.GetByIdAsync(id);
-        var userOrganizationUnits = (await _userOrganizationUnitRepository.GetListAsync())
-            .Where(x => x.UserId == id)
-            .ToList();
+        var userOrganizationUnitQueryable = await _userOrganizationUnitRepository.GetQueryableAsync();
+        var userOrganizationUnits = await _asyncQueryableExecuter.ToListAsync(
+            userOrganizationUnitQueryable.Where(x => x.UserId == id));
         if (userOrganizationUnits.Count > 0)
         {
             await _userOrganizationUnitRepository.DeleteManyAsync(userOrganizationUnits, autoSave: true);
@@ -403,9 +465,9 @@ public class PlatformUserService : ITransientDependency
             await _userProfileRepository.DeleteAsync(profile, autoSave: true);
         }
 
-        var mappings = (await _externalAccountMappingRepository.GetListAsync())
-            .Where(x => x.UserId == id)
-            .ToList();
+        var mappingQueryable = await _externalAccountMappingRepository.GetQueryableAsync();
+        var mappings = await _asyncQueryableExecuter.ToListAsync(
+            mappingQueryable.Where(x => x.UserId == id));
         if (mappings.Count > 0)
         {
             await _externalAccountMappingRepository.DeleteManyAsync(mappings, autoSave: true);
@@ -559,15 +621,20 @@ public class PlatformUserService : ITransientDependency
 
     private async Task<string> GenerateNextEmployeeNoAsync()
     {
+        var profileQueryable = await _userProfileRepository.GetQueryableAsync();
+        var employeeNos = await _asyncQueryableExecuter.ToListAsync(
+            profileQueryable
+                .Where(x => x.EmployeeNo != null && x.EmployeeNo != string.Empty)
+                .Select(x => x.EmployeeNo!));
         var maxNumber = 0;
-        foreach (var profile in await _userProfileRepository.GetListAsync())
+        foreach (var employeeNo in employeeNos)
         {
-            if (string.IsNullOrWhiteSpace(profile.EmployeeNo))
+            if (string.IsNullOrWhiteSpace(employeeNo))
             {
                 continue;
             }
 
-            var match = EmployeeNoRegex.Match(profile.EmployeeNo.Trim());
+            var match = EmployeeNoRegex.Match(employeeNo.Trim());
             if (match.Success && int.TryParse(match.Groups["number"].Value, out var number))
             {
                 maxNumber = Math.Max(maxNumber, number);
@@ -579,10 +646,13 @@ public class PlatformUserService : ITransientDependency
 
     private async Task EnsureEmployeeNoUniqueAsync(string employeeNo, Guid? currentUserId)
     {
-        var duplicated = (await _userProfileRepository.GetListAsync())
-            .Any(x =>
-                string.Equals(x.EmployeeNo, employeeNo, StringComparison.OrdinalIgnoreCase) &&
-                (!currentUserId.HasValue || x.UserId != currentUserId.Value));
+        var normalizedEmployeeNo = employeeNo.Trim();
+        var profileQueryable = await _userProfileRepository.GetQueryableAsync();
+        var duplicated = await _asyncQueryableExecuter.AnyAsync(
+            profileQueryable.Where(x =>
+                x.EmployeeNo != null &&
+                x.EmployeeNo.ToUpper() == normalizedEmployeeNo.ToUpper() &&
+                (!currentUserId.HasValue || x.UserId != currentUserId.Value)));
         if (duplicated)
         {
             throw new InvalidOperationException($"工号 {employeeNo} 已存在，请更换后重试。");
@@ -591,11 +661,12 @@ public class PlatformUserService : ITransientDependency
 
     private async Task SyncUserOrganizationUnitsAsync(Guid userId, Guid? organizationUnitId)
     {
-        var existingOrganizationUnits = (await _userOrganizationUnitRepository.GetListAsync())
-            .Where(x => x.UserId == userId)
-            .Select(x => x.OrganizationUnitId)
-            .Distinct()
-            .ToList();
+        var userOrganizationUnitQueryable = await _userOrganizationUnitRepository.GetQueryableAsync();
+        var existingOrganizationUnits = await _asyncQueryableExecuter.ToListAsync(
+            userOrganizationUnitQueryable
+                .Where(x => x.UserId == userId)
+                .Select(x => x.OrganizationUnitId)
+                .Distinct());
 
         foreach (var existingOrganizationUnitId in existingOrganizationUnits)
         {
@@ -613,9 +684,17 @@ public class PlatformUserService : ITransientDependency
     private async Task SyncUserRolesAsync(IdentityUser user, IReadOnlyCollection<string> roleNames)
     {
         var requestedRoles = NormalizeRoleNames(roleNames);
-        var existingRoles = (await _roleRepository.GetListAsync())
-            .Where(x => requestedRoles.Contains(x.Name, StringComparer.OrdinalIgnoreCase))
-            .Select(x => x.Name)
+        var normalizedRequestedRoles = requestedRoles
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var roleQueryable = await _roleRepository.GetQueryableAsync();
+        var existingRoles = (await _asyncQueryableExecuter.ToListAsync(
+                roleQueryable
+                    .Where(x => x.NormalizedName != null && normalizedRequestedRoles.Contains(x.NormalizedName))
+                    .Select(x => x.Name)))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

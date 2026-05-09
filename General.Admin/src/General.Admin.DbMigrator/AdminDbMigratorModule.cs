@@ -1,4 +1,4 @@
-﻿using General.Admin.EntityFrameworkCore;
+using General.Admin.EntityFrameworkCore;
 using Volo.Abp.Autofac;
 using Volo.Abp.Modularity;
 

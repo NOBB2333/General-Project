@@ -35,7 +35,7 @@ public class MinioPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
 
         var originalName = Path.GetFileName(fileName);
         var fileKey = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{Path.GetExtension(originalName)}";
-        var objectName = CloudPlatformFileStoragePathHelper.BuildObjectName(options.PathTemplate, fileKey, DateTime.Now);
+        var objectName = CloudPlatformFileStoragePathHelper.BuildObjectName(options.PathTemplate, fileKey, DateTime.UtcNow);
         var uploadStream = await CloudPlatformFileStoragePathHelper.EnsureSeekableAsync(stream, cancellationToken);
 
         await client.PutObjectAsync(

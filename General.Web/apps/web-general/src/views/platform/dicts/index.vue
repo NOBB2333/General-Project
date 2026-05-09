@@ -31,6 +31,7 @@ import {
   updateDictDataApi,
   updateDictTypeApi,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
 
 defineOptions({ name: 'PlatformDictsPage' });
 
@@ -61,6 +62,7 @@ const typeModalVisible = ref(false);
 const dataModalVisible = ref(false);
 const editingTypeId = ref<null | string>(null);
 const editingDataId = ref<null | string>(null);
+const { actionLoadingKey, runAction } = useActionLoading();
 
 const selectedType = computed(() => types.value.find((item) => item.id === selectedTypeId.value) || null);
 
@@ -226,18 +228,22 @@ async function saveData() {
 }
 
 async function handleDeleteType(item: DictApi.DictTypeItem) {
-  await deleteDictTypeApi(item.id);
-  message.success('字典类型已删除');
-  if (selectedTypeId.value === item.id) {
-    selectedTypeId.value = '';
-  }
-  await reloadAll();
+  await runAction(`delete-type:${item.id}`, async () => {
+    await deleteDictTypeApi(item.id);
+    message.success('字典类型已删除');
+    if (selectedTypeId.value === item.id) {
+      selectedTypeId.value = '';
+    }
+    await reloadAll();
+  });
 }
 
 async function handleDeleteData(id: string) {
-  await deleteDictDataApi(id);
-  message.success('字典项已删除');
-  await loadData();
+  await runAction(`delete-data:${id}`, async () => {
+    await deleteDictDataApi(id);
+    message.success('字典项已删除');
+    await loadData();
+  });
 }
 
 onMounted(async () => {
@@ -272,7 +278,15 @@ onMounted(async () => {
                   编辑
                 </Button>
                 <Popconfirm title="删除类型会同时删除字典项，确认继续？" @confirm="handleDeleteType(record as DictApi.DictTypeItem)">
-                  <Button danger size="small" type="link" @click.stop>删除</Button>
+                  <Button
+                    danger
+                    :loading="actionLoadingKey === `delete-type:${(record as DictApi.DictTypeItem).id}`"
+                    size="small"
+                    type="link"
+                    @click.stop
+                  >
+                    删除
+                  </Button>
                 </Popconfirm>
               </Space>
             </template>
@@ -309,7 +323,14 @@ onMounted(async () => {
                   编辑
                 </Button>
                 <Popconfirm title="确认删除该字典项？" @confirm="handleDeleteData(record.id)">
-                  <Button danger size="small" type="link">删除</Button>
+                  <Button
+                    danger
+                    :loading="actionLoadingKey === `delete-data:${(record as DictApi.DictDataItem).id}`"
+                    size="small"
+                    type="link"
+                  >
+                    删除
+                  </Button>
                 </Popconfirm>
               </Space>
             </template>

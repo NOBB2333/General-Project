@@ -14,6 +14,7 @@ import {
   resetOpenApiApplicationSecretApi,
   updateOpenApiApplicationApi,
 } from '#/api/core';
+import { useActionLoading } from '#/composables/platform/use-action-loading';
 
 defineOptions({ name: 'PlatformOpenApiPage' });
 
@@ -32,6 +33,7 @@ const saving = ref(false);
 const modalVisible = ref(false);
 const editingId = ref<null | string>(null);
 const latestSecret = ref('');
+const { actionLoadingKey, runAction } = useActionLoading();
 const formState = reactive<OpenApiApplicationApi.ApplicationSaveInput>({
   isEnabled: true,
   name: '',
@@ -109,15 +111,19 @@ async function handleSubmit() {
 }
 
 async function handleResetSecret(id: string) {
-  const result = await resetOpenApiApplicationSecretApi(id);
-  latestSecret.value = result.appSecret;
-  message.success('密钥已重置，请立即记录新密钥');
+  await runAction(`reset-secret:${id}`, async () => {
+    const result = await resetOpenApiApplicationSecretApi(id);
+    latestSecret.value = result.appSecret;
+    message.success('密钥已重置，请立即记录新密钥');
+  });
 }
 
 async function handleDelete(id: string) {
-  await deleteOpenApiApplicationApi(id);
-  message.success('开放应用已删除');
-  await loadItems();
+  await runAction(`delete:${id}`, async () => {
+    await deleteOpenApiApplicationApi(id);
+    message.success('开放应用已删除');
+    await loadItems();
+  });
 }
 
 onMounted(loadItems);
@@ -154,10 +160,23 @@ onMounted(loadItems);
                 编辑
               </Button>
               <Popconfirm title="重置后旧密钥立即失效，确认继续？" @confirm="handleResetSecret(record.id)">
-                <Button size="small" type="link">重置密钥</Button>
+                <Button
+                  :loading="actionLoadingKey === `reset-secret:${(record as OpenApiApplicationApi.ApplicationItem).id}`"
+                  size="small"
+                  type="link"
+                >
+                  重置密钥
+                </Button>
               </Popconfirm>
               <Popconfirm title="确认删除该开放应用？" @confirm="handleDelete(record.id)">
-                <Button danger size="small" type="link">删除</Button>
+                <Button
+                  danger
+                  :loading="actionLoadingKey === `delete:${(record as OpenApiApplicationApi.ApplicationItem).id}`"
+                  size="small"
+                  type="link"
+                >
+                  删除
+                </Button>
               </Popconfirm>
             </Space>
           </template>

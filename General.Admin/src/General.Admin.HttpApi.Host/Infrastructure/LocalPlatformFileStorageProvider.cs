@@ -32,7 +32,7 @@ public class LocalPlatformFileStorageProvider : IPlatformFileStorageProvider, IS
     {
         var originalName = Path.GetFileName(fileName);
         var fileKey = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}{Path.GetExtension(originalName)}";
-        var storageDirectory = GetStorageDirectory(DateTime.Now, source);
+        var storageDirectory = GetStorageDirectory(DateTime.UtcNow, source);
         Directory.CreateDirectory(storageDirectory);
 
         var filePath = Path.Combine(storageDirectory, fileKey);

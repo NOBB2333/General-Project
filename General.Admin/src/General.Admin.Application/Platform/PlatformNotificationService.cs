@@ -1,5 +1,6 @@
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Identity;
 using Volo.Abp.Linq;
 using Volo.Abp.Users;
 
@@ -13,6 +14,7 @@ public class PlatformNotificationService : ITransientDependency
     private readonly IRepository<AppNotification, Guid> _notificationRepository;
     private readonly PlatformNotificationPublisher _publisher;
     private readonly IRepository<AppUserNotification, Guid> _userNotificationRepository;
+    private readonly IRepository<IdentityUser, Guid> _userRepository;
 
     public PlatformNotificationService(
         IAsyncQueryableExecuter asyncQueryableExecuter,
@@ -20,7 +22,8 @@ public class PlatformNotificationService : ITransientDependency
         ICurrentUser currentUser,
         IRepository<AppNotification, Guid> notificationRepository,
         PlatformNotificationPublisher publisher,
-        IRepository<AppUserNotification, Guid> userNotificationRepository)
+        IRepository<AppUserNotification, Guid> userNotificationRepository,
+        IRepository<IdentityUser, Guid> userRepository)
     {
         _asyncQueryableExecuter = asyncQueryableExecuter;
         _bulkOperator = bulkOperator;
@@ -28,6 +31,7 @@ public class PlatformNotificationService : ITransientDependency
         _notificationRepository = notificationRepository;
         _publisher = publisher;
         _userNotificationRepository = userNotificationRepository;
+        _userRepository = userRepository;
     }
 
     public async Task<List<PlatformNotificationDto>> GetListAsync(PlatformNotificationListInput input)
@@ -37,6 +41,7 @@ public class PlatformNotificationService : ITransientDependency
         var skipCount = Math.Max(0, input.SkipCount);
 
         var userNotificationQueryable = await _userNotificationRepository.GetQueryableAsync();
+        var notificationQueryable = await _notificationRepository.GetQueryableAsync();
         var query = userNotificationQueryable
             .Where(x => x.UserId == userId && !x.IsRemoved);
         if (input.OnlyUnread)
@@ -44,25 +49,39 @@ public class PlatformNotificationService : ITransientDependency
             query = query.Where(x => !x.IsRead);
         }
 
-        var userNotifications = await _asyncQueryableExecuter.ToListAsync(
-            query
-                .OrderByDescending(x => x.CreationTime)
+        var joinedQuery =
+            from userNotification in query
+            join notification in notificationQueryable
+                on userNotification.NotificationId equals notification.Id
+            orderby userNotification.CreationTime descending
+            select new
+            {
+                Notification = notification,
+                UserNotification = userNotification
+            };
+        var items = await _asyncQueryableExecuter.ToListAsync(
+            joinedQuery
                 .Skip(skipCount)
                 .Take(maxResultCount));
-        if (userNotifications.Count == 0)
+        if (items.Count == 0)
         {
             return [];
         }
 
-        var notificationIds = userNotifications.Select(x => x.NotificationId).Distinct().ToList();
-        var notificationQueryable = await _notificationRepository.GetQueryableAsync();
-        var notifications = (await _asyncQueryableExecuter.ToListAsync(
-                notificationQueryable.Where(x => notificationIds.Contains(x.Id))))
-            .ToDictionary(x => x.Id);
+        var senderIds = items
+            .Select(x => x.Notification)
+            .Where(x => x.SenderUserId.HasValue)
+            .Select(x => x.SenderUserId!.Value)
+            .Distinct()
+            .ToList();
+        var senderNames = senderIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : (await _asyncQueryableExecuter.ToListAsync(
+                    (await _userRepository.GetQueryableAsync()).Where(x => senderIds.Contains(x.Id))))
+                .ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.UserName) ? x.Name : x.UserName);
 
-        return userNotifications
-            .Where(x => notifications.ContainsKey(x.NotificationId))
-            .Select(x => MapToDto(notifications[x.NotificationId], x))
+        return items
+            .Select(x => MapToDto(x.Notification, x.UserNotification, senderNames))
             .ToList();
     }
 
@@ -122,13 +141,19 @@ public class PlatformNotificationService : ITransientDependency
         return _currentUser.Id ?? throw new InvalidOperationException("Current user is not available.");
     }
 
-    private static PlatformNotificationDto MapToDto(AppNotification notification, AppUserNotification userNotification)
+    private static PlatformNotificationDto MapToDto(
+        AppNotification notification,
+        AppUserNotification userNotification,
+        IReadOnlyDictionary<Guid, string> senderNames)
     {
+        var senderName = notification.SenderUserId.HasValue &&
+                         senderNames.TryGetValue(notification.SenderUserId.Value, out var resolvedSenderName)
+            ? resolvedSenderName
+            : null;
         return new PlatformNotificationDto
         {
-            Avatar = string.IsNullOrWhiteSpace(notification.Avatar)
-                ? $"https://avatar.vercel.sh/{notification.Type}.svg?text=GA"
-                : notification.Avatar,
+            Avatar = notification.Avatar,
+            AvatarText = ResolveAvatarText(senderName, notification.Title),
             CreationTime = notification.CreationTime,
             Date = notification.CreationTime.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
             Id = notification.Id,
@@ -139,5 +164,14 @@ public class PlatformNotificationService : ITransientDependency
             Title = notification.Title,
             Type = notification.Type
         };
+    }
+
+    private static string ResolveAvatarText(string? senderName, string title)
+    {
+        var source = string.IsNullOrWhiteSpace(senderName) ? title : senderName;
+        source = source.Trim();
+        return string.IsNullOrWhiteSpace(source)
+            ? "G"
+            : source[..1].ToUpperInvariant();
     }
 }

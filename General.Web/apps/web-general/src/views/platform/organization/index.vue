@@ -29,12 +29,12 @@ import {
   transferOrganizationMembersApi,
   updateOrganizationUnitApi,
 } from '#/api/core';
-
-interface UiTreeNode {
-  children?: UiTreeNode[];
-  key: string;
-  title: string;
-}
+import { useActionLoading } from '#/composables/platform/use-action-loading';
+import {
+  normalizePlatformTree,
+  normalizePlatformTreeSelect,
+  type PlatformTreeNode,
+} from '#/composables/platform/use-tree-normalization';
 
 const columns = [
   { dataIndex: 'displayName', key: 'displayName', title: '姓名' },
@@ -58,6 +58,7 @@ const transferTargetOrganizationUnitId = ref<string>();
 const transferUser = ref<null | UserApi.UserListItem>(null);
 const transferVisible = ref(false);
 const users = ref<UserApi.UserListItem[]>([]);
+const { actionLoadingKey, runAction } = useActionLoading();
 const formState = reactive({
   displayName: '',
   parentId: undefined as string | undefined,
@@ -72,22 +73,12 @@ function buildTreeTitle(item: OrganizationApi.OrganizationTreeItem) {
     : `${item.displayName}（${item.memberCount}）`;
 }
 
-function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): UiTreeNode[] {
-  return items.map((item) => ({
-    children: normalizeTree(item.children || []),
-    key: item.id,
-    title: buildTreeTitle(item),
-  }));
+function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTree(items, buildTreeTitle);
 }
 
-function normalizeTreeSelect(
-  items: OrganizationApi.OrganizationTreeItem[],
-): Array<{ children?: any[]; title: string; value: string }> {
-  return items.map((item) => ({
-    children: normalizeTreeSelect(item.children || []),
-    title: item.displayName,
-    value: item.id,
-  }));
+function normalizeTreeSelect(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
+  return normalizePlatformTreeSelect(items, (item) => item.displayName);
 }
 
 function findNodeById(
@@ -124,8 +115,9 @@ async function loadMembers() {
   try {
     users.value = await getUserListApi({
       keyword: keyword.value || undefined,
+      maxResultCount: 1000,
       organizationUnitId: selectedNodeKey.value || undefined,
-    });
+    }).then((result) => result.items);
   } finally {
     loadingMembers.value = false;
   }
@@ -206,11 +198,14 @@ async function handleDelete() {
     return;
   }
 
-  await deleteOrganizationUnitApi(selectedNode.value.id);
-  message.success('组织节点已删除');
-  selectedNodeKey.value = '';
-  await loadTree();
-  await loadMembers();
+  const nodeId = selectedNode.value.id;
+  await runAction(`delete:${nodeId}`, async () => {
+    await deleteOrganizationUnitApi(nodeId);
+    message.success('组织节点已删除');
+    selectedNodeKey.value = '';
+    await loadTree();
+    await loadMembers();
+  });
 }
 
 function openTransfer(record: UserApi.UserListItem) {
@@ -290,7 +285,14 @@ onMounted(async () => {
                 <Button type="primary" @click="openCreateChild">新增节点</Button>
                 <Button :disabled="!selectedNode" @click="openEdit">编辑</Button>
                 <Button :disabled="!selectedNode" @click="openMove">移动</Button>
-                <Button danger :disabled="!selectedNode" @click="handleDelete">删除</Button>
+                <Button
+                  danger
+                  :disabled="!selectedNode"
+                  :loading="selectedNode ? actionLoadingKey === `delete:${selectedNode.id}` : false"
+                  @click="handleDelete"
+                >
+                  删除
+                </Button>
               </div>
             </template>
 

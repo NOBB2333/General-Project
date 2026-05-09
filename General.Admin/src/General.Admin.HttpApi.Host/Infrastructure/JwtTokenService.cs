@@ -18,7 +18,14 @@ public class JwtTokenService : ITransientDependency
         _jwtOptions = jwtOptions.Value;
     }
 
-    public string CreateAccessToken(IdentityUser user, IReadOnlyCollection<string> roles)
+    public string CreateAccessToken(
+        IdentityUser user,
+        IReadOnlyCollection<string> roles,
+        Guid? tenantIdOverride = null,
+        bool isHostTenantOperation = false,
+        string? operationTenantName = null,
+        Guid? hostOperatorUserId = null,
+        string? hostOperatorUserName = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecurityKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -32,6 +39,29 @@ public class JwtTokenService : ITransientDependency
             new(AbpClaimTypes.Name, string.IsNullOrWhiteSpace(user.Name) ? user.UserName ?? string.Empty : user.Name),
             new(AbpClaimTypes.SurName, user.Surname ?? string.Empty)
         };
+        var tenantId = tenantIdOverride ?? user.TenantId;
+        if (tenantId.HasValue)
+        {
+            claims.Add(new Claim(AbpClaimTypes.TenantId, tenantId.Value.ToString()));
+        }
+
+        if (isHostTenantOperation)
+        {
+            claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostTenantOperation, "true"));
+            claims.Add(new Claim(PlatformTenantOperationClaimTypes.OriginalTenantId, user.TenantId?.ToString() ?? string.Empty));
+            if (hostOperatorUserId.HasValue)
+            {
+                claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostOperatorUserId, hostOperatorUserId.Value.ToString()));
+            }
+            if (!string.IsNullOrWhiteSpace(hostOperatorUserName))
+            {
+                claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostOperatorUserName, hostOperatorUserName));
+            }
+            if (!string.IsNullOrWhiteSpace(operationTenantName))
+            {
+                claims.Add(new Claim(PlatformTenantOperationClaimTypes.OperationTenantName, operationTenantName));
+            }
+        }
 
         foreach (var role in roles.Distinct(StringComparer.OrdinalIgnoreCase))
         {
