@@ -5,7 +5,12 @@ import { useRouter } from 'vue-router';
 
 import { LOGIN_PATH } from '@vben/constants';
 import { preferences } from '@vben/preferences';
-import { resetAllStores, useAccessStore, useUserStore } from '@vben/stores';
+import {
+  resetAllStores,
+  useAccessStore,
+  useTabbarStore,
+  useUserStore,
+} from '@vben/stores';
 
 import { notification } from 'ant-design-vue';
 import { defineStore } from 'pinia';
@@ -22,6 +27,7 @@ import { $t } from '#/locales';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
+  const tabbarStore = useTabbarStore();
   const userStore = useUserStore();
   const router = useRouter();
 
@@ -63,6 +69,14 @@ export const useAuthStore = defineStore('auth', () => {
     let userInfo: null | UserInfo = null;
     try {
       loginLoading.value = true;
+      accessStore.setAccessToken(null);
+      accessStore.setRefreshToken(null);
+      accessStore.setAccessCodes([]);
+      accessStore.setAccessMenus([]);
+      accessStore.setAccessRoutes([]);
+      accessStore.setIsAccessChecked(false);
+      tabbarStore.clearRuntimeTabs();
+
       const { accessToken } = await loginApi(params);
 
       // 如果成功获取到 accessToken
@@ -140,6 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     accessStore.setAccessMenus([]);
     accessStore.setAccessRoutes([]);
     accessStore.setIsAccessChecked(false);
+    tabbarStore.clearRuntimeTabs();
 
     try {
       const [userInfoResult, accessCodes] = await Promise.all([

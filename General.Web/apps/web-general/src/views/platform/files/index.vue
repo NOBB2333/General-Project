@@ -4,6 +4,7 @@ import type { Dayjs } from 'dayjs';
 
 import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
 import {
@@ -49,12 +50,45 @@ import { useDateFormatter } from '#/composables/platform/use-date-formatter';
 
 defineOptions({ name: 'PlatformFilePage' });
 
+const FILE_MANAGE_CODE = 'Platform.File.Manage';
+
+const { hasAccessByCodes } = useAccess();
+const canManageFiles = computed(() => hasAccessByCodes([FILE_MANAGE_CODE]));
+
 interface FileTreeNode {
   children?: FileTreeNode[];
   isLeaf?: boolean;
   key: string;
   title: string;
 }
+
+type FileMetadataFormState = Omit<FileApi.FileMetadataInput, 'businessId' | 'businessType'> & {
+  businessId: string;
+  businessType: string;
+};
+
+type StorageSourceFormState = Omit<
+  FileApi.StorageSourceSaveInput,
+  | 'accessKeyId'
+  | 'bucketName'
+  | 'customDomain'
+  | 'endpoint'
+  | 'pathTemplate'
+  | 'region'
+  | 'remark'
+  | 'rootPath'
+  | 'secretKey'
+> & {
+  accessKeyId: string;
+  bucketName: string;
+  customDomain: string;
+  endpoint: string;
+  pathTemplate: string;
+  region: string;
+  remark: string;
+  rootPath: string;
+  secretKey: string;
+};
 
 const columns = [
   { dataIndex: 'fileName', key: 'fileName', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => left.fileName.localeCompare(right.fileName, 'zh-CN'), title: '文件名' },
@@ -105,7 +139,7 @@ const providerOptions = [
   { label: '阿里云 OSS', value: 'AliyunOSS' },
 ];
 
-const sourceForm = reactive<FileApi.StorageSourceSaveInput>({
+const sourceForm = reactive<StorageSourceFormState>({
   accessKeyId: '',
   bucketName: '',
   customDomain: '',
@@ -123,7 +157,7 @@ const sourceForm = reactive<FileApi.StorageSourceSaveInput>({
   useSsl: false,
 });
 
-const metadataForm = reactive<FileApi.FileMetadataInput>({
+const metadataForm = reactive<FileMetadataFormState>({
   businessId: '',
   businessType: '',
   fileName: '',
@@ -199,12 +233,18 @@ const filteredItems = computed(() => {
 
 const selectedFileCount = computed(() => selectedFileKeys.value.length);
 
-const rowSelection = computed(() => ({
-  selectedRowKeys: selectedFileKeys.value,
-  onChange: (keys: (number | string)[]) => {
-    selectedFileKeys.value = keys.map((key) => `${key}`);
-  },
-}));
+const rowSelection = computed(() => {
+  if (!canManageFiles.value) {
+    return undefined;
+  }
+
+  return {
+    selectedRowKeys: selectedFileKeys.value,
+    onChange: (keys: (number | string)[]) => {
+      selectedFileKeys.value = keys.map((key) => `${key}`);
+    },
+  };
+});
 
 async function loadFiles() {
   loading.value = true;
@@ -258,7 +298,11 @@ async function loadSources(enabledOnly = false) {
 }
 
 async function loadPage() {
-  await Promise.all([loadSources(), loadTree(), loadFiles()]);
+  await Promise.all([
+    canManageFiles.value ? loadSources() : Promise.resolve(),
+    loadTree(),
+    loadFiles(),
+  ]);
 }
 
 const customRequest: UploadProps['customRequest'] = async (options) => {
@@ -706,6 +750,7 @@ onBeforeUnmount(revokePreviewUrl);
               :options="categoryOptions"
             />
             <Select
+              v-if="canManageFiles"
               v-model:value="storageSourceFilter"
               allow-clear
               placeholder="按存储源筛选"
@@ -722,16 +767,18 @@ onBeforeUnmount(revokePreviewUrl);
             <Button type="primary" @click="handleSearch">查询</Button>
             <Button @click="resetFilters">重置</Button>
             <Select
+              v-if="canManageFiles"
               v-model:value="uploadStorageSourceId"
               allow-clear
               placeholder="上传源"
               style="width: 180px"
               :options="enabledSourceOptions"
             />
-            <Upload :custom-request="customRequest" :show-upload-list="false">
+            <Upload v-if="canManageFiles" :custom-request="customRequest" :show-upload-list="false">
               <Button type="primary">上传文件</Button>
             </Upload>
             <Popconfirm
+              v-if="canManageFiles"
               :disabled="selectedFileCount === 0"
               :title="`确认删除选中的 ${selectedFileCount} 个文件？`"
               @confirm="handleBatchDelete"
@@ -744,7 +791,7 @@ onBeforeUnmount(revokePreviewUrl);
                 批量删除
               </Button>
             </Popconfirm>
-            <Button @click="sourceDrawerOpen = true">存储源</Button>
+            <Button v-if="canManageFiles" @click="sourceDrawerOpen = true">存储源</Button>
           </Space>
         </template>
 
@@ -808,10 +855,19 @@ onBeforeUnmount(revokePreviewUrl);
                 <Button size="small" type="link" @click="handleDownload(record as FileApi.FileItem)">
                   下载
                 </Button>
-                <Button size="small" type="link" @click="openMetadataEdit(record as FileApi.FileItem)">
+                <Button
+                  v-if="canManageFiles"
+                  size="small"
+                  type="link"
+                  @click="openMetadataEdit(record as FileApi.FileItem)"
+                >
                   编辑
                 </Button>
-                <Popconfirm title="确认删除该文件？" @confirm="handleDelete(record.fileKey)">
+                <Popconfirm
+                  v-if="canManageFiles"
+                  title="确认删除该文件？"
+                  @confirm="handleDelete(record.fileKey)"
+                >
                   <Button
                     danger
                     :loading="actionLoadingKey === `delete-file:${(record as FileApi.FileItem).fileKey}`"

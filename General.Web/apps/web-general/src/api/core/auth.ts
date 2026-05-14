@@ -1,4 +1,8 @@
-import { baseRequestClient, requestClient } from '#/api/request';
+import {
+  baseRequestClient,
+  requestClient,
+  unauthenticatedRequestClient,
+} from '#/api/request';
 
 export namespace AuthApi {
   /** 登录接口参数 */
@@ -25,7 +29,10 @@ export namespace AuthApi {
  * 登录
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  return requestClient.post<AuthApi.LoginResult>('/app/auth/login', data);
+  return unauthenticatedRequestClient.post<AuthApi.LoginResult>(
+    '/app/auth/login',
+    data,
+  );
 }
 
 export async function enterTenantOperationApi(tenantId: string) {

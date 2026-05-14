@@ -68,18 +68,11 @@ public class PlatformRoleService : ITransientDependency
         var userCounts = await _identityLookupService.GetUserCountsByRoleIdsAsync(roles.Select(x => x.Id).ToList());
         var result = new List<PlatformRoleDto>();
 
-        foreach (var roleGroup in roles.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
+        foreach (var role in roles)
         {
-            var roleIds = roleGroup.Select(x => x.Id).ToHashSet();
-            var role = roleGroup
-                .OrderByDescending(x => userCounts.GetValueOrDefault(x.Id))
-                .ThenByDescending(x => roleMenus.Count(roleMenu => roleMenu.RoleId == x.Id))
-                .ThenBy(x => x.Id)
-                .First();
-            var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id) ??
-                                roleAuthorizations.FirstOrDefault(x => roleIds.Contains(x.RoleId));
+            var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id);
             var effectiveMenuIds = roleMenus
-                .Where(x => roleIds.Contains(x.RoleId))
+                .Where(x => x.RoleId == role.Id)
                 .Select(x => x.MenuId)
                 .Distinct()
                 .ToList();
@@ -111,11 +104,26 @@ public class PlatformRoleService : ITransientDependency
                 MenuCount = effectiveMenuIds.Count,
                 Name = role.Name,
                 Status = true,
-                UserCount = roleIds.Sum(roleId => userCounts.GetValueOrDefault(roleId))
+                UserCount = userCounts.GetValueOrDefault(role.Id)
             });
         }
 
         return result;
+    }
+
+    public async Task<List<PlatformRoleOptionDto>> GetOptionsAsync()
+    {
+        return (await _roleRepository.GetListAsync())
+            .Where(x => x.TenantId == _currentTenant.Id)
+            .OrderBy(x => GetOrder(x.Name))
+            .ThenBy(x => x.Name)
+            .Select(x => new PlatformRoleOptionDto
+            {
+                Description = GetDescription(x.Name),
+                Id = x.Id,
+                Name = x.Name
+            })
+            .ToList();
     }
 
     public async Task CreateAsync(PlatformRoleSaveInput input)
@@ -220,9 +228,6 @@ public class PlatformRoleService : ITransientDependency
                 PlatformSeedIds.PlatformRoot,
                 PlatformSeedIds.PlatformWorkspace,
                 PlatformSeedIds.PlatformProfile,
-                PlatformSeedIds.PlatformScheduler,
-                PlatformSeedIds.PlatformSchedulerManage,
-                PlatformSeedIds.PlatformSchedulerExecute,
                 PlatformSeedIds.ProjectRoot,
                 PlatformSeedIds.ProjectList,
                 PlatformSeedIds.ProjectDetail,
@@ -300,6 +305,7 @@ public class PlatformRoleService : ITransientDependency
                 apiBlacklist);
             await _roleAuthorizationRepository.InsertAsync(authorization, autoSave: true);
             await _platformCacheService.InvalidateAsync("role");
+            await _platformCacheService.InvalidateAsync("organization");
             return;
         }
 
@@ -311,6 +317,7 @@ public class PlatformRoleService : ITransientDependency
             apiBlacklist);
         await _roleAuthorizationRepository.UpdateAsync(authorization, autoSave: true);
         await _platformCacheService.InvalidateAsync("role");
+        await _platformCacheService.InvalidateAsync("organization");
     }
 
     private static string GetDescription(string roleName)

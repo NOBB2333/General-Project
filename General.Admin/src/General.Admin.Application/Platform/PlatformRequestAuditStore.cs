@@ -58,6 +58,8 @@ public class PlatformRequestAuditStore : ITransientDependency
                     (x.Url != null && x.Url.Contains(keyword)) ||
                     (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
                     (x.HostOperatorUserName != null && x.HostOperatorUserName.Contains(keyword)) ||
+                    (x.ImpersonatedUserName != null && x.ImpersonatedUserName.Contains(keyword)) ||
+                    (x.OperationSessionId != null && x.OperationSessionId.Contains(keyword)) ||
                     (x.ActionSummary != null && x.ActionSummary.Contains(keyword)) ||
                     (x.MenuTitle != null && x.MenuTitle.Contains(keyword)));
             }
@@ -107,8 +109,12 @@ public class PlatformRequestAuditStore : ITransientDependency
             HostOperatorUserId = log.HostOperatorUserId,
             HostOperatorUserName = log.HostOperatorUserName,
             Id = log.Id,
+            ImpersonatedUserId = log.ImpersonatedUserId,
+            ImpersonatedUserName = log.ImpersonatedUserName,
             IsHostTenantOperation = log.IsHostTenantOperation,
             MenuTitle = log.MenuTitle,
+            OperationSessionId = log.OperationSessionId,
+            OperationTenantId = log.OperationTenantId,
             TenantName = log.TenantName,
             Url = log.Url,
             UserName = log.UserName
@@ -144,9 +150,17 @@ public class PlatformRequestAuditEntry
 
     public Guid Id { get; set; }
 
+    public Guid? ImpersonatedUserId { get; set; }
+
+    public string? ImpersonatedUserName { get; set; }
+
     public bool IsHostTenantOperation { get; set; }
 
     public string? MenuTitle { get; set; } // populated for pagevisit category
+
+    public string? OperationSessionId { get; set; }
+
+    public Guid? OperationTenantId { get; set; }
 
     public string? TenantName { get; set; }
 

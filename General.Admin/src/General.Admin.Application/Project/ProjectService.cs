@@ -357,7 +357,10 @@ public class ProjectService : ITransientDependency
         var allMembers = (await _projectMemberRepository.GetListAsync()).ToList();
 
         var visibleProjectIds = new HashSet<Guid>();
-        if (_currentUser.IsInRole(PlatformRoleNames.Admin))
+        var canSeeAllProjects = _currentUser.IsInRole(PlatformRoleNames.Admin)
+            || _currentUser.IsInRole(PlatformRoleNames.Pmo);
+
+        if (canSeeAllProjects)
         {
             visibleProjectIds.UnionWith(allProjects.Select(item => item.Id));
         }
@@ -370,9 +373,16 @@ public class ProjectService : ITransientDependency
 
             if (_currentUser.Id.HasValue)
             {
+                var currentUserId = _currentUser.Id.Value;
+                visibleProjectIds.UnionWith(
+                    allProjects
+                        .Where(project =>
+                            project.ManagerUserId == currentUserId ||
+                            project.SponsorUserId == currentUserId)
+                        .Select(project => project.Id));
                 visibleProjectIds.UnionWith(
                     allMembers
-                        .Where(item => item.UserId == _currentUser.Id.Value)
+                        .Where(item => item.UserId == currentUserId)
                         .Where(item => item.IsActive() || item.AllowHistoricalRead)
                         .Select(item => item.ProjectId));
             }
@@ -429,7 +439,8 @@ public class ProjectService : ITransientDependency
             users,
             myMemberMap,
             _currentUser.Id,
-            _currentUser.IsInRole(PlatformRoleNames.Admin));
+            _currentUser.IsInRole(PlatformRoleNames.Admin),
+            _currentUser.IsInRole(PlatformRoleNames.Pmo));
     }
 
     /// <summary>
@@ -448,7 +459,10 @@ public class ProjectService : ITransientDependency
 
         // 权限检查：当前用户必须能看到该项目
         var canAccess = _currentUser.IsInRole(PlatformRoleNames.Admin)
+            || _currentUser.IsInRole(PlatformRoleNames.Pmo)
             || accessibleOrganizationUnitIds.Contains(project.OrganizationUnitId)
+            || (_currentUser.Id.HasValue &&
+                (project.ManagerUserId == _currentUser.Id.Value || project.SponsorUserId == _currentUser.Id.Value))
             || (_currentUser.Id.HasValue && allMembers.Any(m =>
                 m.ProjectId == projectId
                 && m.UserId == _currentUser.Id.Value
@@ -493,7 +507,8 @@ public class ProjectService : ITransientDependency
             users,
             myMemberMap,
             _currentUser.Id,
-            _currentUser.IsInRole(PlatformRoleNames.Admin));
+            _currentUser.IsInRole(PlatformRoleNames.Admin),
+            _currentUser.IsInRole(PlatformRoleNames.Pmo));
     }
 
     private static List<ProjectCalendarItemDto> BuildCalendarItems(
@@ -798,6 +813,11 @@ public class ProjectService : ITransientDependency
             return "管理员";
         }
 
+        if (context.CurrentUserIsPmo)
+        {
+            return "PMO";
+        }
+
         return "组织可见";
     }
 
@@ -816,7 +836,8 @@ public class ProjectService : ITransientDependency
         Dictionary<Guid, string> UserNameMap,
         Dictionary<Guid, ProjectMember> MyMemberMap,
         Guid? CurrentUserId,
-        bool CurrentUserIsAdmin)
+        bool CurrentUserIsAdmin,
+        bool CurrentUserIsPmo)
     {
         // 单条查找
         public Dictionary<Guid, string> TaskTitleMap { get; } =

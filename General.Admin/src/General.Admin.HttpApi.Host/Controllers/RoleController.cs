@@ -6,7 +6,7 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(AdminPermissions.Platform.RoleManage)]
+[Authorize]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/role")]
 public class RoleController : ControllerBase
@@ -18,18 +18,27 @@ public class RoleController : ControllerBase
         _roleService = roleService;
     }
 
+    [Authorize(AdminPermissions.Platform.RoleManage)]
     [HttpGet("list")]
     public async Task<ActionResult<ApiResponse<List<PlatformRoleDto>>>> GetListAsync()
     {
         return ApiResponse<List<PlatformRoleDto>>.Ok(await _roleService.GetListAsync());
     }
 
+    [HttpGet("options")]
+    public async Task<ActionResult<ApiResponse<List<PlatformRoleOptionDto>>>> GetOptionsAsync()
+    {
+        return ApiResponse<List<PlatformRoleOptionDto>>.Ok(await _roleService.GetOptionsAsync());
+    }
+
+    [Authorize(AdminPermissions.Platform.RoleManage)]
     [HttpGet("{id:guid}/authorization")]
     public async Task<ActionResult<ApiResponse<PlatformRoleAuthorizationDto>>> GetAuthorizationAsync(Guid id)
     {
         return ApiResponse<PlatformRoleAuthorizationDto>.Ok(await _roleService.GetAuthorizationAsync(id));
     }
 
+    [Authorize(AdminPermissions.Platform.RoleManage)]
     [HttpPut("{id:guid}/authorization")]
     [PlatformEndpoint("Platform.Role.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(Guid id, [FromBody] PlatformRoleAuthorizationSaveInput input)
@@ -38,6 +47,7 @@ public class RoleController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
+    [Authorize(AdminPermissions.Platform.RoleManage)]
     [HttpPost]
     [PlatformEndpoint("Platform.Role.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformRoleSaveInput input)
@@ -46,6 +56,7 @@ public class RoleController : ControllerBase
         return ApiResponse<bool>.Ok(true);
     }
 
+    [Authorize(AdminPermissions.Platform.RoleManage)]
     [HttpDelete("{id:guid}")]
     [PlatformEndpoint("Platform.Role.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)

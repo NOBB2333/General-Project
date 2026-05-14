@@ -103,7 +103,10 @@ public class AdminDbMigrationService : ITransientDependency
     {
         Logger.LogInformation($"Executing {(tenant == null ? "host" : tenant.Name + " tenant")} database seed...");
 
-        using var unitOfWork = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: true);
+        // SQLite allows only one writer at a time. The platform seed switches
+        // between host and tenant contexts in the same database, so a long outer
+        // transaction can block the next tenant-scoped DbContext from starting.
+        using var unitOfWork = _unitOfWorkManager.Begin(requiresNew: true, isTransactional: false);
         await _platformDataSeedContributor.SeedAsync(new DataSeedContext(tenant?.Id));
         await unitOfWork.CompleteAsync();
     }

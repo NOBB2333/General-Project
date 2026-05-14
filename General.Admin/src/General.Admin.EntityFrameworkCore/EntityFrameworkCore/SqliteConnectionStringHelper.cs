@@ -29,7 +29,9 @@ public static class SqliteConnectionStringHelper
         }
 
         builder.Mode = SqliteOpenMode.ReadWriteCreate;
-        builder.Cache = SqliteCacheMode.Shared;
+        // Shared cache uses table-level locks across connections and commonly
+        // surfaces as SQLITE_LOCKED during ABP seeding with multiple DbContexts.
+        builder.Cache = SqliteCacheMode.Private;
         builder.DefaultTimeout = 30;
         builder.Pooling = true;
 

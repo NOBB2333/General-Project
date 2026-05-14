@@ -160,7 +160,7 @@ const metrics = computed(() => [
 function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTree(
     items,
-    (item) => item.title,
+    (item) => `[${item.appCode}] ${item.title}${item.permissionCode ? ` · ${item.permissionCode}` : ''}`,
   );
 }
 

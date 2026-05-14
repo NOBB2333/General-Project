@@ -13,6 +13,7 @@ public class AdminPermissionDefinitionProvider : PermissionDefinitionProvider
         adminGroup.AddPermission(AdminPermissions.Platform.OrganizationManage, L("Permission:Platform.Organization.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.UserManage, L("Permission:Platform.User.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.RoleManage, L("Permission:Platform.Role.Manage"));
+        adminGroup.AddPermission(AdminPermissions.Platform.TenantView, L("Permission:Platform.Tenant.View"));
         adminGroup.AddPermission(AdminPermissions.Platform.TenantManage, L("Permission:Platform.Tenant.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.MenuManage, L("Permission:Platform.Menu.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.ConfigManage, L("Permission:Platform.Config.Manage"));

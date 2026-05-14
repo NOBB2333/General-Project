@@ -21,7 +21,11 @@ import { refreshTokenApi } from './core';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
-function createRequestClient(baseURL: string, options?: RequestClientOptions) {
+function createRequestClient(
+  baseURL: string,
+  options?: RequestClientOptions,
+  authorize: boolean = true,
+) {
   const client = new RequestClient({
     ...options,
     baseURL,
@@ -100,7 +104,11 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
         }
       }
 
-      config.headers.Authorization = formatToken(accessStore.accessToken);
+      if (authorize) {
+        config.headers.Authorization = formatToken(accessStore.accessToken);
+      } else {
+        delete config.headers.Authorization;
+      }
       config.headers['Accept-Language'] = preferences.app.locale;
       return config;
     },
@@ -116,15 +124,17 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   );
 
   // token过期的处理
-  client.addResponseInterceptor(
-    authenticateResponseInterceptor({
-      client,
-      doReAuthenticate,
-      doRefreshToken,
-      enableRefreshToken: preferences.app.enableRefreshToken,
-      formatToken,
-    }),
-  );
+  if (authorize) {
+    client.addResponseInterceptor(
+      authenticateResponseInterceptor({
+        client,
+        doReAuthenticate,
+        doRefreshToken,
+        enableRefreshToken: preferences.app.enableRefreshToken,
+        formatToken,
+      }),
+    );
+  }
 
   // 通用的错误处理,如果没有进入上面的错误处理逻辑，就会进入这里
   client.addResponseInterceptor(
@@ -144,5 +154,13 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
 export const requestClient = createRequestClient(apiURL, {
   responseReturn: 'data',
 });
+
+export const unauthenticatedRequestClient = createRequestClient(
+  apiURL,
+  {
+    responseReturn: 'data',
+  },
+  false,
+);
 
 export const baseRequestClient = new RequestClient({ baseURL: apiURL });

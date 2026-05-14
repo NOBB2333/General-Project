@@ -23,9 +23,11 @@ public class JwtTokenService : ITransientDependency
         IReadOnlyCollection<string> roles,
         Guid? tenantIdOverride = null,
         bool isHostTenantOperation = false,
+        Guid? operationTenantId = null,
         string? operationTenantName = null,
         Guid? hostOperatorUserId = null,
-        string? hostOperatorUserName = null)
+        string? hostOperatorUserName = null,
+        string? operationSessionId = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecurityKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -49,6 +51,12 @@ public class JwtTokenService : ITransientDependency
         {
             claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostTenantOperation, "true"));
             claims.Add(new Claim(PlatformTenantOperationClaimTypes.OriginalTenantId, user.TenantId?.ToString() ?? string.Empty));
+            claims.Add(new Claim(PlatformTenantOperationClaimTypes.ImpersonatedUserId, user.Id.ToString()));
+            claims.Add(new Claim(PlatformTenantOperationClaimTypes.ImpersonatedUserName, user.UserName ?? string.Empty));
+            if (operationTenantId.HasValue)
+            {
+                claims.Add(new Claim(PlatformTenantOperationClaimTypes.OperationTenantId, operationTenantId.Value.ToString()));
+            }
             if (hostOperatorUserId.HasValue)
             {
                 claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostOperatorUserId, hostOperatorUserId.Value.ToString()));
@@ -56,6 +64,10 @@ public class JwtTokenService : ITransientDependency
             if (!string.IsNullOrWhiteSpace(hostOperatorUserName))
             {
                 claims.Add(new Claim(PlatformTenantOperationClaimTypes.HostOperatorUserName, hostOperatorUserName));
+            }
+            if (!string.IsNullOrWhiteSpace(operationSessionId))
+            {
+                claims.Add(new Claim(PlatformTenantOperationClaimTypes.OperationSessionId, operationSessionId));
             }
             if (!string.IsNullOrWhiteSpace(operationTenantName))
             {

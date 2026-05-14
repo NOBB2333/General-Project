@@ -1452,6 +1452,13 @@ namespace General.Admin.Migrations.Sqlite
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("ImpersonatedUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImpersonatedUserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
@@ -1464,6 +1471,13 @@ namespace General.Admin.Migrations.Sqlite
 
                     b.Property<string>("MenuTitle")
                         .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperationSessionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("OperationTenantId")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TenantName")
@@ -1485,6 +1499,8 @@ namespace General.Admin.Migrations.Sqlite
                     b.HasIndex("Category", "ExecutionTime");
 
                     b.HasIndex("IsHostTenantOperation", "ExecutionTime");
+
+                    b.HasIndex("OperationSessionId", "ExecutionTime");
 
                     b.HasIndex("UserName", "ExecutionTime");
 

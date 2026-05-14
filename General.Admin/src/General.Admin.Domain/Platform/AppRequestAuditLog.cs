@@ -24,6 +24,10 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
 
     public string? HostOperatorUserName { get; private set; }
 
+    public Guid? ImpersonatedUserId { get; private set; }
+
+    public string? ImpersonatedUserName { get; private set; }
+
     public string? HttpMethod { get; private set; }
 
     public int? HttpStatusCode { get; private set; }
@@ -31,6 +35,10 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
     public bool IsHostTenantOperation { get; private set; }
 
     public string? MenuTitle { get; private set; }
+
+    public string? OperationSessionId { get; private set; }
+
+    public Guid? OperationTenantId { get; private set; }
 
     public string? TenantName { get; private set; }
 
@@ -56,6 +64,10 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
         bool isHostTenantOperation,
         Guid? hostOperatorUserId,
         string? hostOperatorUserName,
+        string? operationSessionId,
+        Guid? operationTenantId,
+        Guid? impersonatedUserId,
+        string? impersonatedUserName,
         string? clientIpAddress,
         string? browserInfo,
         string? actionSummary,
@@ -74,6 +86,10 @@ public class AppRequestAuditLog : CreationAuditedAggregateRoot<Guid>
         IsHostTenantOperation = isHostTenantOperation;
         HostOperatorUserId = hostOperatorUserId;
         HostOperatorUserName = Normalize(hostOperatorUserName);
+        OperationSessionId = Normalize(operationSessionId);
+        OperationTenantId = operationTenantId;
+        ImpersonatedUserId = impersonatedUserId;
+        ImpersonatedUserName = Normalize(impersonatedUserName);
         ClientIpAddress = Normalize(clientIpAddress);
         BrowserInfo = Normalize(browserInfo);
         ActionSummary = Normalize(actionSummary);

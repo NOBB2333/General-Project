@@ -4,6 +4,7 @@ import type { OrganizationApi, UserApi } from '#/api/core';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
 import {
@@ -37,7 +38,34 @@ import {
 
 defineOptions({ name: 'ProjectListPage' });
 
+const PROJECT_CREATE_CODE = 'Project.Project.Create';
+
+type ProjectSaveFormState = Omit<
+  ProjectApi.ProjectSaveInput,
+  | 'budgetTotalAmount'
+  | 'contractTotalAmount'
+  | 'description'
+  | 'plannedEndDate'
+  | 'plannedStartDate'
+  | 'projectSource'
+  | 'projectType'
+  | 'receivedAmount'
+  | 'shortName'
+> & {
+  budgetTotalAmount?: number;
+  contractTotalAmount?: number;
+  description?: string;
+  plannedEndDate?: string;
+  plannedStartDate?: string;
+  projectSource?: string;
+  projectType?: string;
+  receivedAmount?: number;
+  shortName?: string;
+};
+
 const router = useRouter();
+const { hasAccessByCodes } = useAccess();
+const canCreateProject = computed(() => hasAccessByCodes([PROJECT_CREATE_CODE]));
 const loading = ref(false);
 const saving = ref(false);
 const createVisible = ref(false);
@@ -49,22 +77,22 @@ const filters = reactive<ProjectApi.ProjectListInput>({
   onlyMyRelated: false,
   status: undefined,
 });
-const formState = reactive<ProjectApi.ProjectSaveInput>({
-  budgetTotalAmount: null,
-  contractTotalAmount: null,
-  description: null,
+const formState = reactive<ProjectSaveFormState>({
+  budgetTotalAmount: undefined,
+  contractTotalAmount: undefined,
+  description: undefined,
   isKeyProject: false,
   managerUserId: '',
   name: '',
   organizationUnitId: '',
-  plannedEndDate: null,
-  plannedStartDate: null,
+  plannedEndDate: undefined,
+  plannedStartDate: undefined,
   priority: '中',
   projectCode: '',
-  projectSource: null,
-  projectType: null,
-  receivedAmount: null,
-  shortName: null,
+  projectSource: undefined,
+  projectType: undefined,
+  receivedAmount: undefined,
+  shortName: undefined,
   sponsorUserId: '',
   status: '待规划',
 });
@@ -157,26 +185,30 @@ function openDetail(record: ProjectApi.ProjectListItem) {
 }
 
 function resetForm() {
-  formState.budgetTotalAmount = null;
-  formState.contractTotalAmount = null;
-  formState.description = null;
+  formState.budgetTotalAmount = undefined;
+  formState.contractTotalAmount = undefined;
+  formState.description = undefined;
   formState.isKeyProject = false;
   formState.managerUserId = '';
   formState.name = '';
   formState.organizationUnitId = '';
-  formState.plannedEndDate = null;
-  formState.plannedStartDate = null;
+  formState.plannedEndDate = undefined;
+  formState.plannedStartDate = undefined;
   formState.priority = '中';
   formState.projectCode = '';
-  formState.projectSource = null;
-  formState.projectType = null;
-  formState.receivedAmount = null;
-  formState.shortName = null;
+  formState.projectSource = undefined;
+  formState.projectType = undefined;
+  formState.receivedAmount = undefined;
+  formState.shortName = undefined;
   formState.sponsorUserId = '';
   formState.status = '待规划';
 }
 
 async function openCreate() {
+  if (!canCreateProject.value) {
+    return;
+  }
+
   resetForm();
   createVisible.value = true;
   if (organizationTree.value.length === 0 || userOptions.value.length === 0) {
@@ -250,7 +282,7 @@ onMounted(async () => {
               与我相关
             </Button>
             <Button type="primary" @click="loadProjects">查询</Button>
-            <Button type="primary" @click="openCreate">新建项目</Button>
+            <Button v-if="canCreateProject" type="primary" @click="openCreate">新建项目</Button>
           </div>
         </template>
 

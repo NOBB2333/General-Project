@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Volo.Abp.Authorization.Permissions;
 
 namespace General.Admin.Controllers;
 
@@ -13,15 +14,25 @@ namespace General.Admin.Controllers;
 public class PlatformEndpointController : ControllerBase
 {
     private readonly IActionDescriptorCollectionProvider _actionDescriptorCollectionProvider;
+    private readonly IPermissionChecker _permissionChecker;
 
-    public PlatformEndpointController(IActionDescriptorCollectionProvider actionDescriptorCollectionProvider)
+    public PlatformEndpointController(
+        IActionDescriptorCollectionProvider actionDescriptorCollectionProvider,
+        IPermissionChecker permissionChecker)
     {
         _actionDescriptorCollectionProvider = actionDescriptorCollectionProvider;
+        _permissionChecker = permissionChecker;
     }
 
     [HttpGet("options")]
-    public ActionResult<ApiResponse<List<PlatformEndpointGroupDto>>> GetOptions()
+    public async Task<ActionResult<ApiResponse<List<PlatformEndpointGroupDto>>>> GetOptions()
     {
+        if (!await _permissionChecker.IsGrantedAsync(AdminPermissions.Platform.RoleManage) &&
+            !await _permissionChecker.IsGrantedAsync(AdminPermissions.Platform.TenantManage))
+        {
+            return Forbid();
+        }
+
         var items = _actionDescriptorCollectionProvider.ActionDescriptors.Items
             .OfType<ControllerActionDescriptor>()
             .Select(action => new

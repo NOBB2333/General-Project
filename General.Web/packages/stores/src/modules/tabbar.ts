@@ -429,6 +429,19 @@ export const useTabbarStore = defineStore('core-tabbar', {
       await new Promise((resolve) => setTimeout(resolve, 200));
       this.excludeCachedTabs.delete(name);
     },
+    /**
+     * Clear tab and keep-alive state when the authenticated identity changes.
+     */
+    clearRuntimeTabs() {
+      this.tabs = [];
+      this.cachedRoutes.clear();
+      this.cachedTabs.clear();
+      this.excludeCachedTabs.clear();
+      this.renderRouteView = true;
+      if (isVisitHistory()) {
+        this.visitHistory.clear();
+      }
+    },
 
     /**
      * @zh_CN 重置标签页标题

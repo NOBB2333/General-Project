@@ -17,6 +17,12 @@ export namespace RoleApi {
     userCount: number;
   }
 
+  export interface RoleOption {
+    description: string;
+    id: string;
+    name: string;
+  }
+
   export interface RoleAuthorization {
     apiBlacklist: string[];
     accountScopeMode: string;
@@ -41,6 +47,10 @@ export namespace RoleApi {
 
 export async function getRoleListApi() {
   return requestClient.get<RoleApi.RoleItem[]>('/app/role/list');
+}
+
+export async function getRoleOptionsApi() {
+  return requestClient.get<RoleApi.RoleOption[]>('/app/role/options');
 }
 
 export async function createRoleApi(data: RoleApi.RoleSaveInput) {

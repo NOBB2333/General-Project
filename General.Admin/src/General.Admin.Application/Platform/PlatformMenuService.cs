@@ -5,6 +5,7 @@ using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
 using Volo.Abp.Authorization.Permissions;
+using Volo.Abp.Linq;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.PermissionManagement;
 using Volo.Abp.Users;
@@ -20,8 +21,10 @@ public class PlatformMenuService : ITransientDependency
 
     private readonly ICurrentTenant _currentTenant;
     private readonly ICurrentUser _currentUser;
+    private readonly IAsyncQueryableExecuter _asyncQueryableExecuter;
     private readonly IDistributedCache _distributedCache;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
+    private readonly IPermissionGrantRepository _permissionGrantRepository;
     private readonly IPermissionManager _permissionManager;
     private readonly PlatformCacheService _platformCacheService;
     private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
@@ -30,8 +33,10 @@ public class PlatformMenuService : ITransientDependency
     public PlatformMenuService(
         ICurrentTenant currentTenant,
         ICurrentUser currentUser,
+        IAsyncQueryableExecuter asyncQueryableExecuter,
         IDistributedCache distributedCache,
         IRepository<AppMenu, Guid> menuRepository,
+        IPermissionGrantRepository permissionGrantRepository,
         IPermissionManager permissionManager,
         PlatformCacheService platformCacheService,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
@@ -39,8 +44,10 @@ public class PlatformMenuService : ITransientDependency
     {
         _currentTenant = currentTenant;
         _currentUser = currentUser;
+        _asyncQueryableExecuter = asyncQueryableExecuter;
         _distributedCache = distributedCache;
         _menuRepository = menuRepository;
+        _permissionGrantRepository = permissionGrantRepository;
         _permissionManager = permissionManager;
         _platformCacheService = platformCacheService;
         _roleMenuRepository = roleMenuRepository;
@@ -93,10 +100,11 @@ public class PlatformMenuService : ITransientDependency
 
     public async Task<List<Guid>> GetRoleMenuIdsAsync(Guid roleId)
     {
-        return (await _roleMenuRepository.GetListAsync())
-            .Where(x => x.RoleId == roleId)
-            .Select(x => x.MenuId)
-            .ToList();
+        var roleMenuQueryable = await _roleMenuRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.ToListAsync(
+            roleMenuQueryable
+                .Where(x => x.RoleId == roleId)
+                .Select(x => x.MenuId));
     }
 
     public async Task<List<MenuPermissionTreeDto>> GetPermissionTreeAsync(IReadOnlyCollection<string>? appCodes = null)
@@ -200,9 +208,7 @@ public class PlatformMenuService : ITransientDependency
         var allMenus = await _menuRepository.GetListAsync();
         var normalizedMenuIds = NormalizeMenuIds(menuIds, allMenus);
 
-        var existingMappings = (await _roleMenuRepository.GetListAsync())
-            .Where(x => x.RoleId == roleId)
-            .ToList();
+        var existingMappings = await GetRoleMenuMappingsAsync(roleId);
 
         var existingIds = existingMappings.Select(x => x.MenuId).ToHashSet();
         var toDelete = existingMappings.Where(x => !normalizedMenuIds.Contains(x.MenuId)).ToList();
@@ -222,9 +228,12 @@ public class PlatformMenuService : ITransientDependency
         }
 
         var role = await _roleRepository.GetAsync(roleId);
-        await SyncRolePermissionGrantsAsync(role, allMenus, normalizedMenuIds);
-        await _platformCacheService.InvalidateAsync("menu");
-        await _platformCacheService.InvalidateAsync("role");
+        var permissionsChanged = await SyncRolePermissionGrantsAsync(role, allMenus, normalizedMenuIds);
+        if (toDelete.Count > 0 || toAdd.Count > 0 || permissionsChanged)
+        {
+            await _platformCacheService.InvalidateAsync("menu");
+            await _platformCacheService.InvalidateAsync("role");
+        }
     }
 
     private string BuildCurrentUserCachePart()
@@ -243,7 +252,14 @@ public class PlatformMenuService : ITransientDependency
         return $"{tenantPart}:{operationPart}:{userId}:{roles}";
     }
 
-    private async Task SyncRolePermissionGrantsAsync(
+    private async Task<List<AppRoleMenu>> GetRoleMenuMappingsAsync(Guid roleId)
+    {
+        var roleMenuQueryable = await _roleMenuRepository.GetQueryableAsync();
+        return await _asyncQueryableExecuter.ToListAsync(
+            roleMenuQueryable.Where(x => x.RoleId == roleId));
+    }
+
+    private async Task<bool> SyncRolePermissionGrantsAsync(
         IdentityRole role,
         IReadOnlyCollection<AppMenu> allMenus,
         IReadOnlyCollection<Guid> grantedMenuIds)
@@ -266,14 +282,32 @@ public class PlatformMenuService : ITransientDependency
             })
             .ToList();
 
-        foreach (var item in permissionGroups)
+        if (permissionGroups.Count == 0)
+        {
+            return false;
+        }
+
+        var permissionCodes = permissionGroups.Select(x => x.PermissionCode).ToArray();
+        var currentGrants = await _permissionGrantRepository.GetListAsync(
+            permissionCodes,
+            RolePermissionValueProvider.ProviderName,
+            role.Name);
+        var grantedCodes = currentGrants
+            .Select(x => x.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var changed = false;
+        foreach (var item in permissionGroups.Where(x => x.IsGranted != grantedCodes.Contains(x.PermissionCode)))
         {
             await _permissionManager.SetAsync(
                 item.PermissionCode,
                 RolePermissionValueProvider.ProviderName,
                 role.Name,
                 item.IsGranted);
+            changed = true;
         }
+
+        return changed;
     }
 
     private List<BackendRouteDto> BuildRouteTree(IReadOnlyCollection<AppMenu> menus, Guid? parentId)
@@ -347,31 +381,118 @@ public class PlatformMenuService : ITransientDependency
             return [];
         }
 
-        var roleIds = (await _roleRepository.GetListAsync())
-            .Where(x => currentRoleNames.Contains(x.Name))
-            .Select(x => x.Id)
+        var normalizedRoleNames = currentRoleNames
+            .Select(x => x.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var roleQueryable = await _roleRepository.GetQueryableAsync();
+        var roles = await _asyncQueryableExecuter.ToListAsync(
+            roleQueryable
+                .Where(x => x.NormalizedName != null && normalizedRoleNames.Contains(x.NormalizedName))
+                .Select(x => new { x.Id, x.Name }));
+        var roleIds = roles.Select(x => x.Id).ToList();
 
         if (roleIds.Count == 0)
         {
             return [];
         }
 
-        var menuIds = (await _roleMenuRepository.GetListAsync())
-            .Where(x => roleIds.Contains(x.RoleId))
-            .Select(x => x.MenuId)
-            .Distinct()
+        var roleMenuQueryable = await _roleMenuRepository.GetQueryableAsync();
+        var menuIds = await _asyncQueryableExecuter.ToListAsync(
+            roleMenuQueryable
+                .Where(x => roleIds.Contains(x.RoleId))
+                .Select(x => x.MenuId)
+                .Distinct());
+
+        var allMenus = (await _menuRepository.GetListAsync())
+            .Where(x => x.IsEnabled)
             .ToList();
+        if (menuIds.Count == 0)
+        {
+            menuIds = roles
+                .SelectMany(x => ResolveDefaultMenuIds(x.Name, allMenus))
+                .Distinct()
+                .ToList();
+        }
 
         if (menuIds.Count == 0)
         {
             return [];
         }
 
-        return (await _menuRepository.GetListAsync())
-            .Where(x => menuIds.Contains(x.Id) && x.IsEnabled)
+        var normalizedMenuIds = NormalizeMenuIds(menuIds, allMenus);
+
+        return allMenus
+            .Where(x => normalizedMenuIds.Contains(x.Id))
             .OrderBy(x => x.Order)
             .ToList();
+    }
+
+    private static IReadOnlyCollection<Guid> ResolveDefaultMenuIds(string roleName, IReadOnlyCollection<AppMenu> allMenus)
+    {
+        return roleName switch
+        {
+            PlatformRoleNames.Admin => allMenus.Select(x => x.Id).Distinct().ToList(),
+            PlatformRoleNames.Pmo =>
+            [
+                PlatformSeedIds.PlatformRoot,
+                PlatformSeedIds.PlatformWorkspace,
+                PlatformSeedIds.PlatformProfile,
+                PlatformSeedIds.ProjectRoot,
+                PlatformSeedIds.ProjectList,
+                PlatformSeedIds.ProjectDetail,
+                PlatformSeedIds.ProjectMyRelated,
+                PlatformSeedIds.ProjectPmoOverview,
+                PlatformSeedIds.ProjectCreate,
+                PlatformSeedIds.BusinessRoot,
+                PlatformSeedIds.BusinessOverview,
+                PlatformSeedIds.BusinessProjects,
+                PlatformSeedIds.BusinessReports,
+                PlatformSeedIds.BusinessBudgetSensitive,
+                PlatformSeedIds.BusinessReportExport
+            ],
+            PlatformRoleNames.Pm =>
+            [
+                PlatformSeedIds.PlatformRoot,
+                PlatformSeedIds.PlatformWorkspace,
+                PlatformSeedIds.PlatformProfile,
+                PlatformSeedIds.ProjectRoot,
+                PlatformSeedIds.ProjectList,
+                PlatformSeedIds.ProjectDetail,
+                PlatformSeedIds.ProjectMyRelated,
+                PlatformSeedIds.ProjectPmDashboard,
+                PlatformSeedIds.ProjectCreate,
+                PlatformSeedIds.ProjectTaskManage,
+                PlatformSeedIds.BusinessRoot,
+                PlatformSeedIds.BusinessOverview,
+                PlatformSeedIds.BusinessProjects
+            ],
+            PlatformRoleNames.Member =>
+            [
+                PlatformSeedIds.PlatformRoot,
+                PlatformSeedIds.PlatformWorkspace,
+                PlatformSeedIds.PlatformProfile,
+                PlatformSeedIds.ProjectRoot,
+                PlatformSeedIds.ProjectList,
+                PlatformSeedIds.ProjectDetail,
+                PlatformSeedIds.ProjectMyRelated
+            ],
+            PlatformRoleNames.Viewer =>
+            [
+                PlatformSeedIds.PlatformRoot,
+                PlatformSeedIds.PlatformWorkspace,
+                PlatformSeedIds.PlatformProfile,
+                PlatformSeedIds.ProjectRoot,
+                PlatformSeedIds.ProjectList,
+                PlatformSeedIds.ProjectDetail,
+                PlatformSeedIds.ProjectPmoOverview,
+                PlatformSeedIds.BusinessRoot,
+                PlatformSeedIds.BusinessOverview,
+                PlatformSeedIds.BusinessProjects,
+                PlatformSeedIds.BusinessReports
+            ],
+            _ => []
+        };
     }
 
     private async Task ValidateMenuParentAsync(Guid? currentMenuId, PlatformMenuSaveInput input)

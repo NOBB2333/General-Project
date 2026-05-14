@@ -4,6 +4,7 @@ import type { PlatformEndpointApi, TenantApi } from '#/api/core';
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
 import {
@@ -51,7 +52,17 @@ defineOptions({ name: 'PlatformTenantPage' });
 
 type DrawerType = 'api' | 'edit' | 'menu' | 'users';
 
-const columns = [
+const TENANT_MANAGE_CODE = 'Platform.Tenant.Manage';
+
+type TenantAuthorizationFormState = Omit<TenantApi.TenantAuthorization, 'adminUserId' | 'remark'> & {
+  adminUserId?: string;
+  remark?: string;
+};
+
+const { hasAccessByCodes } = useAccess();
+const canManageTenants = computed(() => hasAccessByCodes([TENANT_MANAGE_CODE]));
+
+const baseColumns = [
   { dataIndex: 'name', key: 'name', title: '租户名称', width: 180 },
   { dataIndex: 'adminUserName', key: 'adminUserName', title: '管理员账号', width: 140 },
   { dataIndex: 'adminEmail', key: 'adminEmail', title: '管理员邮箱', width: 220 },
@@ -61,6 +72,12 @@ const columns = [
   { dataIndex: 'creationTime', key: 'creationTime', title: '创建时间', width: 180 },
   { key: 'actions', title: '操作', width: 420 },
 ];
+
+const columns = computed(() =>
+  canManageTenants.value
+    ? baseColumns
+    : baseColumns.map((item) => item.key === 'actions' ? { ...item, width: 120 } : item),
+);
 
 const loading = ref(false);
 const saving = ref(false);
@@ -95,7 +112,7 @@ const formState = reactive({
   remark: '',
 });
 
-const authorizationState = reactive<TenantApi.TenantAuthorization>({
+const authorizationState = reactive<TenantAuthorizationFormState>({
   adminUserId: undefined,
   apiBlacklist: [],
   isActive: true,
@@ -113,7 +130,7 @@ const metrics = computed(() => [
 ]);
 
 function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): PlatformTreeNode[] {
-  return normalizePlatformTree(items, (item) => item.title);
+  return normalizePlatformTree(items, (item) => `[${item.appCode}] ${item.title}`);
 }
 
 function filterLeafMenuIds(menuIds: string[]) {
@@ -124,6 +141,13 @@ function filterLeafMenuIds(menuIds: string[]) {
 async function loadTenants() {
   loading.value = true;
   try {
+    if (!canManageTenants.value) {
+      items.value = await getTenantListApi();
+      treeData.value = [];
+      endpointGroups.value = [];
+      return;
+    }
+
     const [tenantResult, menuResult, endpointResult] = await Promise.allSettled([
       getTenantListApi(),
       getMenuPermissionTreeApi('platform,project,business'),
@@ -218,12 +242,16 @@ async function handleToggleStatus(record: TenantApi.TenantItem) {
 async function handleEnterTenant(record: TenantApi.TenantItem) {
   await runAction(`enter:${record.id}`, async () => {
     await authStore.enterTenantOperation(record.id);
-    message.success(`已进入租户【${record.name}】运维模式`);
+    message.success(`已开始运维租户【${record.name}】`);
     await router.replace('/platform/organization');
   });
 }
 
 async function openDrawer(type: DrawerType, tenant: TenantApi.TenantItem) {
+  if (type !== 'users' && !canManageTenants.value) {
+    return;
+  }
+
   activeTenant.value = tenant;
   drawerType.value = type;
   drawerVisible.value = true;
@@ -314,7 +342,7 @@ loadTenants();
 
       <Card class="platform-page__card" title="租户台账">
         <template #extra>
-          <Button type="primary" @click="openCreate">新增租户</Button>
+          <Button v-if="canManageTenants" type="primary" @click="openCreate">新增租户</Button>
         </template>
 
         <Skeleton :loading="loading" active>
@@ -358,6 +386,7 @@ loadTenants();
               <template v-else-if="column.key === 'actions'">
                 <Space wrap>
                   <Popconfirm
+                    v-if="canManageTenants"
                     :title="`确认${record.isActive ? '停用' : '启用'}租户【${record.name}】？`"
                     @confirm="handleToggleStatus(record as TenantApi.TenantItem)"
                   >
@@ -368,19 +397,39 @@ loadTenants();
                       {{ record.isActive ? '停用' : '启用' }}
                     </Button>
                   </Popconfirm>
-                  <Button size="small" @click="openDrawer('edit', record as TenantApi.TenantItem)">编辑信息</Button>
                   <Button
+                    v-if="canManageTenants"
+                    size="small"
+                    @click="openDrawer('edit', record as TenantApi.TenantItem)"
+                  >
+                    编辑信息
+                  </Button>
+                  <Button
+                    v-if="canManageTenants"
                     :loading="actionLoadingKey === `enter:${(record as TenantApi.TenantItem).id}`"
                     size="small"
                     type="primary"
                     @click="handleEnterTenant(record as TenantApi.TenantItem)"
                   >
-                    进入
+                    运维
                   </Button>
                   <Button size="small" @click="openDrawer('users', record as TenantApi.TenantItem)">查看账号</Button>
-                  <Button size="small" @click="openDrawer('menu', record as TenantApi.TenantItem)">菜单授权</Button>
-                  <Button size="small" @click="openDrawer('api', record as TenantApi.TenantItem)">接口黑名单</Button>
                   <Button
+                    v-if="canManageTenants"
+                    size="small"
+                    @click="openDrawer('menu', record as TenantApi.TenantItem)"
+                  >
+                    菜单授权
+                  </Button>
+                  <Button
+                    v-if="canManageTenants"
+                    size="small"
+                    @click="openDrawer('api', record as TenantApi.TenantItem)"
+                  >
+                    接口黑名单
+                  </Button>
+                  <Button
+                    v-if="canManageTenants"
                     danger
                     :loading="actionLoadingKey === `delete:${(record as TenantApi.TenantItem).id}`"
                     size="small"

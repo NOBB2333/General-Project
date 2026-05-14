@@ -46,9 +46,17 @@ public class PlatformDataSeedContributorTests : AdminEntityFrameworkCoreTestBase
             var seedUserOrganizationUnitCount = await dbContext.UserOrganizationUnits
                 .Where(x => seedUserIds.Contains(x.UserId))
                 .CountAsync();
+            var pmoRoleIds = await dbContext.Roles
+                .Where(x => x.TenantId == defaultTenant.Id && x.Name == PlatformRoleNames.Pmo)
+                .Select(x => x.Id)
+                .ToListAsync();
+            var pmoAuthorization = await dbContext.Set<AppRoleAuthorization>()
+                .Where(x => pmoRoleIds.Contains(x.RoleId))
+                .ToListAsync();
 
             seedUsers.Count.ShouldBe(PlatformSeedUserNames.All.Length);
             seedUserOrganizationUnitCount.ShouldBe(PlatformSeedUserNames.All.Length);
+            pmoAuthorization.ShouldContain(x => x.DataScopeMode == PlatformAuthorizationDefaults.DataScopeAll);
         });
     }
 
@@ -69,6 +77,7 @@ public class PlatformDataSeedContributorTests : AdminEntityFrameworkCoreTestBase
             "ruanjian-yunwei1",
             "yingjian-jiegou1",
             "shouqian1",
+            "member.demo",
             "viewer.demo"
         ];
     }

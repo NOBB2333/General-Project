@@ -493,19 +493,26 @@ public class BusinessService : ITransientDependency
 
         // 只查一次项目表（修复 #1 双重查询）
         var allProjects = await _projectRepository.GetListAsync();
+        var canSeeAllProjects = _currentUser.IsInRole(PlatformRoleNames.Admin)
+            || _currentUser.IsInRole(PlatformRoleNames.Pmo);
+
         var projects = allProjects
-            .Where(project => _currentUser.IsInRole(PlatformRoleNames.Admin) || accessibleOrganizationUnitIds.Contains(project.OrganizationUnitId))
+            .Where(project => canSeeAllProjects || accessibleOrganizationUnitIds.Contains(project.OrganizationUnitId))
             .ToList();
 
-        if (_currentUser.Id.HasValue && !_currentUser.IsInRole(PlatformRoleNames.Admin))
+        if (_currentUser.Id.HasValue && !canSeeAllProjects)
         {
+            var currentUserId = _currentUser.Id.Value;
             var projectIdsByMembership = (await _projectMemberRepository.GetListAsync())
-                .Where(item => item.UserId == _currentUser.Id.Value)
+                .Where(item => item.UserId == currentUserId)
                 .Select(item => item.ProjectId)
                 .ToHashSet();
 
             projects = projects
-                .Concat(allProjects.Where(item => projectIdsByMembership.Contains(item.Id)))
+                .Concat(allProjects.Where(item =>
+                    item.ManagerUserId == currentUserId ||
+                    item.SponsorUserId == currentUserId ||
+                    projectIdsByMembership.Contains(item.Id)))
                 .DistinctBy(item => item.Id)
                 .ToList();
         }

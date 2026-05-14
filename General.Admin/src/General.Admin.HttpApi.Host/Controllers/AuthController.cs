@@ -11,7 +11,6 @@ using Volo.Abp.Linq;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.TenantManagement;
-using Volo.Abp.Uow;
 using IdentityUser = Volo.Abp.Identity.IdentityUser;
 
 namespace General.Admin.Controllers;
@@ -56,7 +55,6 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    [UnitOfWork(false)]
     public async Task<ActionResult<ApiResponse<LoginResultDto>>> LoginAsync([FromBody] LoginInput input)
     {
         var user = await ResolveLoginUserAsync(input.Username);
@@ -132,13 +130,16 @@ public class AuthController : ControllerBase
         {
             roles = (await _userManager.GetRolesAsync(tenantOperator)).ToList();
         }
+        var operationSessionId = Guid.NewGuid().ToString("N");
         var token = _jwtTokenService.CreateAccessToken(
             tenantOperator,
             roles,
             isHostTenantOperation: true,
+            operationTenantId: tenant.Id,
             operationTenantName: tenant.Name,
             hostOperatorUserId: currentUser.Id,
-            hostOperatorUserName: currentUser.UserName);
+            hostOperatorUserName: currentUser.UserName,
+            operationSessionId: operationSessionId);
 
         return ApiResponse<LoginResultDto>.Ok(BuildLoginResult(tenantOperator, roles, token, tenant.Id, tenant.Name, true));
     }

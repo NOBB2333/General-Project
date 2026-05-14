@@ -28,9 +28,17 @@ public class PlatformAuditLogItemDto
 
     public string? HostOperatorUserName { get; set; }
 
+    public Guid? ImpersonatedUserId { get; set; }
+
+    public string? ImpersonatedUserName { get; set; }
+
     public bool IsHostTenantOperation { get; set; }
 
     public string? MenuTitle { get; set; }
+
+    public string? OperationSessionId { get; set; }
+
+    public Guid? OperationTenantId { get; set; }
 
     public string? TenantName { get; set; }
 

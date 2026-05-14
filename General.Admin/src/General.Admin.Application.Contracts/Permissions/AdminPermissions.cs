@@ -9,6 +9,7 @@ public static class AdminPermissions
         Platform.OrganizationManage,
         Platform.UserManage,
         Platform.RoleManage,
+        Platform.TenantView,
         Platform.TenantManage,
         Platform.MenuManage,
         Platform.ConfigManage,
@@ -34,6 +35,7 @@ public static class AdminPermissions
         public const string OrganizationManage = "Platform.Organization.Manage";
         public const string UserManage = "Platform.User.Manage";
         public const string RoleManage = "Platform.Role.Manage";
+        public const string TenantView = "Platform.Tenant.View";
         public const string TenantManage = "Platform.Tenant.Manage";
         public const string MenuManage = "Platform.Menu.Manage";
         public const string ConfigManage = "Platform.Config.Manage";

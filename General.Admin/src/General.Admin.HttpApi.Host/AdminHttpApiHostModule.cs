@@ -138,6 +138,34 @@ public class AdminHttpApiHostModule : AbpModule
                     IssuerSigningKey = signingKey,
                     ClockSkew = TimeSpan.FromMinutes(1)
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = async context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json; charset=utf-8";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
+                        {
+                            code = -1,
+                            data = false,
+                            error = "Authentication is required.",
+                            message = "Authentication is required."
+                        }));
+                    },
+                    OnForbidden = async context =>
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        context.Response.ContentType = "application/json; charset=utf-8";
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(new
+                        {
+                            code = -1,
+                            data = false,
+                            error = "Permission denied.",
+                            message = "Permission denied."
+                        }));
+                    }
+                };
             });
 
         context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(options =>

@@ -3,6 +3,7 @@ import type { OnlineUserApi, OrganizationApi, RoleApi, UserApi } from '#/api/cor
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
 import {
@@ -29,7 +30,7 @@ import {
   forceLogoutOnlineUserApi,
   getOnlineUserListApi,
   getOrganizationTreeApi,
-  getRoleListApi,
+  getRoleOptionsApi,
   getUserListApi,
   resetUserPasswordApi,
   updateUserApi,
@@ -39,7 +40,12 @@ import { normalizePlatformTreeSelect, type PlatformTreeNode } from '#/composable
 
 defineOptions({ name: 'PlatformUserPage' });
 
-const columns = [
+const USER_MANAGE_CODE = 'Platform.User.Manage';
+
+const { hasAccessByCodes } = useAccess();
+const canManageUsers = computed(() => hasAccessByCodes([USER_MANAGE_CODE]));
+
+const baseColumns = [
   { dataIndex: 'displayName', key: 'displayName', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.displayName.localeCompare(right.displayName, 'zh-CN'), title: '姓名', width: 140 },
   { dataIndex: 'username', key: 'username', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.username.localeCompare(right.username, 'zh-CN'), title: '账号', width: 160 },
   { dataIndex: 'employeeNo', key: 'employeeNo', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.employeeNo || '').localeCompare(right.employeeNo || '', 'zh-CN'), title: '工号', width: 120 },
@@ -53,6 +59,12 @@ const columns = [
   { dataIndex: 'isActive', key: 'isActive', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => Number(left.isActive) - Number(right.isActive), title: '状态', width: 100 },
   { key: 'actions', title: '操作', width: 210 },
 ];
+
+const columns = computed(() =>
+  canManageUsers.value
+    ? baseColumns
+    : baseColumns.filter((item) => item.key !== 'actions'),
+);
 
 const onlineColumns = [
   { dataIndex: 'userName', key: 'userName', title: '账号' },
@@ -77,7 +89,7 @@ const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const organizationUnitId = ref<string>();
 const statusFilter = ref<string>();
 const roleName = ref<string>();
-const roleItems = ref<RoleApi.RoleItem[]>([]);
+const roleItems = ref<RoleApi.RoleOption[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
 const totalCount = ref(0);
 const pageIndex = ref(1);
@@ -123,19 +135,25 @@ const formState = reactive<UserFormState>({
 });
 
 const metrics = computed(() => [
-  { label: '用户总数', value: totalCount.value },
-  {
-    label: '当前页启用',
-    value: users.value.filter((item) => item.isActive).length,
-  },
-  {
-    label: '当前页部门',
-    value: new Set(users.value.flatMap((item) => item.organizationUnitNames)).size,
-  },
-  {
-    label: '在线会话',
-    value: onlineUsers.value.length,
-  },
+  ...[
+    { label: '用户总数', value: totalCount.value },
+    {
+      label: '当前页启用',
+      value: users.value.filter((item) => item.isActive).length,
+    },
+    {
+      label: '当前页部门',
+      value: new Set(users.value.flatMap((item) => item.organizationUnitNames)).size,
+    },
+  ],
+  ...(canManageUsers.value
+    ? [
+        {
+          label: '在线会话',
+          value: onlineUsers.value.length,
+        },
+      ]
+    : []),
 ]);
 
 const roleOptions = computed(() =>
@@ -149,7 +167,7 @@ function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformT
 async function loadFilters() {
   const [treeResult, roleResult] = await Promise.allSettled([
     getOrganizationTreeApi(),
-    getRoleListApi(),
+    getRoleOptionsApi(),
   ]);
   if (treeResult.status === 'fulfilled') {
     organizationTree.value = treeResult.value;
@@ -188,6 +206,11 @@ async function loadUsers() {
 }
 
 async function loadOnlineUsers() {
+  if (!canManageUsers.value) {
+    onlineUsers.value = [];
+    return;
+  }
+
   onlineLoading.value = true;
   try {
     onlineUsers.value = await getOnlineUserListApi();
@@ -200,7 +223,13 @@ async function loadOnlineUsers() {
 }
 
 async function refreshUserData() {
-  await Promise.allSettled([loadUsers(), loadOnlineUsers()]);
+  if (canManageUsers.value) {
+    await Promise.allSettled([loadUsers(), loadOnlineUsers()]);
+    return;
+  }
+
+  onlineUsers.value = [];
+  await loadUsers();
 }
 
 async function handleForceLogout(record: OnlineUserApi.OnlineUserItem) {
@@ -212,6 +241,10 @@ async function handleForceLogout(record: OnlineUserApi.OnlineUserItem) {
 }
 
 function openOnlineDrawer() {
+  if (!canManageUsers.value) {
+    return;
+  }
+
   onlineVisible.value = true;
   void loadOnlineUsers();
 }
@@ -491,8 +524,8 @@ onBeforeUnmount(() => {
             />
             <Button type="primary" @click="searchUsers">查询</Button>
             <Button @click="resetFilters">重置</Button>
-            <Button @click="openOnlineDrawer">在线会话</Button>
-            <Button type="primary" @click="openCreate">新增用户</Button>
+            <Button v-if="canManageUsers" @click="openOnlineDrawer">在线会话</Button>
+            <Button v-if="canManageUsers" type="primary" @click="openCreate">新增用户</Button>
           </div>
         </template>
 
@@ -541,12 +574,16 @@ onBeforeUnmount(() => {
             </template>
             <template v-else-if="column.key === 'isActive'">
               <Switch
+                v-if="canManageUsers"
                 :checked="record.isActive"
                 checked-children="启用"
                 :loading="actionLoadingKey === `toggle:${(record as UserApi.UserListItem).id}`"
                 un-checked-children="停用"
                 @change="(checked) => handleToggleStatus(record as UserApi.UserListItem, checked === true)"
               />
+              <Tag v-else :color="record.isActive ? 'success' : 'default'">
+                {{ record.isActive ? '启用' : '停用' }}
+              </Tag>
             </template>
             <template v-else-if="column.key === 'isOnline'">
               <Tag :color="record.isOnline ? 'success' : 'default'">

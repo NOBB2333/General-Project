@@ -6,7 +6,7 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize(AdminPermissions.Platform.TenantManage)]
+[Authorize(AdminPermissions.Platform.TenantView)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/tenant")]
 public class TenantController : ControllerBase
@@ -31,6 +31,7 @@ public class TenantController : ControllerBase
     }
 
     [HttpPut("{id:guid}/authorization")]
+    [Authorize(AdminPermissions.Platform.TenantManage)]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> SaveAuthorizationAsync(
         Guid id,
@@ -41,6 +42,7 @@ public class TenantController : ControllerBase
     }
 
     [HttpPut("{id:guid}/status")]
+    [Authorize(AdminPermissions.Platform.TenantManage)]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> SetStatusAsync(Guid id, [FromQuery] bool isActive)
     {
@@ -49,6 +51,7 @@ public class TenantController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(AdminPermissions.Platform.TenantManage)]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> CreateAsync([FromBody] PlatformTenantSaveInput input)
     {
@@ -57,6 +60,7 @@ public class TenantController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(AdminPermissions.Platform.TenantManage)]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> UpdateAsync(Guid id, [FromBody] PlatformTenantSaveInput input)
     {
@@ -65,6 +69,7 @@ public class TenantController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(AdminPermissions.Platform.TenantManage)]
     [PlatformEndpoint("Platform.Tenant.Manage")]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(Guid id)
     {

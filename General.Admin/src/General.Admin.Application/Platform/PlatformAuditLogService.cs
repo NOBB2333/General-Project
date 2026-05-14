@@ -291,8 +291,12 @@ public class PlatformAuditLogService : ITransientDependency
                 HostOperatorUserId = item.HostOperatorUserId,
                 HostOperatorUserName = item.HostOperatorUserName,
                 Id = item.Id,
+                ImpersonatedUserId = item.ImpersonatedUserId,
+                ImpersonatedUserName = item.ImpersonatedUserName,
                 IsHostTenantOperation = item.IsHostTenantOperation,
                 MenuTitle = item.MenuTitle,
+                OperationSessionId = item.OperationSessionId,
+                OperationTenantId = item.OperationTenantId,
                 TenantName = item.TenantName,
                 Url = item.Url,
                 UserName = item.UserName

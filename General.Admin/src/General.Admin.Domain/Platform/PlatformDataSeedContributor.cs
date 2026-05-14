@@ -19,6 +19,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
 
     private readonly IGuidGenerator _guidGenerator;
     private readonly IRepository<AppMenu, Guid> _menuRepository;
+    private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IRepository<AppRoleMenu, Guid> _roleMenuRepository;
     private readonly IRepository<AppTenantAuthorization, Guid> _tenantAuthorizationRepository;
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
@@ -58,6 +59,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     public PlatformDataSeedContributor(
         IGuidGenerator guidGenerator,
         IRepository<AppMenu, Guid> menuRepository,
+        IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
         IRepository<AppTenantAuthorization, Guid> tenantAuthorizationRepository,
         IRepository<AppUserProfile, Guid> userProfileRepository,
@@ -96,6 +98,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     {
         _guidGenerator = guidGenerator;
         _menuRepository = menuRepository;
+        _roleAuthorizationRepository = roleAuthorizationRepository;
         _roleMenuRepository = roleMenuRepository;
         _tenantAuthorizationRepository = tenantAuthorizationRepository;
         _userProfileRepository = userProfileRepository;
@@ -149,9 +152,12 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         await SeedMenusAsync();
         await SeedRoleMenusAsync();
         await RepairDefaultTenantSeedDataAsync(defaultTenant);
+        Guid defaultTenantAdminId;
         using (_currentTenant.Change(defaultTenant.Id, defaultTenant.Name))
         {
             await SeedRolesAsync();
+            defaultTenantAdminId = await SeedDefaultTenantUserAsync(defaultTenant);
+            await SeedRoleAuthorizationsAsync();
             await SeedRoleMenusAsync();
             await SeedOrganizationUnitsAsync();
             await SeedUsersAsync();
@@ -159,7 +165,6 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             await SeedBusinessManagementDataAsync();
         }
 
-        var defaultTenantAdminId = await SeedDefaultTenantUserAsync(defaultTenant);
         await SeedDefaultTenantAuthorizationAsync(defaultTenant, defaultTenantAdminId);
         await SeedDefaultTenantAdminRoleMenusAsync(defaultTenant, await _menuRepository.GetListAsync());
         await SeedRolesAsync();
@@ -235,6 +240,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         await SeedUserAsync(Guid.Parse("5F7B6BA9-84A5-4E32-9538-1DD7B7B5E1F6"), "ruanjian-yunwei1", "软件-运维1", "ruanjian-yunwei1@qq.com", PlatformRoleNames.Member, PlatformSeedIds.SoftwareDept, "18821776666");
         await SeedUserAsync(Guid.Parse("B0BF606F-4EBB-4984-90DB-B152A0BDA3FD"), "yingjian-jiegou1", "硬件-结构1", "yingjian-jiegou1@qq.com", PlatformRoleNames.Member, PlatformSeedIds.HardwareDept, "18821776666");
         await SeedUserAsync(Guid.Parse("3A20D747-5654-BABA-C2BF-504368B3652C"), "shouqian1", "售前1", "shouqian1@general.local", PlatformRoleNames.Member, PlatformSeedIds.PreSalesDept, "19921776666");
+        await SeedUserAsync(Guid.Parse("3A20DB5A-77E9-5B3D-3005-B5FFF8F5A793"), "member.demo", "项目成员", "member.demo@general.local", PlatformRoleNames.Member, PlatformSeedIds.PreSalesDept);
         await SeedUserAsync(Guid.Parse("3A20D747-5689-9C72-3A86-5F1BAC103070"), "viewer.demo", "经营查看", "viewer.demo@general.local", PlatformRoleNames.Viewer, PlatformSeedIds.FinanceDept);
     }
 
@@ -247,6 +253,60 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             GetSeedOrganizationUnitIds(),
             GetSeedOrganizationUnitNames(),
             GetDefaultTenantSeedRoleNames());
+    }
+
+    private async Task SeedRoleAuthorizationsAsync()
+    {
+        var currentTenantId = _currentTenant.Id;
+        var roles = (await _roleRepository.GetListAsync())
+            .Where(x => x.TenantId == currentTenantId && PlatformRoleNames.All.Contains(x.Name))
+            .ToList();
+
+        foreach (var role in roles)
+        {
+            var defaults = ResolveDefaultRoleAuthorization(role.Name);
+            var authorization = await _roleAuthorizationRepository.FindAsync(x => x.RoleId == role.Id);
+            if (authorization != null)
+            {
+                continue;
+            }
+
+            await _roleAuthorizationRepository.InsertAsync(
+                new AppRoleAuthorization(
+                    _guidGenerator.Create(),
+                    role.Id,
+                    defaults.DataScopeMode,
+                    defaults.AccountScopeMode,
+                    "[]",
+                    "[]",
+                    "[]"),
+                autoSave: true);
+        }
+    }
+
+    private static (string AccountScopeMode, string DataScopeMode) ResolveDefaultRoleAuthorization(string roleName)
+    {
+        return roleName switch
+        {
+            PlatformRoleNames.Admin => (
+                PlatformAuthorizationDefaults.AccountScopeAll,
+                PlatformAuthorizationDefaults.DataScopeAll),
+            PlatformRoleNames.Pmo => (
+                PlatformAuthorizationDefaults.AccountScopeAll,
+                PlatformAuthorizationDefaults.DataScopeAll),
+            PlatformRoleNames.Pm => (
+                PlatformAuthorizationDefaults.AccountScopeDataAndUsers,
+                PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants),
+            PlatformRoleNames.Member => (
+                PlatformAuthorizationDefaults.AccountScopeOnlyUsers,
+                PlatformAuthorizationDefaults.DataScopeSelf),
+            PlatformRoleNames.Viewer => (
+                PlatformAuthorizationDefaults.AccountScopeData,
+                PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants),
+            _ => (
+                PlatformAuthorizationDefaults.AccountScopeDataAndUsers,
+                PlatformAuthorizationDefaults.DataScopeCurrentOrganizationAndDescendants)
+        };
     }
 
     private static Guid[] GetSeedOrganizationUnitIds()
@@ -304,6 +364,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Guid.Parse("5F7B6BA9-84A5-4E32-9538-1DD7B7B5E1F6"),
             Guid.Parse("B0BF606F-4EBB-4984-90DB-B152A0BDA3FD"),
             Guid.Parse("3A20D747-5654-BABA-C2BF-504368B3652C"),
+            Guid.Parse("3A20DB5A-77E9-5B3D-3005-B5FFF8F5A793"),
             Guid.Parse("3A20D747-5689-9C72-3A86-5F1BAC103070")
         ];
     }
@@ -325,8 +386,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             "ruanjian-yunwei1",
             "yingjian-jiegou1",
             "shouqian1",
-            "viewer.demo",
-            "member.demo"
+            "member.demo",
+            "viewer.demo"
         ];
     }
 
@@ -393,7 +454,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
 
         var user = new IdentityUser(_guidGenerator.Create(), "host.admin", "host.admin@general.local")
         {
-            Name = "宿主管理员",
+            Name = "超级管理员",
             Surname = string.Empty
         };
         user.AddRole(role.Id);
@@ -556,7 +617,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         var adminUser = await _userManager.FindByNameAsync("tenant.admin");
         var pmoUser = await _userManager.FindByNameAsync("pmo.demo");
         var pmUser = await _userManager.FindByNameAsync("pm.demo");
-        var memberUser = await _userManager.FindByNameAsync("shouqian1");
+        var memberUser = await _userManager.FindByNameAsync("member.demo");
         var viewerUser = await _userManager.FindByNameAsync("viewer.demo");
 
         if (adminUser == null || pmoUser == null || pmUser == null || memberUser == null || viewerUser == null)
@@ -723,6 +784,23 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 new(Guid.Parse("57000000-0000-0000-0000-000000000008"), projects[2].Id, viewerUser.Id, PlatformSeedIds.FinanceDept, ["业务", "运维"], new DateTime(2026, 4, 10))
             ], autoSave: true);
         }
+        else
+        {
+            await EnsureProjectMemberAsync(
+                Guid.Parse("57000000-0000-0000-0000-000000000101"),
+                projects[0].Id,
+                memberUser.Id,
+                PlatformSeedIds.PreSalesDept,
+                ["开发", "测试"],
+                new DateTime(2026, 4, 2));
+            await EnsureProjectMemberAsync(
+                Guid.Parse("57000000-0000-0000-0000-000000000106"),
+                projects[1].Id,
+                memberUser.Id,
+                PlatformSeedIds.PreSalesDept,
+                ["测试", "运维"],
+                new DateTime(2026, 4, 6));
+        }
 
         if (!await _projectWorklogRepository.AnyAsync())
         {
@@ -736,6 +814,27 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 new(Guid.Parse("58000000-0000-0000-0000-000000000005"), projects[2].Id, viewerUser.Id, weekStart, new DateTime(2026, 4, 15), 1, "整理财务接口口径与回款节点", Guid.Parse("52000000-0000-0000-0000-000000000007"))
             ], autoSave: true);
         }
+    }
+
+    private async Task EnsureProjectMemberAsync(
+        Guid id,
+        Guid projectId,
+        Guid userId,
+        Guid organizationUnitId,
+        IEnumerable<string> roleNames,
+        DateTime joinDate)
+    {
+        var exists = await _projectMemberRepository.AnyAsync(x =>
+            x.ProjectId == projectId &&
+            x.UserId == userId);
+        if (exists)
+        {
+            return;
+        }
+
+        await _projectMemberRepository.InsertAsync(
+            new ProjectMember(id, projectId, userId, organizationUnitId, roleNames, joinDate),
+            autoSave: true);
     }
 
     private async Task SeedPlatformScheduledJobsAsync()
@@ -1005,9 +1104,6 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 PlatformSeedIds.PlatformRoot,
                 PlatformSeedIds.PlatformWorkspace,
                 PlatformSeedIds.PlatformProfile,
-                PlatformSeedIds.PlatformScheduler,
-                PlatformSeedIds.PlatformSchedulerManage,
-                PlatformSeedIds.PlatformSchedulerExecute,
                 PlatformSeedIds.ProjectRoot,
                 PlatformSeedIds.ProjectList,
                 PlatformSeedIds.ProjectDetail,
@@ -1096,9 +1192,53 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             await GrantRolePermissionsForMenusAsync(role, allMenus, effectiveMenuIds);
         }
 
+        await RemovePmoSchedulerSeedPermissionsAsync(roles);
+
         if (_unitOfWorkManager.Current != null)
         {
             await _unitOfWorkManager.Current.SaveChangesAsync();
+        }
+    }
+
+    private async Task RemovePmoSchedulerSeedPermissionsAsync(IReadOnlyDictionary<string, List<Guid>> roles)
+    {
+        if (!roles.TryGetValue(PlatformRoleNames.Pmo, out var roleIds) || roleIds.Count == 0)
+        {
+            return;
+        }
+
+        var schedulerMenuIds = new[]
+        {
+            PlatformSeedIds.PlatformScheduler,
+            PlatformSeedIds.PlatformSchedulerManage,
+            PlatformSeedIds.PlatformSchedulerExecute
+        }.ToHashSet();
+
+        var roleMenus = (await _roleMenuRepository.GetListAsync())
+            .Where(x => roleIds.Contains(x.RoleId) && schedulerMenuIds.Contains(x.MenuId))
+            .ToList();
+        if (roleMenus.Count > 0)
+        {
+            await _roleMenuRepository.DeleteManyAsync(roleMenus);
+        }
+
+        var schedulerPermissionCodes = new[]
+        {
+            "Platform.Scheduler.View",
+            "Platform.Scheduler.Manage",
+            "Platform.Scheduler.Execute"
+        }.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var permissionGrants = (await _permissionGrantRepository.GetListAsync())
+            .Where(x =>
+                schedulerPermissionCodes.Contains(x.Name) &&
+                x.ProviderName == RolePermissionValueProvider.ProviderName &&
+                x.ProviderKey == PlatformRoleNames.Pmo &&
+                x.TenantId == _currentTenant.Id)
+            .ToList();
+        if (permissionGrants.Count > 0)
+        {
+            await _permissionGrantRepository.DeleteManyAsync(permissionGrants);
         }
     }
 
@@ -1131,6 +1271,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             }
 
             await GrantRolePermissionsForMenusAsync(role, allMenus, menuIds);
+            await RevokeRolePermissionAsync(role, "Platform.Tenant.View");
             await RevokeRolePermissionAsync(role, "Platform.Tenant.Manage");
         }
     }
@@ -1203,10 +1344,10 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Catalog(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRoot, null, "PlatformCenter", "/platform", "平台中心", "lucide:settings-2"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformWorkspace, PlatformSeedIds.PlatformRoot, "PlatformWorkspace", "/platform/workspace", "/platform/workspace/index", "平台总览", "lucide:layout-dashboard", 10, affixTab: true),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOrganization, PlatformSeedIds.PlatformRoot, "PlatformOrganization", "/platform/organization", "/platform/organization/index", "组织架构", "lucide:building-2", 20),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformTenants, PlatformSeedIds.PlatformRoot, "PlatformTenants", "/platform/tenants", "/platform/tenants/index", "租户管理", "lucide:building", 50),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformTenants, PlatformSeedIds.PlatformRoot, "PlatformTenants", "/platform/tenants", "/platform/tenants/index", "租户管理", "lucide:building", 50, permissionCode: "Platform.Tenant.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUsers, PlatformSeedIds.PlatformRoot, "PlatformUsers", "/platform/users", "/platform/users/index", "用户管理", "lucide:users", 30),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRoles, PlatformSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenus, PlatformSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRoles, PlatformSeedIds.PlatformRoot, "PlatformRoles", "/platform/roles", "/platform/roles/index", "角色权限", "lucide:key-round", 40, permissionCode: "Platform.Role.Manage"),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenus, PlatformSeedIds.PlatformRoot, "PlatformMenus", "/platform/menus", "/platform/menus/index", "菜单管理", "lucide:waypoints", 60, permissionCode: "Platform.Menu.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigs, PlatformSeedIds.PlatformRoot, "PlatformConfigs", "/platform/configs", "/platform/configs/index", "配置参数", "lucide:sliders-horizontal", 65, permissionCode: "Platform.Config.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformCache, PlatformSeedIds.PlatformRoot, "PlatformCache", "/platform/cache", "/platform/cache/index", "缓存管理", "lucide:database-zap", 66, permissionCode: "Platform.Cache.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDicts, PlatformSeedIds.PlatformRoot, "PlatformDicts", "/platform/dicts", "/platform/dicts/index", "字典管理", "lucide:list-tree", 68, permissionCode: "Platform.Dict.Manage"),

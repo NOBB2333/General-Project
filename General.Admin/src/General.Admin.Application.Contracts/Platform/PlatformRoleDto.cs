@@ -28,3 +28,12 @@ public class PlatformRoleDto
 
     public int UserCount { get; set; }
 }
+
+public class PlatformRoleOptionDto
+{
+    public string Description { get; set; } = string.Empty;
+
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}

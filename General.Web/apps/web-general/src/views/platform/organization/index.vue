@@ -3,6 +3,7 @@ import type { OrganizationApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
+import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 
 import {
@@ -36,7 +37,12 @@ import {
   type PlatformTreeNode,
 } from '#/composables/platform/use-tree-normalization';
 
-const columns = [
+const ORG_MANAGE_CODE = 'Platform.Organization.Manage';
+
+const { hasAccessByCodes } = useAccess();
+const canManageOrganization = computed(() => hasAccessByCodes([ORG_MANAGE_CODE]));
+
+const baseColumns = [
   { dataIndex: 'displayName', key: 'displayName', title: '姓名' },
   { dataIndex: 'username', key: 'username', title: '账号' },
   { dataIndex: 'roles', key: 'roles', title: '角色' },
@@ -44,6 +50,12 @@ const columns = [
   { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
   { key: 'actions', title: '操作', width: 120 },
 ];
+
+const columns = computed(() =>
+  canManageOrganization.value
+    ? baseColumns
+    : baseColumns.filter((item) => item.key !== 'actions'),
+);
 
 const keyword = ref('');
 const loadingMembers = ref(false);
@@ -260,7 +272,7 @@ onMounted(async () => {
       <div class="platform-page__grid">
         <Card class="platform-page__card" title="组织树">
           <template #extra>
-            <Button type="primary" @click="openCreateRoot">新增节点</Button>
+            <Button v-if="canManageOrganization" type="primary" @click="openCreateRoot">新增节点</Button>
           </template>
 
           <Skeleton :loading="loadingTree" active>
@@ -281,7 +293,7 @@ onMounted(async () => {
         <div class="platform-page__stack">
           <Card class="platform-page__card" title="节点概览">
             <template #extra>
-              <div class="toolbar">
+              <div v-if="canManageOrganization" class="toolbar">
                 <Button type="primary" @click="openCreateChild">新增节点</Button>
                 <Button :disabled="!selectedNode" @click="openEdit">编辑</Button>
                 <Button :disabled="!selectedNode" @click="openMove">移动</Button>
@@ -365,7 +377,7 @@ onMounted(async () => {
                     {{ record.isActive ? '启用' : '停用' }}
                   </Tag>
                 </template>
-                <template v-else-if="column.key === 'actions'">
+                <template v-else-if="column.key === 'actions' && canManageOrganization">
                   <Button size="small" type="link" @click="openTransfer(record as UserApi.UserListItem)">
                     转移成员
                   </Button>

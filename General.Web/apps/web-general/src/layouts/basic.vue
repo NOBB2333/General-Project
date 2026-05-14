@@ -93,7 +93,7 @@ const menus = computed(() => {
         void handleExitTenantOperation();
       },
       icon: 'lucide:log-out',
-      text: '退出租户运维',
+      text: '退出运维租户',
     });
   }
 
@@ -200,10 +200,10 @@ watch(
     <template #header-right-120>
       <div v-if="isHostTenantOperation" class="tenant-operation-bar">
         <span class="tenant-operation-text">
-          运维：{{ userStore.userInfo?.operationTenantName || '-' }}
+          正在运维租户：{{ userStore.userInfo?.operationTenantName || '-' }}
         </span>
         <Button size="small" type="link" @click="handleExitTenantOperation">
-          退出
+          退出运维
         </Button>
       </div>
     </template>

@@ -1456,6 +1456,13 @@ namespace General.Admin.Migrations.PostgreSql
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<Guid?>("ImpersonatedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ImpersonatedUserName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("HttpMethod")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
@@ -1469,6 +1476,13 @@ namespace General.Admin.Migrations.PostgreSql
                     b.Property<string>("MenuTitle")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<string>("OperationSessionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("OperationTenantId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("TenantName")
                         .HasMaxLength(128)
@@ -1489,6 +1503,8 @@ namespace General.Admin.Migrations.PostgreSql
                     b.HasIndex("Category", "ExecutionTime");
 
                     b.HasIndex("IsHostTenantOperation", "ExecutionTime");
+
+                    b.HasIndex("OperationSessionId", "ExecutionTime");
 
                     b.HasIndex("UserName", "ExecutionTime");
 

@@ -45,6 +45,14 @@ public class PlatformRequestAuditMiddleware : IMiddleware, ITransientDependency
             var hostOperatorUserId = Guid.TryParse(hostOperatorUserIdText, out var parsedHostOperatorUserId)
                 ? parsedHostOperatorUserId
                 : (Guid?)null;
+            var operationTenantIdText = context.User.FindFirst(PlatformTenantOperationClaimTypes.OperationTenantId)?.Value;
+            var operationTenantId = Guid.TryParse(operationTenantIdText, out var parsedOperationTenantId)
+                ? parsedOperationTenantId
+                : (Guid?)null;
+            var impersonatedUserIdText = context.User.FindFirst(PlatformTenantOperationClaimTypes.ImpersonatedUserId)?.Value;
+            var impersonatedUserId = Guid.TryParse(impersonatedUserIdText, out var parsedImpersonatedUserId)
+                ? parsedImpersonatedUserId
+                : (Guid?)null;
 
             await _requestAuditStore.AppendAsync(new PlatformRequestAuditEntry
             {
@@ -60,7 +68,11 @@ public class PlatformRequestAuditMiddleware : IMiddleware, ITransientDependency
                 HostOperatorUserId = hostOperatorUserId,
                 HostOperatorUserName = context.User.FindFirst(PlatformTenantOperationClaimTypes.HostOperatorUserName)?.Value,
                 Id = Guid.NewGuid(),
+                ImpersonatedUserId = impersonatedUserId,
+                ImpersonatedUserName = context.User.FindFirst(PlatformTenantOperationClaimTypes.ImpersonatedUserName)?.Value,
                 IsHostTenantOperation = isHostTenantOperation,
+                OperationSessionId = context.User.FindFirst(PlatformTenantOperationClaimTypes.OperationSessionId)?.Value,
+                OperationTenantId = operationTenantId,
                 TenantName = context.User.FindFirst(PlatformTenantOperationClaimTypes.OperationTenantName)?.Value
                     ?? context.User.FindFirst("tenant_name")?.Value
                     ?? context.User.FindFirst(AbpClaimTypes.TenantId)?.Value,

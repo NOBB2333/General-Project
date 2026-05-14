@@ -35,6 +35,23 @@ function resetAccessState() {
   accessStore.setLoginExpired(false);
 }
 
+function findFirstAccessiblePath(items: any[]): null | string {
+  for (const item of items) {
+    if (typeof item?.path === 'string' && item.path.startsWith('/')) {
+      return item.path;
+    }
+
+    const childPath = Array.isArray(item?.children)
+      ? findFirstAccessiblePath(item.children)
+      : null;
+    if (childPath) {
+      return childPath;
+    }
+  }
+
+  return null;
+}
+
 /**
  * 通用守卫配置
  * @param router
@@ -116,9 +133,7 @@ function setupAccessGuard(router: Router) {
       return to;
     }
 
-    const shouldRegenerateAccess =
-      !accessStore.isAccessChecked ||
-      to.name === FALLBACK_NOT_FOUND_ROUTE_NAME;
+    const shouldRegenerateAccess = !accessStore.isAccessChecked;
 
     if (!shouldRegenerateAccess) {
       return true;
@@ -142,9 +157,16 @@ function setupAccessGuard(router: Router) {
         (to.path === preferences.app.defaultHomePath
           ? userInfo.homePath || preferences.app.defaultHomePath
           : to.fullPath)) as string;
+      const normalizedRedirectPath = decodeURIComponent(redirectPath);
+      const resolvedRedirect = router.resolve(normalizedRedirectPath);
+      const fallbackPath =
+        resolvedRedirect.name === FALLBACK_NOT_FOUND_ROUTE_NAME
+          ? findFirstAccessiblePath(accessibleMenus) ||
+            findFirstAccessiblePath(accessibleRoutes)
+          : null;
 
       return {
-        ...router.resolve(decodeURIComponent(redirectPath)),
+        ...router.resolve(fallbackPath || normalizedRedirectPath),
         replace: true,
       };
     } catch (error) {
