@@ -19,6 +19,7 @@ public class BusinessController : ControllerBase
     }
 
     [HttpGet("overview")]
+    [Authorize(AdminPermissions.Business.ReportView)]
     public async Task<ActionResult<ApiResponse<BusinessOverviewDto>>> GetOverviewAsync()
     {
         return ApiResponse<BusinessOverviewDto>.Ok(await _businessService.GetOverviewAsync());
@@ -37,6 +38,7 @@ public class BusinessController : ControllerBase
     }
 
     [HttpGet("reports")]
+    [Authorize(AdminPermissions.Business.ReportView)]
     public async Task<ActionResult<ApiResponse<BusinessReportDto>>> GetReportsAsync([FromQuery] BusinessReportQueryInput input)
     {
         return ApiResponse<BusinessReportDto>.Ok(await _businessService.GetReportAsync(input));

@@ -250,7 +250,7 @@ public class PlatformMenuService : ITransientDependency
     {
         var grantedIdSet = grantedMenuIds.ToHashSet();
         var managedPermissionCodes = AdminPermissions.All.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var permissionCodes = allMenus
+        var permissionGroups = allMenus
             .Where(x => x.IsEnabled && !string.IsNullOrWhiteSpace(x.PermissionCode))
             .Select(x => new
             {
@@ -258,16 +258,21 @@ public class PlatformMenuService : ITransientDependency
                 PermissionCode = x.PermissionCode!.Trim()
             })
             .Where(x => !string.IsNullOrWhiteSpace(x.PermissionCode) && managedPermissionCodes.Contains(x.PermissionCode))
-            .DistinctBy(x => x.PermissionCode)
+            .GroupBy(x => x.PermissionCode, StringComparer.OrdinalIgnoreCase)
+            .Select(x => new
+            {
+                PermissionCode = x.Key,
+                IsGranted = x.Any(item => grantedIdSet.Contains(item.Id))
+            })
             .ToList();
 
-        foreach (var item in permissionCodes)
+        foreach (var item in permissionGroups)
         {
             await _permissionManager.SetAsync(
                 item.PermissionCode,
                 RolePermissionValueProvider.ProviderName,
                 role.Name,
-                grantedIdSet.Contains(item.Id));
+                item.IsGranted);
         }
     }
 

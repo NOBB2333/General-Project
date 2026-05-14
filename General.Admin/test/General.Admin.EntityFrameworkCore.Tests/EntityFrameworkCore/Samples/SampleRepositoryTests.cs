@@ -34,7 +34,7 @@ public class SampleRepositoryTests : AdminEntityFrameworkCoreTestBase
         {
                 //Act
                 var adminUser = await (await _appUserRepository.GetQueryableAsync())
-                .Where(u => u.UserName == "admin.demo")
+                .Where(u => u.UserName == "host.admin")
                 .FirstOrDefaultAsync();
 
                 //Assert

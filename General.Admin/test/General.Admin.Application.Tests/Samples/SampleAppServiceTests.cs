@@ -32,6 +32,6 @@ public abstract class SampleAppServiceTests<TStartupModule> : AdminApplicationTe
 
         //Assert
         result.TotalCount.ShouldBeGreaterThan(0);
-        result.Items.ShouldContain(u => u.UserName == "admin.demo");
+        result.Items.ShouldContain(u => u.UserName == "host.admin");
     }
 }

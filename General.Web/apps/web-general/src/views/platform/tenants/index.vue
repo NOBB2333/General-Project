@@ -113,7 +113,7 @@ const metrics = computed(() => [
 ]);
 
 function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): PlatformTreeNode[] {
-  return normalizePlatformTree(items, (item) => `[${item.appCode}] ${item.title}`);
+  return normalizePlatformTree(items, (item) => item.title);
 }
 
 function filterLeafMenuIds(menuIds: string[]) {

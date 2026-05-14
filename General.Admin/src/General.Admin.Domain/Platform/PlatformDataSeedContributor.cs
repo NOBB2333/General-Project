@@ -24,6 +24,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     private readonly IRepository<AppUserProfile, Guid> _userProfileRepository;
     private readonly IRepository<IdentityRole, Guid> _roleRepository;
     private readonly IRepository<OrganizationUnit, Guid> _organizationUnitRepository;
+    private readonly IRepository<IdentityUserOrganizationUnit> _userOrganizationUnitRepository;
     private readonly IRepository<ProjectEntity, Guid> _projectRepository;
     private readonly IRepository<ProjectCycle, Guid> _projectCycleRepository;
     private readonly IRepository<ProjectDocument, Guid> _projectDocumentRepository;
@@ -62,6 +63,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IRepository<AppUserProfile, Guid> userProfileRepository,
         IRepository<IdentityRole, Guid> roleRepository,
         IRepository<OrganizationUnit, Guid> organizationUnitRepository,
+        IRepository<IdentityUserOrganizationUnit> userOrganizationUnitRepository,
         IRepository<ProjectEntity, Guid> projectRepository,
         IRepository<ProjectCycle, Guid> projectCycleRepository,
         IRepository<ProjectDocument, Guid> projectDocumentRepository,
@@ -99,6 +101,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         _userProfileRepository = userProfileRepository;
         _roleRepository = roleRepository;
         _organizationUnitRepository = organizationUnitRepository;
+        _userOrganizationUnitRepository = userOrganizationUnitRepository;
         _projectRepository = projectRepository;
         _projectCycleRepository = projectCycleRepository;
         _projectDocumentRepository = projectDocumentRepository;
@@ -149,6 +152,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         using (_currentTenant.Change(defaultTenant.Id, defaultTenant.Name))
         {
             await SeedRolesAsync();
+            await SeedRoleMenusAsync();
             await SeedOrganizationUnitsAsync();
             await SeedUsersAsync();
             await SeedProjectExecutionDataAsync();
@@ -187,7 +191,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 continue;
             }
 
-            var role = new IdentityRole(_guidGenerator.Create(), roleName);
+            var role = new IdentityRole(_guidGenerator.Create(), roleName, _currentTenant.Id);
             EnsureSucceeded(await _roleManager.CreateAsync(role));
         }
     }
@@ -436,7 +440,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         var organizationUnit = await _organizationUnitRepository.FindAsync(id);
         if (organizationUnit == null)
         {
-            organizationUnit = new OrganizationUnit(id, displayName, parentId);
+            organizationUnit = new OrganizationUnit(id, displayName, parentId, _currentTenant.Id);
             await _organizationUnitManager.CreateAsync(organizationUnit);
             await SaveSeedChangesAsync();
             return;
@@ -475,7 +479,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         var existingUser = await _userManager.FindByNameAsync(userName);
         if (existingUser == null)
         {
-            existingUser = new IdentityUser(id, userName, email)
+            existingUser = new IdentityUser(id, userName, email, _currentTenant.Id)
             {
                 Name = displayName,
                 Surname = string.Empty
@@ -500,8 +504,29 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             EnsureSucceeded(await _userManager.AddToRoleAsync(existingUser, roleName));
         }
 
-        await _userManager.SetOrganizationUnitsAsync(existingUser.Id, [organizationUnitId]);
+        await SaveSeedChangesAsync();
+        await EnsureUserOrganizationUnitAsync(existingUser.Id, organizationUnitId);
         await UpsertSeedUserProfileAsync(existingUser.Id, employeeNo, phoneNumber);
+    }
+
+    private async Task EnsureUserOrganizationUnitAsync(Guid userId, Guid organizationUnitId)
+    {
+        if (!await _organizationUnitRepository.AnyAsync(x => x.Id == organizationUnitId))
+        {
+            throw new InvalidOperationException($"OrganizationUnit {organizationUnitId} not found in database.");
+        }
+
+        var exists = await _userOrganizationUnitRepository.AnyAsync(x =>
+            x.UserId == userId &&
+            x.OrganizationUnitId == organizationUnitId);
+        if (exists)
+        {
+            return;
+        }
+
+        await _userOrganizationUnitRepository.InsertAsync(
+            new IdentityUserOrganizationUnit(userId, organizationUnitId, _currentTenant.Id),
+            autoSave: true);
     }
 
     private async Task UpsertSeedUserProfileAsync(Guid userId, string? employeeNo, string? phoneNumber)
@@ -958,9 +983,14 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
 
     private async Task SeedRoleMenusAsync()
     {
+        var currentTenantId = _currentTenant.Id;
         var roles = (await _roleRepository.GetListAsync())
-            .Where(x => PlatformRoleNames.All.Contains(x.Name))
-            .ToDictionary(x => x.Name, x => x.Id);
+            .Where(x => x.TenantId == currentTenantId && PlatformRoleNames.All.Contains(x.Name))
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(role => role.Id).Distinct().ToList(),
+                StringComparer.OrdinalIgnoreCase);
 
         var allMenus = await _menuRepository.GetListAsync();
         var allMenuIds = allMenus
@@ -976,6 +1006,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 PlatformSeedIds.PlatformWorkspace,
                 PlatformSeedIds.PlatformProfile,
                 PlatformSeedIds.PlatformScheduler,
+                PlatformSeedIds.PlatformSchedulerManage,
+                PlatformSeedIds.PlatformSchedulerExecute,
                 PlatformSeedIds.ProjectRoot,
                 PlatformSeedIds.ProjectList,
                 PlatformSeedIds.ProjectDetail,
@@ -986,7 +1018,8 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
                 PlatformSeedIds.BusinessOverview,
                 PlatformSeedIds.BusinessProjects,
                 PlatformSeedIds.BusinessReports,
-                PlatformSeedIds.BusinessBudgetSensitive
+                PlatformSeedIds.BusinessBudgetSensitive,
+                PlatformSeedIds.BusinessReportExport
             ],
             [PlatformRoleNames.Pm] =
             [
@@ -1032,29 +1065,41 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
 
         foreach (var (roleName, menuIds) in mappings)
         {
-            if (!roles.TryGetValue(roleName, out var roleId))
+            if (!roles.TryGetValue(roleName, out var roleIds) || roleIds.Count == 0)
             {
                 continue;
             }
 
-            foreach (var menuId in menuIds.Distinct())
+            foreach (var roleId in roleIds)
             {
-                var exists = await _roleMenuRepository.AnyAsync(x => x.RoleId == roleId && x.MenuId == menuId);
-                if (!exists)
+                var existingMenuIds = (await _roleMenuRepository.GetListAsync())
+                    .Where(x => x.RoleId == roleId)
+                    .Select(x => x.MenuId)
+                    .ToHashSet();
+
+                foreach (var menuId in menuIds.Distinct())
                 {
-                    await _roleMenuRepository.InsertAsync(new AppRoleMenu(_guidGenerator.Create(), roleId, menuId));
+                    if (existingMenuIds.Add(menuId))
+                    {
+                        await _roleMenuRepository.InsertAsync(new AppRoleMenu(_guidGenerator.Create(), roleId, menuId));
+                    }
                 }
             }
 
-            var role = await _roleRepository.GetAsync(roleId);
+            var role = await _roleRepository.GetAsync(roleIds[0]);
             var effectiveMenuIds = (await _roleMenuRepository.GetListAsync())
-                .Where(x => x.RoleId == roleId)
+                .Where(x => roleIds.Contains(x.RoleId))
                 .Select(x => x.MenuId)
+                .Concat(menuIds)
                 .Distinct()
                 .ToList();
             await GrantRolePermissionsForMenusAsync(role, allMenus, effectiveMenuIds);
         }
 
+        if (_unitOfWorkManager.Current != null)
+        {
+            await _unitOfWorkManager.Current.SaveChangesAsync();
+        }
     }
 
     private async Task SeedDefaultTenantAdminRoleMenusAsync(Tenant defaultTenant, IReadOnlyCollection<AppMenu> allMenus)
@@ -1165,25 +1210,27 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigs, PlatformSeedIds.PlatformRoot, "PlatformConfigs", "/platform/configs", "/platform/configs/index", "配置参数", "lucide:sliders-horizontal", 65, permissionCode: "Platform.Config.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformCache, PlatformSeedIds.PlatformRoot, "PlatformCache", "/platform/cache", "/platform/cache/index", "缓存管理", "lucide:database-zap", 66, permissionCode: "Platform.Cache.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDicts, PlatformSeedIds.PlatformRoot, "PlatformDicts", "/platform/dicts", "/platform/dicts/index", "字典管理", "lucide:list-tree", 68, permissionCode: "Platform.Dict.Manage"),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApi, PlatformSeedIds.PlatformRoot, "PlatformOpenApi", "/platform/open-api", "/platform/open-api/index", "开放接口", "lucide:plug-zap", 72, permissionCode: "Platform.OpenApi.Manage"),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApi, PlatformSeedIds.PlatformRoot, "PlatformOpenApi", "/platform/open-api", "/platform/open-api/index", "开放接口", "lucide:plug-zap", 69, permissionCode: "Platform.OpenApi.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFiles, PlatformSeedIds.PlatformRoot, "PlatformFiles", "/platform/files", "/platform/files/index", "文件管理", "lucide:files", 70),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRecycleBin, PlatformSeedIds.PlatformRoot, "PlatformRecycleBin", "/platform/recycle-bin", "/platform/recycle-bin/index", "回收中心", "lucide:archive-restore", 73, permissionCode: "Platform.RecycleBin.Manage"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSystemMonitor, PlatformSeedIds.PlatformRoot, "PlatformSystemMonitor", "/platform/system-monitor", "/platform/system-monitor/index", "系统监控", "lucide:monitor", 90, permissionCode: "Platform.SystemMonitor.View"),
-            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformScheduler, PlatformSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100),
+            Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformScheduler, PlatformSeedIds.PlatformRoot, "PlatformScheduler", "/platform/scheduler", "/platform/scheduler/index", "定时任务", "lucide:clock-3", 100, permissionCode: "Platform.Scheduler.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformAuditLogs, PlatformSeedIds.PlatformRoot, "PlatformAuditLogs", "/platform/audit-logs", "/platform/audit-logs/index", "日志中心", "lucide:shield-check", 75, permissionCode: "Platform.AuditLog.View"),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUpdateLogs, PlatformSeedIds.PlatformRoot, "PlatformUpdateLogs", "/platform/update-logs", "/platform/update-logs/index", "更新日志", "lucide:scroll-text", 110),
             Menu(PlatformAppCodes.Platform, PlatformSeedIds.PlatformProfile, PlatformSeedIds.PlatformRoot, "PlatformProfile", "/platform/profile", "/platform/profile/index", "个人中心", "lucide:user-circle-2", 120),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOrganizationManage, PlatformSeedIds.PlatformOrganization, "PlatformOrganizationManage", "Platform.Organization.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUsersManage, PlatformSeedIds.PlatformUsers, "PlatformUsersManage", "Platform.User.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRolesManage, PlatformSeedIds.PlatformRoles, "PlatformRoleManage", "Platform.Role.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformTenantsManage, PlatformSeedIds.PlatformTenants, "PlatformTenantManage", "Platform.Tenant.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenusManage, PlatformSeedIds.PlatformMenus, "PlatformMenuManage", "Platform.Menu.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigsManage, PlatformSeedIds.PlatformConfigs, "PlatformConfigManage", "Platform.Config.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformCacheManage, PlatformSeedIds.PlatformCache, "PlatformCacheManage", "Platform.Cache.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDictsManage, PlatformSeedIds.PlatformDicts, "PlatformDictManage", "Platform.Dict.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApiManage, PlatformSeedIds.PlatformOpenApi, "PlatformOpenApiManage", "Platform.OpenApi.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRecycleBinManage, PlatformSeedIds.PlatformRecycleBin, "PlatformRecycleBinManage", "Platform.RecycleBin.Manage"),
-            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFilesManage, PlatformSeedIds.PlatformFiles, "PlatformFileManage", "Platform.File.Manage"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOrganizationManage, PlatformSeedIds.PlatformOrganization, "PlatformOrganizationManage", "Platform.Organization.Manage", "管理组织"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformUsersManage, PlatformSeedIds.PlatformUsers, "PlatformUsersManage", "Platform.User.Manage", "管理用户"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRolesManage, PlatformSeedIds.PlatformRoles, "PlatformRoleManage", "Platform.Role.Manage", "管理角色"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformTenantsManage, PlatformSeedIds.PlatformTenants, "PlatformTenantManage", "Platform.Tenant.Manage", "管理租户"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformMenusManage, PlatformSeedIds.PlatformMenus, "PlatformMenuManage", "Platform.Menu.Manage", "管理菜单"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformConfigsManage, PlatformSeedIds.PlatformConfigs, "PlatformConfigManage", "Platform.Config.Manage", "管理配置"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformCacheManage, PlatformSeedIds.PlatformCache, "PlatformCacheManage", "Platform.Cache.Manage", "管理缓存"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformDictsManage, PlatformSeedIds.PlatformDicts, "PlatformDictManage", "Platform.Dict.Manage", "管理字典"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformOpenApiManage, PlatformSeedIds.PlatformOpenApi, "PlatformOpenApiManage", "Platform.OpenApi.Manage", "管理开放接口"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformRecycleBinManage, PlatformSeedIds.PlatformRecycleBin, "PlatformRecycleBinManage", "Platform.RecycleBin.Manage", "管理回收中心"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformFilesManage, PlatformSeedIds.PlatformFiles, "PlatformFileManage", "Platform.File.Manage", "管理文件"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSchedulerManage, PlatformSeedIds.PlatformScheduler, "PlatformSchedulerManage", "Platform.Scheduler.Manage", "管理任务"),
+            Button(PlatformAppCodes.Platform, PlatformSeedIds.PlatformSchedulerExecute, PlatformSeedIds.PlatformScheduler, "PlatformSchedulerExecute", "Platform.Scheduler.Execute", "执行任务"),
 
             Catalog(PlatformAppCodes.Project, PlatformSeedIds.ProjectRoot, null, "ProjectCenter", "/project", "项目执行", "lucide:folder-kanban", 20),
             Menu(PlatformAppCodes.Project, PlatformSeedIds.ProjectList, PlatformSeedIds.ProjectRoot, "ProjectList", "/project/projects", "/project/projects/index", "项目列表", "lucide:folder-open-dot", 20),
@@ -1191,14 +1238,15 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             Menu(PlatformAppCodes.Project, PlatformSeedIds.ProjectMyRelated, PlatformSeedIds.ProjectRoot, "ProjectMyRelated", "/project/my-related", "/project/my-related/index", "与我相关", "lucide:user-round-check", 40),
             Menu(PlatformAppCodes.Project, PlatformSeedIds.ProjectPmDashboard, PlatformSeedIds.ProjectRoot, "ProjectPmDashboard", "/project/pm-dashboard", "/project/pm-dashboard/index", "PM 工作台", "lucide:monitor-cog", 60),
             Menu(PlatformAppCodes.Project, PlatformSeedIds.ProjectPmoOverview, PlatformSeedIds.ProjectRoot, "ProjectPmoOverview", "/project/pmo-overview", "/project/pmo-overview/index", "PMO 执行总览", "lucide:layout-dashboard", 70),
-            Button(PlatformAppCodes.Project, PlatformSeedIds.ProjectCreate, PlatformSeedIds.ProjectList, "ProjectCreate", "Project.Project.Create"),
-            Button(PlatformAppCodes.Project, PlatformSeedIds.ProjectTaskManage, PlatformSeedIds.ProjectDetail, "ProjectTaskManage", "Project.Task.Manage"),
+            Button(PlatformAppCodes.Project, PlatformSeedIds.ProjectCreate, PlatformSeedIds.ProjectList, "ProjectCreate", "Project.Project.Create", "新建项目"),
+            Button(PlatformAppCodes.Project, PlatformSeedIds.ProjectTaskManage, PlatformSeedIds.ProjectDetail, "ProjectTaskManage", "Project.Task.Manage", "管理任务"),
 
             Catalog(PlatformAppCodes.Business, PlatformSeedIds.BusinessRoot, null, "BusinessCenter", "/business", "经营管理", "lucide:briefcase-business", 30),
-            Menu(PlatformAppCodes.Business, PlatformSeedIds.BusinessOverview, PlatformSeedIds.BusinessRoot, "BusinessOverview", "/business/overview", "/business/overview/index", "经营总览", "lucide:chart-column-big", 10),
+            Menu(PlatformAppCodes.Business, PlatformSeedIds.BusinessOverview, PlatformSeedIds.BusinessRoot, "BusinessOverview", "/business/overview", "/business/overview/index", "经营总览", "lucide:chart-column-big", 10, permissionCode: "Business.Report.View"),
             Menu(PlatformAppCodes.Business, PlatformSeedIds.BusinessProjects, PlatformSeedIds.BusinessRoot, "BusinessProjects", "/business/projects", "/business/projects/index", "项目经营", "lucide:folder-output", 20),
-            Menu(PlatformAppCodes.Business, PlatformSeedIds.BusinessReports, PlatformSeedIds.BusinessRoot, "BusinessReports", "/business/reports", "/business/reports/index", "报表中心", "lucide:sheet", 30),
-            Button(PlatformAppCodes.Business, PlatformSeedIds.BusinessBudgetSensitive, PlatformSeedIds.BusinessProjects, "BusinessBudgetSensitive", "Business.Budget.Sensitive")
+            Menu(PlatformAppCodes.Business, PlatformSeedIds.BusinessReports, PlatformSeedIds.BusinessRoot, "BusinessReports", "/business/reports", "/business/reports/index", "报表中心", "lucide:sheet", 30, permissionCode: "Business.Report.View"),
+            Button(PlatformAppCodes.Business, PlatformSeedIds.BusinessBudgetSensitive, PlatformSeedIds.BusinessProjects, "BusinessBudgetSensitive", "Business.Budget.Sensitive", "查看敏感预算"),
+            Button(PlatformAppCodes.Business, PlatformSeedIds.BusinessReportExport, PlatformSeedIds.BusinessReports, "BusinessReportExport", "Business.Report.Export", "导出报表")
         ];
     }
 
@@ -1268,7 +1316,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         await _menuRepository.UpdateManyAsync(existingMenus, autoSave: true);
     }
 
-    private static AppMenu Button(string appCode, Guid id, Guid parentId, string name, string permissionCode)
+    private static AppMenu Button(string appCode, Guid id, Guid parentId, string name, string permissionCode, string title)
     {
         return new AppMenu(
             id,
@@ -1279,7 +1327,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
             null,
             null,
             PlatformMenuType.Button,
-            permissionCode,
+            title,
             null,
             permissionCode,
             null,

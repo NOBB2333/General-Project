@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
+import { useAccess } from '@vben/access';
 
 import {
   Button,
@@ -49,6 +50,10 @@ import {
 
 defineOptions({ name: 'PlatformSchedulerPage' });
 
+const SCHEDULER_MANAGE_CODE = 'Platform.Scheduler.Manage';
+const SCHEDULER_EXECUTE_CODE = 'Platform.Scheduler.Execute';
+const { hasAccessByCodes } = useAccess();
+
 const loading = ref(false);
 const actionLoadingKey = ref('');
 const items = ref<SchedulerApi.JobItem[]>([]);
@@ -69,6 +74,8 @@ const editingTriggerKey = ref('');
 const jobRecords = ref<SchedulerApi.JobRecordItem[]>([]);
 const jobTriggers = ref<SchedulerApi.TriggerItem[]>([]);
 const clusterNodes = ref<SchedulerApi.ClusterNodeItem[]>([]);
+const canExecuteScheduler = computed(() => hasAccessByCodes([SCHEDULER_EXECUTE_CODE]));
+const canManageScheduler = computed(() => hasAccessByCodes([SCHEDULER_MANAGE_CODE]));
 
 const jobForm = reactive<SchedulerApi.JobSaveInput>({
   cronExpression: '0 0/5 * * * ?',
@@ -108,15 +115,21 @@ const handlerOptions = computed(() =>
   })),
 );
 
-const rowSelection = computed(() => ({
-  getCheckboxProps: (record: SchedulerApi.JobItem) => ({
-    disabled: record.isRunning,
-  }),
-  onChange: (keys: (number | string)[]) => {
-    selectedJobKeys.value = keys.map((key) => `${key}`);
-  },
-  selectedRowKeys: selectedJobKeys.value,
-}));
+const rowSelection = computed(() => {
+  if (!canExecuteScheduler.value && !canManageScheduler.value) {
+    return undefined;
+  }
+
+  return {
+    getCheckboxProps: (record: SchedulerApi.JobItem) => ({
+      disabled: record.isRunning,
+    }),
+    onChange: (keys: (number | string)[]) => {
+      selectedJobKeys.value = keys.map((key) => `${key}`);
+    },
+    selectedRowKeys: selectedJobKeys.value,
+  };
+});
 
 const columns = [
   { dataIndex: 'title', key: 'title', title: '任务名称', width: 180 },
@@ -528,6 +541,7 @@ onMounted(loadData);
         <Space>
           <Tag v-if="selectedJobKeys.length" color="blue">已选 {{ selectedJobKeys.length }}</Tag>
           <Button
+            v-if="canManageScheduler"
             :disabled="selectedJobKeys.length === 0"
             :loading="actionLoadingKey === 'batch:enable'"
             @click="batchToggle(true)"
@@ -535,6 +549,7 @@ onMounted(loadData);
             批量启用
           </Button>
           <Button
+            v-if="canManageScheduler"
             :disabled="selectedJobKeys.length === 0"
             :loading="actionLoadingKey === 'batch:disable'"
             @click="batchToggle(false)"
@@ -542,6 +557,7 @@ onMounted(loadData);
             批量停用
           </Button>
           <Button
+            v-if="canExecuteScheduler"
             :disabled="selectedJobKeys.length === 0"
             :loading="actionLoadingKey === 'batch:run'"
             @click="batchRun"
@@ -550,6 +566,7 @@ onMounted(loadData);
           </Button>
           <Popconfirm title="确认批量清理所选任务的执行记录？将保留最近 100 条。" @confirm="batchClearRecords">
             <Button
+              v-if="canManageScheduler"
               danger
               :disabled="selectedJobKeys.length === 0"
               :loading="actionLoadingKey === 'batch:clear-records'"
@@ -558,7 +575,7 @@ onMounted(loadData);
             </Button>
           </Popconfirm>
           <Button @click="openClusterNodes">集群节点</Button>
-          <Button type="primary" @click="openCreateJob">新增任务</Button>
+          <Button v-if="canManageScheduler" type="primary" @click="openCreateJob">新增任务</Button>
           <Button :loading="loading" @click="loadData">刷新</Button>
         </Space>
       </template>
@@ -630,12 +647,14 @@ onMounted(loadData);
           <template v-else-if="column.key === 'actions'">
             <Space>
               <Switch
+                v-if="canManageScheduler"
                 :checked="(record as SchedulerApi.JobItem).isEnabled"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:toggle`"
                 :disabled="(record as SchedulerApi.JobItem).isRunning"
                 @change="(checked) => toggleJob(record as SchedulerApi.JobItem, Boolean(checked))"
               />
               <Button
+                v-if="canExecuteScheduler"
                 size="small"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:run`"
                 :disabled="(record as SchedulerApi.JobItem).isRunning"
@@ -646,6 +665,7 @@ onMounted(loadData);
               <Button size="small" @click="openJobTriggers(record as SchedulerApi.JobItem)">触发器</Button>
               <Button size="small" @click="openJobRecords(record as SchedulerApi.JobItem)">记录</Button>
               <Button
+                v-if="canManageScheduler"
                 size="small"
                 :disabled="(record as SchedulerApi.JobItem).isRunning"
                 @click="openEditJob(record as SchedulerApi.JobItem)"
@@ -653,7 +673,7 @@ onMounted(loadData);
                 编辑
               </Button>
               <Button
-                v-if="(record as SchedulerApi.JobItem).isRunning"
+                v-if="canExecuteScheduler && (record as SchedulerApi.JobItem).isRunning"
                 danger
                 size="small"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:cancel`"
@@ -663,6 +683,7 @@ onMounted(loadData);
               </Button>
               <Popconfirm title="删除任务会同时清理触发器和执行记录，确认删除？" @confirm="deleteJob(record as SchedulerApi.JobItem)">
                 <Button
+                  v-if="canManageScheduler"
                   danger
                   size="small"
                   :disabled="(record as SchedulerApi.JobItem).isRunning"
@@ -714,7 +735,7 @@ onMounted(loadData);
       <template #extra>
         <Space>
           <Button :loading="triggerLoading" @click="selectedJob && loadJobTriggers(selectedJob)">刷新</Button>
-          <Button type="primary" @click="openCreateTrigger">新增触发器</Button>
+          <Button v-if="canManageScheduler" type="primary" @click="openCreateTrigger">新增触发器</Button>
         </Space>
       </template>
 
@@ -741,13 +762,15 @@ onMounted(loadData);
           <template v-else-if="column.key === 'actions'">
             <Space>
               <Switch
+                v-if="canManageScheduler"
                 :checked="(record as SchedulerApi.TriggerItem).isEnabled"
                 :loading="actionLoadingKey === `${(record as SchedulerApi.TriggerItem).triggerKey}:toggle`"
                 @change="(checked) => toggleTrigger(record as SchedulerApi.TriggerItem, Boolean(checked))"
               />
-              <Button size="small" @click="openEditTrigger(record as SchedulerApi.TriggerItem)">编辑</Button>
+              <Button v-if="canManageScheduler" size="small" @click="openEditTrigger(record as SchedulerApi.TriggerItem)">编辑</Button>
               <Popconfirm title="确认删除该触发器？" @confirm="deleteTrigger(record as SchedulerApi.TriggerItem)">
                 <Button
+                  v-if="canManageScheduler"
                   danger
                   size="small"
                   :loading="actionLoadingKey === `${(record as SchedulerApi.TriggerItem).triggerKey}:delete`"
@@ -797,6 +820,7 @@ onMounted(loadData);
           <Button :loading="recordLoading" @click="selectedJob && loadJobRecords(selectedJob)">刷新</Button>
           <Popconfirm title="确认清理该任务的历史执行记录？将保留最近 100 条。" @confirm="clearJobRecords">
             <Button
+              v-if="canManageScheduler"
               danger
               :disabled="!selectedJob || jobRecords.length === 0"
               :loading="selectedJob ? actionLoadingKey === `${selectedJob.jobKey}:clear-records` : false"

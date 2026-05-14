@@ -23,9 +23,14 @@ public class AdminPermissionDefinitionProvider : PermissionDefinitionProvider
         adminGroup.AddPermission(AdminPermissions.Platform.FileManage, L("Permission:Platform.File.Manage"));
         adminGroup.AddPermission(AdminPermissions.Platform.AuditLogView, L("Permission:Platform.AuditLog.View"));
         adminGroup.AddPermission(AdminPermissions.Platform.SystemMonitorView, L("Permission:Platform.SystemMonitor.View"));
+        adminGroup.AddPermission(AdminPermissions.Platform.SchedulerView, L("Permission:Platform.Scheduler.View"));
+        adminGroup.AddPermission(AdminPermissions.Platform.SchedulerManage, L("Permission:Platform.Scheduler.Manage"));
+        adminGroup.AddPermission(AdminPermissions.Platform.SchedulerExecute, L("Permission:Platform.Scheduler.Execute"));
         adminGroup.AddPermission(AdminPermissions.Project.Create, L("Permission:Project.Project.Create"));
         adminGroup.AddPermission(AdminPermissions.Project.TaskManage, L("Permission:Project.Task.Manage"));
         adminGroup.AddPermission(AdminPermissions.Business.BudgetSensitive, L("Permission:Business.Budget.Sensitive"));
+        adminGroup.AddPermission(AdminPermissions.Business.ReportView, L("Permission:Business.Report.View"));
+        adminGroup.AddPermission(AdminPermissions.Business.ReportExport, L("Permission:Business.Report.Export"));
     }
 
     private static LocalizableString L(string name)

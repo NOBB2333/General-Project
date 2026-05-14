@@ -49,6 +49,8 @@ public static class PlatformSeedIds
     public static readonly Guid PlatformCacheManage = Guid.Parse("20000000-0000-0000-0000-000000000032");
     public static readonly Guid PlatformOpenApiManage = Guid.Parse("20000000-0000-0000-0000-000000000029");
     public static readonly Guid PlatformRecycleBinManage = Guid.Parse("20000000-0000-0000-0000-000000000030");
+    public static readonly Guid PlatformSchedulerManage = Guid.Parse("20000000-0000-0000-0000-000000000033");
+    public static readonly Guid PlatformSchedulerExecute = Guid.Parse("20000000-0000-0000-0000-000000000034");
 
     public static readonly Guid ProjectRoot = Guid.Parse("30000000-0000-0000-0000-000000000001");
     public static readonly Guid ProjectWorkspace = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -71,4 +73,5 @@ public static class PlatformSeedIds
     public static readonly Guid BusinessReceivables = Guid.Parse("40000000-0000-0000-0000-000000000006");
     public static readonly Guid BusinessReports = Guid.Parse("40000000-0000-0000-0000-000000000007");
     public static readonly Guid BusinessBudgetSensitive = Guid.Parse("40000000-0000-0000-0000-000000000008");
+    public static readonly Guid BusinessReportExport = Guid.Parse("40000000-0000-0000-0000-000000000009");
 }

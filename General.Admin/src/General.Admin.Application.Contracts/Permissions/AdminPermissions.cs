@@ -19,9 +19,14 @@ public static class AdminPermissions
         Platform.FileManage,
         Platform.AuditLogView,
         Platform.SystemMonitorView,
+        Platform.SchedulerView,
+        Platform.SchedulerManage,
+        Platform.SchedulerExecute,
         Project.Create,
         Project.TaskManage,
-        Business.BudgetSensitive
+        Business.BudgetSensitive,
+        Business.ReportView,
+        Business.ReportExport
     ];
 
     public static class Platform
@@ -39,6 +44,9 @@ public static class AdminPermissions
         public const string FileManage = "Platform.File.Manage";
         public const string AuditLogView = "Platform.AuditLog.View";
         public const string SystemMonitorView = "Platform.SystemMonitor.View";
+        public const string SchedulerView = "Platform.Scheduler.View";
+        public const string SchedulerManage = "Platform.Scheduler.Manage";
+        public const string SchedulerExecute = "Platform.Scheduler.Execute";
     }
 
     public static class Project
@@ -50,5 +58,7 @@ public static class AdminPermissions
     public static class Business
     {
         public const string BudgetSensitive = "Business.Budget.Sensitive";
+        public const string ReportView = "Business.Report.View";
+        public const string ReportExport = "Business.Report.Export";
     }
 }

@@ -38,7 +38,6 @@ import {
 } from '#/api/core';
 import { useActionLoading } from '#/composables/platform/use-action-loading';
 import {
-  collectPlatformLeafKeys,
   normalizePlatformTree,
   type PlatformTreeNode,
 } from '#/composables/platform/use-tree-normalization';
@@ -96,6 +95,18 @@ const authorizationState = reactive<RoleApi.RoleAuthorization>({
   menuIds: [],
 });
 
+const menuCheckedKeys = computed({
+  get: () => ({
+    checked: authorizationState.menuIds,
+    halfChecked: [],
+  }),
+  set: (value: string[] | { checked?: string[] }) => {
+    authorizationState.menuIds = Array.isArray(value)
+      ? value
+      : [...(value.checked || [])];
+  },
+});
+
 const accountOptions = computed(() =>
   users.value
     .filter((item) => {
@@ -149,17 +160,12 @@ const metrics = computed(() => [
 function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTree(
     items,
-    (item) => `[${item.appCode}] ${item.title}${item.permissionCode ? ` · ${item.permissionCode}` : ''}`,
+    (item) => item.title,
   );
 }
 
 function normalizeOrganizationTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTree(items, (item) => item.displayName);
-}
-
-function filterLeafMenuIds(menuIds: string[]) {
-  const leafKeys = collectPlatformLeafKeys(treeData.value);
-  return menuIds.filter((id) => leafKeys.has(id));
 }
 
 async function loadBaseData() {
@@ -200,7 +206,7 @@ async function loadRoleAuthorization(role: RoleApi.RoleItem) {
     authorizationState.accountUserIds = [...authorization.accountUserIds];
     authorizationState.customOrganizationUnitIds = [...authorization.customOrganizationUnitIds];
     authorizationState.dataScopeMode = authorization.dataScopeMode;
-    authorizationState.menuIds = filterLeafMenuIds(authorization.menuIds);
+    authorizationState.menuIds = [...authorization.menuIds];
   } finally {
     drawerLoading.value = false;
   }
@@ -222,7 +228,7 @@ async function saveCurrentDrawer() {
   saving.value = true;
   try {
     if (drawerType.value === 'menu') {
-      await saveRoleMenusApi(activeRole.value.id, filterLeafMenuIds(authorizationState.menuIds));
+      await saveRoleMenusApi(activeRole.value.id, authorizationState.menuIds);
       message.success('菜单授权已保存');
     } else {
       await saveRoleAuthorizationApi(activeRole.value.id, {
@@ -382,9 +388,10 @@ onMounted(loadBaseData);
           <div v-if="activeRole" class="role-drawer">
             <template v-if="drawerType === 'menu'">
               <Tree
-                v-model:checkedKeys="authorizationState.menuIds"
+                v-model:checkedKeys="menuCheckedKeys"
                 block-node
                 checkable
+                check-strictly
                 default-expand-all
                 :height="620"
                 :tree-data="treeData"

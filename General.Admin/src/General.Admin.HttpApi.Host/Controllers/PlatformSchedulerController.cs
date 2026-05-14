@@ -6,7 +6,7 @@ using Volo.Abp.Auditing;
 namespace General.Admin.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(AdminPermissions.Platform.SchedulerView)]
 [ApiExplorerSettings(GroupName = ApiDocGroups.Platform)]
 [Route("api/app/platform/scheduler")]
 public class PlatformSchedulerController : ControllerBase
@@ -43,12 +43,14 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<PlatformScheduledJobDto>>> CreateAsync([FromBody] PlatformScheduledJobSaveInput input)
     {
         return ApiResponse<PlatformScheduledJobDto>.Ok(await _schedulerService.CreateAsync(input));
     }
 
     [HttpPut("{jobKey}")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<PlatformScheduledJobDto>>> UpdateAsync(
         string jobKey,
         [FromBody] PlatformScheduledJobSaveInput input)
@@ -72,6 +74,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("{jobKey}/triggers")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<PlatformScheduledJobTriggerDto>>> CreateTriggerAsync(
         string jobKey,
         [FromBody] PlatformScheduledJobTriggerSaveInput input)
@@ -80,6 +83,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPut("{jobKey}/triggers/{triggerKey}")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<PlatformScheduledJobTriggerDto>>> UpdateTriggerAsync(
         string jobKey,
         string triggerKey,
@@ -90,6 +94,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("{jobKey}/triggers/{triggerKey}/toggle")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<string>>> ToggleTriggerAsync(
         string jobKey,
         string triggerKey,
@@ -100,6 +105,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpDelete("{jobKey}/triggers/{triggerKey}")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteTriggerAsync(string jobKey, string triggerKey)
     {
         await _schedulerService.DeleteTriggerAsync(jobKey, triggerKey);
@@ -107,12 +113,14 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("{jobKey}/run")]
+    [Authorize(AdminPermissions.Platform.SchedulerExecute)]
     public async Task<ActionResult<ApiResponse<string>>> RunAsync(string jobKey)
     {
         return ApiResponse<string>.Ok(await _schedulerService.RunAsync(jobKey));
     }
 
     [HttpPost("batch/run")]
+    [Authorize(AdminPermissions.Platform.SchedulerExecute)]
     public async Task<ActionResult<ApiResponse<List<PlatformScheduledJobOperationResultDto>>>> RunBatchAsync(
         [FromBody] PlatformScheduledJobBatchInput input)
     {
@@ -121,12 +129,14 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("{jobKey}/cancel")]
+    [Authorize(AdminPermissions.Platform.SchedulerExecute)]
     public async Task<ActionResult<ApiResponse<string>>> CancelAsync(string jobKey)
     {
         return ApiResponse<string>.Ok(await _schedulerService.CancelAsync(jobKey));
     }
 
     [HttpPost("{jobKey}/toggle")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<string>>> ToggleAsync(string jobKey, [FromBody] PlatformScheduledJobToggleInput input)
     {
         await _schedulerService.ToggleAsync(jobKey, input.IsEnabled);
@@ -134,6 +144,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("batch/toggle")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<bool>>> ToggleBatchAsync(
         [FromBody] PlatformScheduledJobBatchToggleInput input)
     {
@@ -142,6 +153,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpDelete("{jobKey}")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<bool>>> DeleteAsync(string jobKey)
     {
         await _schedulerService.DeleteAsync(jobKey);
@@ -149,6 +161,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpDelete("{jobKey}/records")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<bool>>> ClearRecordsAsync(
         string jobKey,
         [FromQuery] int keepLastN = 0)
@@ -158,6 +171,7 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpPost("batch/records/clear")]
+    [Authorize(AdminPermissions.Platform.SchedulerManage)]
     public async Task<ActionResult<ApiResponse<bool>>> ClearRecordsBatchAsync(
         [FromBody] PlatformScheduledJobBatchClearRecordsInput input)
     {

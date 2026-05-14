@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Identity;
+using Volo.Abp.MultiTenancy;
 
 namespace General.Admin.Platform;
 
@@ -25,6 +26,7 @@ public class PlatformRoleService : ITransientDependency
     private readonly IRepository<AppRoleAuthorization, Guid> _roleAuthorizationRepository;
     private readonly IDistributedCache _distributedCache;
     private readonly IPlatformIdentityLookupService _identityLookupService;
+    private readonly ICurrentTenant _currentTenant;
     private readonly PlatformCacheService _platformCacheService;
     private readonly IdentityUserManager _userManager;
     private readonly IdentityRoleManager _roleManager;
@@ -36,6 +38,7 @@ public class PlatformRoleService : ITransientDependency
         IdentityRoleManager roleManager,
         IDistributedCache distributedCache,
         IPlatformIdentityLookupService identityLookupService,
+        ICurrentTenant currentTenant,
         PlatformCacheService platformCacheService,
         IRepository<AppRoleAuthorization, Guid> roleAuthorizationRepository,
         IRepository<AppRoleMenu, Guid> roleMenuRepository,
@@ -45,6 +48,7 @@ public class PlatformRoleService : ITransientDependency
         _roleManager = roleManager;
         _distributedCache = distributedCache;
         _identityLookupService = identityLookupService;
+        _currentTenant = currentTenant;
         _platformCacheService = platformCacheService;
         _roleAuthorizationRepository = roleAuthorizationRepository;
         _roleMenuRepository = roleMenuRepository;
@@ -54,6 +58,7 @@ public class PlatformRoleService : ITransientDependency
     public async Task<List<PlatformRoleDto>> GetListAsync()
     {
         var roles = (await _roleRepository.GetListAsync())
+            .Where(x => x.TenantId == _currentTenant.Id)
             .OrderBy(x => GetOrder(x.Name))
             .ThenBy(x => x.Name)
             .ToList();
@@ -63,11 +68,18 @@ public class PlatformRoleService : ITransientDependency
         var userCounts = await _identityLookupService.GetUserCountsByRoleIdsAsync(roles.Select(x => x.Id).ToList());
         var result = new List<PlatformRoleDto>();
 
-        foreach (var role in roles)
+        foreach (var roleGroup in roles.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase))
         {
-            var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id);
+            var roleIds = roleGroup.Select(x => x.Id).ToHashSet();
+            var role = roleGroup
+                .OrderByDescending(x => userCounts.GetValueOrDefault(x.Id))
+                .ThenByDescending(x => roleMenus.Count(roleMenu => roleMenu.RoleId == x.Id))
+                .ThenBy(x => x.Id)
+                .First();
+            var authorization = roleAuthorizations.FirstOrDefault(x => x.RoleId == role.Id) ??
+                                roleAuthorizations.FirstOrDefault(x => roleIds.Contains(x.RoleId));
             var effectiveMenuIds = roleMenus
-                .Where(x => x.RoleId == role.Id)
+                .Where(x => roleIds.Contains(x.RoleId))
                 .Select(x => x.MenuId)
                 .Distinct()
                 .ToList();
@@ -99,7 +111,7 @@ public class PlatformRoleService : ITransientDependency
                 MenuCount = effectiveMenuIds.Count,
                 Name = role.Name,
                 Status = true,
-                UserCount = userCounts.GetValueOrDefault(role.Id)
+                UserCount = roleIds.Sum(roleId => userCounts.GetValueOrDefault(roleId))
             });
         }
 
@@ -209,6 +221,8 @@ public class PlatformRoleService : ITransientDependency
                 PlatformSeedIds.PlatformWorkspace,
                 PlatformSeedIds.PlatformProfile,
                 PlatformSeedIds.PlatformScheduler,
+                PlatformSeedIds.PlatformSchedulerManage,
+                PlatformSeedIds.PlatformSchedulerExecute,
                 PlatformSeedIds.ProjectRoot,
                 PlatformSeedIds.ProjectList,
                 PlatformSeedIds.ProjectDetail,
@@ -219,7 +233,8 @@ public class PlatformRoleService : ITransientDependency
                 PlatformSeedIds.BusinessOverview,
                 PlatformSeedIds.BusinessProjects,
                 PlatformSeedIds.BusinessReports,
-                PlatformSeedIds.BusinessBudgetSensitive
+                PlatformSeedIds.BusinessBudgetSensitive,
+                PlatformSeedIds.BusinessReportExport
             ],
             PlatformRoleNames.Pm =>
             [

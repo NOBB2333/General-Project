@@ -64,7 +64,7 @@ const selectedMenu = computed(() => findMenuById(items.value, selectedId.value))
 const treeData = computed(() =>
   normalizePlatformTree(
     items.value,
-    (item) => `[${item.appCode}] ${item.title}${item.isEnabled ? '' : ' · 已停用'}`,
+    (item) => `${item.title}${item.isEnabled ? '' : ' · 已停用'}`,
   ),
 );
 
