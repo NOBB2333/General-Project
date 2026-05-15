@@ -2,6 +2,7 @@
 .tools/
 General.Web/.git
 Script/deploy-to-linux.py
+Script/deploy-to-linux copy.py
 
 # 操作系统 / 编辑器垃圾文件
 .DS_Store
