@@ -11,6 +11,20 @@
 - 经营管理能力：预算、合同、发票、回款、验收、预警、经营看板与分析类页面
 - 多端接入能力：浏览器端管理后台，以及基于桌面壳的客户端承载方式
 
+## 界面预览
+
+### 工作台
+
+![General Admin 工作台](.doc/assets/images/home.png)
+
+### 项目执行
+
+![General Admin 项目执行](.doc/assets/images/project.png)
+
+### 经营总览
+
+![General Admin 经营总览](.doc/assets/images/bussness.png)
+
 仓库目录概览：
 
 - `General.Admin`：后端服务，基于 ABP 多层架构
@@ -105,7 +119,7 @@ dotnet run --project src/General.Admin.DbMigrator
 数据库说明：
 
 - 默认配置 SQLite，本地无需安装数据库服务
-- 切到 PostgreSQL：修改 `General.Admin.DbMigrator/appsettings/20-connection-strings.jsonc`，取消 PostgreSQL 行注释，注释 SQLite 行
+- 切到 PostgreSQL：修改 `General.Admin.DbMigrator/appsettings/02-connection-strings.jsonc`，取消 PostgreSQL 行注释，注释 SQLite 行
 - PostgreSQL 模式下 EF Core 会**自动建库**，无需手动 `CREATE DATABASE`
 - 当前迁移文件为 PostgreSQL 专用（类型使用 `bytea`/`double precision` 等 PG 原生类型）
 

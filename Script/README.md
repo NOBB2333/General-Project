@@ -68,9 +68,9 @@ python Script/deploy-to-linux.py wan
 
 应用运行时配置继续由项目自身决定，不放在部署脚本里：
 
-- 数据库配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/40-connection-strings.jsonc`
-- Migrator 数据库配置：`General.Admin/src/General.Admin.DbMigrator/appsettings/20-connection-strings.jsonc`
-- 后端 `App` 配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/10-app.jsonc`
+- 数据库配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/04-connection-strings.jsonc`
+- Migrator 数据库配置：`General.Admin/src/General.Admin.DbMigrator/appsettings/02-connection-strings.jsonc`
+- 后端 `App` 配置：`General.Admin/src/General.Admin.HttpApi.Host/appsettings/01-app.jsonc`
 - 前端 `_app.config.js` / Nginx：继续按你现有方案处理
 
 ## 同步策略

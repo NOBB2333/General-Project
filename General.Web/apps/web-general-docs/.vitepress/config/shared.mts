@@ -35,7 +35,7 @@ export const shared = defineConfig({
   srcDir: 'src',
   themeConfig: {
     i18nRouting: true,
-    logo: 'https://unpkg.com/@vbenjs/static-source@0.1.7/source/logo-v1.webp',
+    logo: '/favicon.ico',
     search: {
       options: {
         locales: {
@@ -44,12 +44,10 @@ export const shared = defineConfig({
       },
       provider: 'local',
     },
-    siteTitle: 'Vben Admin',
-    socialLinks: [
-      { icon: 'github', link: 'https://github.com/vbenjs/vue-vben-admin' },
-    ],
+    siteTitle: 'General Admin',
+    socialLinks: [],
   },
-  title: 'Vben Admin',
+  title: 'General Admin',
   vite: {
     build: {
       chunkSizeWarningLimit: Infinity,
@@ -86,7 +84,7 @@ export const shared = defineConfig({
             username: 'likui628',
           },
         ],
-        repoURL: () => 'https://github.com/vbenjs/vue-vben-admin',
+        repoURL: () => 'https://general-admin.local/General-admin',
       }),
       GitChangelogMarkdownSection(),
       viteArchiverPlugin({ outputDir: '.vitepress' }),
@@ -109,11 +107,11 @@ export const shared = defineConfig({
 
 function head(): HeadConfig[] {
   return [
-    ['meta', { content: 'Vbenjs Team', name: 'author' }],
+    ['meta', { content: 'General Admin Team', name: 'author' }],
     [
       'meta',
       {
-        content: 'vben, vitejs, vite, shacdn-ui, vue',
+        content: 'general admin, abp, dotnet, vue, vitepress',
         name: 'keywords',
       },
     ],
@@ -126,7 +124,7 @@ function head(): HeadConfig[] {
         name: 'viewport',
       },
     ],
-    ['meta', { content: 'vben admin docs', name: 'keywords' }],
+    ['meta', { content: 'general admin docs', name: 'keywords' }],
     ['link', { href: '/favicon.ico', rel: 'icon' }],
     // [
     //   'script',
@@ -141,23 +139,23 @@ function pwa(): PwaOptions {
   return {
     includeManifestIcons: false,
     manifest: {
-      description:
-        'Vben Admin is a modern admin dashboard template based on Vue 3. ',
+        description:
+        'General Admin is an enterprise platform governance, project delivery, and business analytics system.',
       icons: [
         {
           sizes: '192x192',
-          src: 'https://unpkg.com/@vbenjs/static-source@0.1.7/source/pwa-icon-192.png',
+          src: '/favicon.ico',
           type: 'image/png',
         },
         {
           sizes: '512x512',
-          src: 'https://unpkg.com/@vbenjs/static-source@0.1.7/source/pwa-icon-512.png',
+          src: '/favicon.ico',
           type: 'image/png',
         },
       ],
       id: '/',
-      name: 'Vben Admin Doc',
-      short_name: 'vben_admin_doc',
+      name: 'General Admin Docs',
+      short_name: 'general_admin_docs',
       theme_color: '#ffffff',
     },
     outDir: resolve(process.cwd(), '.vitepress/dist'),
