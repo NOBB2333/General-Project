@@ -1,31 +1,20 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, provide } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Alert, Button, Card, Empty, Input, Select, Spin, Table, Tabs, Tag, Tooltip } from 'ant-design-vue';
+import { Alert, Button, Card, Empty, Input, Select, Spin, Tabs, Tag, Tooltip } from 'ant-design-vue';
 
-import {
-  getBusinessProjectDetailApi,
-  getBusinessProjectListApi,
-  type BusinessApi,
-} from '#/api/core';
+import BusinessBudgetTab from './components/BusinessBudgetTab.vue';
+import BusinessChainTab from './components/BusinessChainTab.vue';
+import BusinessIncomeTab from './components/BusinessIncomeTab.vue';
+import BusinessOverviewTab from './components/BusinessOverviewTab.vue';
+import BusinessProfitTab from './components/BusinessProfitTab.vue';
+import BusinessReceivableTab from './components/BusinessReceivableTab.vue';
+import { useBusinessProjectsPage } from './composables/useBusinessProjectsPage';
+import { businessProjectsContextKey } from './context';
 
 defineOptions({ name: 'BusinessProjectsPage' });
-
-const route = useRoute();
-const router = useRouter();
-
-const listKeyword = ref('');
-const loadingList = ref(false);
-const loadingDetail = ref(false);
-const refreshingDetail = ref(false);
-const sidebarCollapsed = ref(false);
-const projects = ref<BusinessApi.ProjectSummary[]>([]);
-const detail = ref<BusinessApi.ProjectDetail | null>(null);
-const selectedProjectId = ref(typeof route.query.projectId === 'string' ? route.query.projectId : '');
-const activeTab = ref(typeof route.query.tab === 'string' ? route.query.tab : 'overview');
 
 const tabItems = [
   { key: 'overview', label: '经营概览' },
@@ -35,6 +24,15 @@ const tabItems = [
   { key: 'receivable', label: '开票与回款' },
   { key: 'profit', label: '利润与预测' },
 ];
+
+const tabComponentMap = {
+  overview: BusinessOverviewTab,
+  budget: BusinessBudgetTab,
+  business: BusinessChainTab,
+  income: BusinessIncomeTab,
+  receivable: BusinessReceivableTab,
+  profit: BusinessProfitTab,
+};
 
 const budgetColumns = [
   { dataIndex: 'budgetCode', key: 'budgetCode', title: '预算编号', width: 160 },
@@ -98,183 +96,36 @@ const historyColumns = [
   { dataIndex: 'reason', key: 'reason', title: '原因', width: 280 },
 ];
 
-let detailRequestSerial = 0;
+const page = useBusinessProjectsPage();
+const {
+  activeTab,
+  detail,
+  formatMoney,
+  getCollapsedProjectLabel,
+  handleProjectChange,
+  listKeyword,
+  loadingDetail,
+  loadingList,
+  openGlobalSearch,
+  projects,
+  refreshingDetail,
+  resetProjects,
+  searchProjects,
+  selectProject,
+  selectedProjectId,
+  sidebarCollapsed,
+} = page;
+const activeTabComponent = computed(() => tabComponentMap[activeTab.value as keyof typeof tabComponentMap] ?? BusinessOverviewTab);
 
-const currentProject = computed(() =>
-  projects.value.find((item) => item.id === selectedProjectId.value) ?? detail.value?.summary ?? null,
-);
-
-const contractRelationItems = computed(() => {
-  if (!detail.value) {
-    return [];
-  }
-
-  const incomeContracts = detail.value.contracts.filter((item) => item.isRevenueContract);
-  const downstreamContracts = detail.value.contracts.filter((item) => !item.isRevenueContract);
-
-  return incomeContracts.map((contract) => ({
-    id: contract.id,
-    title: contract.title,
-    code: contract.contractCode,
-    type: contract.type,
-    status: contract.status,
-    changeCode: contract.sourceChangeCode,
-    linkedProcurements: detail.value?.procurements.filter((item) => item.linkedContractCode === contract.contractCode) ?? [],
-    childContracts: downstreamContracts.filter((item) => item.parentContractCode === contract.contractCode),
-  }));
-});
-
-const closingItems = computed(() => {
-  if (!detail.value) {
-    return [];
-  }
-
-  const totalReceivable = detail.value.receivables.reduce((sum, item) => sum + (item.totalAmount ?? 0), 0);
-  const receivedAmount = detail.value.receivables.reduce((sum, item) => sum + (item.receivedAmount ?? 0), 0);
-  const openReceivables = detail.value.receivables.filter((item) => item.status.includes('待回款'));
-  const hasPendingProcurement = detail.value.procurements.some((item) => !item.status.includes('已签订') && !item.status.includes('完成'));
-
-  return [
-    {
-      key: 'close-status',
-      label: '经营收尾状态',
-      value: detail.value.summary.businessCloseStatus,
-      status: detail.value.summary.businessCloseStatus.includes('收尾') || detail.value.summary.businessCloseStatus.includes('待回款') ? 'warning' : 'normal',
-    },
-    {
-      key: 'receivable-gap',
-      label: '待回款余额',
-      value: formatMoney(totalReceivable - receivedAmount),
-      status: openReceivables.length > 0 ? 'warning' : 'normal',
-    },
-    {
-      key: 'pending-receivable-count',
-      label: '待回款事项',
-      value: `${openReceivables.length} 项`,
-      status: openReceivables.length > 0 ? 'warning' : 'normal',
-    },
-    {
-      key: 'procurement-close',
-      label: '分包采购闭环',
-      value: hasPendingProcurement ? '仍有未闭环事项' : '已闭环',
-      status: hasPendingProcurement ? 'warning' : 'normal',
-    },
-  ];
-});
-
-function formatMoney(value?: null | number) {
-  if (typeof value !== 'number') {
-    return '--';
-  }
-
-  return new Intl.NumberFormat('zh-CN', {
-    maximumFractionDigits: 0,
-    minimumFractionDigits: 0,
-    style: 'currency',
-    currency: 'CNY',
-  }).format(value);
-}
-
-function getCollapsedProjectLabel(name: string) {
-  const compact = name.replace(/\s+/g, '');
-  const asciiWords = compact.match(/[A-Za-z0-9]+/g);
-  if (asciiWords && asciiWords.length > 0) {
-    const tail = asciiWords.join('').slice(-3).toUpperCase();
-    if (tail) {
-      return tail;
-    }
-  }
-
-  const digitTail = compact.match(/\d+/g)?.join('').slice(-3);
-  if (digitTail) {
-    return digitTail;
-  }
-
-  return compact.length <= 1 ? compact : compact.slice(0, 1);
-}
-
-async function loadProjects() {
-  loadingList.value = true;
-  try {
-    const nextProjects = await getBusinessProjectListApi(listKeyword.value.trim() || undefined);
-    projects.value = nextProjects;
-
-    if (nextProjects.length === 0) {
-      selectedProjectId.value = '';
-      detail.value = null;
-      return;
-    }
-
-    const preferredProjectId =
-      selectedProjectId.value ||
-      (typeof route.query.projectId === 'string' ? route.query.projectId : '');
-    const matchedProject = nextProjects.find((item) => item.id === preferredProjectId) ?? nextProjects[0];
-
-    if (matchedProject && matchedProject.id !== selectedProjectId.value) {
-      selectedProjectId.value = matchedProject.id;
-    }
-  } finally {
-    loadingList.value = false;
-  }
-}
-
-async function loadDetail(projectId = selectedProjectId.value) {
-  if (!projectId) {
-    detail.value = null;
-    return;
-  }
-
-  const requestId = ++detailRequestSerial;
-  if (detail.value) {
-    refreshingDetail.value = true;
-  } else {
-    loadingDetail.value = true;
-  }
-
-  try {
-    const nextDetail = await getBusinessProjectDetailApi(projectId);
-    if (requestId !== detailRequestSerial) {
-      return;
-    }
-    detail.value = nextDetail;
-  } finally {
-    if (requestId === detailRequestSerial) {
-      loadingDetail.value = false;
-      refreshingDetail.value = false;
-    }
-  }
-}
-
-function selectProject(projectId: string, tab = activeTab.value) {
-  activeTab.value = tab;
-  selectedProjectId.value = projectId;
-}
-
-function searchProjects() {
-  void loadProjects();
-}
-
-function resetProjects() {
-  listKeyword.value = '';
-  void loadProjects();
-}
-
-function openGlobalSearch() {
-  router.push('/business/reports');
-}
-
-watch(selectedProjectId, (projectId, previousProjectId) => {
-  if (!projectId || projectId === previousProjectId) {
-    return;
-  }
-  void loadDetail(projectId);
-});
-
-onMounted(async () => {
-  await loadProjects();
-  if (selectedProjectId.value && !detail.value) {
-    await loadDetail(selectedProjectId.value);
-  }
+provide(businessProjectsContextKey, {
+  ...page,
+  budgetColumns,
+  businessColumns,
+  contractColumns,
+  detailTableScroll,
+  historyColumns,
+  procurementColumns,
+  receivableColumns,
 });
 </script>
 
@@ -315,6 +166,7 @@ onMounted(async () => {
           :options="projects.map((item) => ({ label: `${item.projectCode} · ${item.name}`, value: item.id }))"
           placeholder="切换项目"
           show-search
+          @change="handleProjectChange"
         />
 
         <div v-if="loadingList" class="business-projects__list-loading">
@@ -416,202 +268,7 @@ onMounted(async () => {
                 <Tabs.TabPane v-for="tab in tabItems" :key="tab.key" :tab="tab.label" />
               </Tabs>
 
-              <div v-if="activeTab === 'overview'" class="business-projects__tab-grid">
-                <Card :bordered="false" title="经营摘要">
-                  <div class="business-projects__summary-grid">
-                    <div class="business-projects__summary-item"><span>当前项目</span><strong>{{ currentProject?.name ?? '--' }}</strong></div>
-                    <div class="business-projects__summary-item"><span>合同收入</span><strong>{{ formatMoney(detail.summary.contractAmount) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>分包与采购</span><strong>{{ formatMoney(detail.summary.procurementAmount) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>年底预计回款</span><strong>{{ formatMoney(detail.summary.yearEndReceivableForecast) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>经营收尾状态</span><strong>{{ detail.summary.businessCloseStatus }}</strong></div>
-                    <div class="business-projects__summary-item"><span>项目阶段</span><strong>{{ detail.summary.status }}</strong></div>
-                  </div>
-                </Card>
-
-                <Card :bordered="false" title="经营收尾视图">
-                  <div class="business-projects__closing-grid">
-                    <article
-                      v-for="item in closingItems"
-                      :key="item.key"
-                      :class="['business-projects__closing-item', { 'is-warning': item.status === 'warning' }]"
-                    >
-                      <span>{{ item.label }}</span>
-                      <strong>{{ item.value }}</strong>
-                    </article>
-                  </div>
-                </Card>
-
-                <Card :bordered="false" title="最近变化">
-                  <Table
-                    class="business-projects__table"
-                    :columns="historyColumns"
-                    :data-source="detail.forecastHistories"
-                    :pagination="false"
-                    row-key="id"
-                    :scroll="detailTableScroll"
-                    size="middle"
-                  />
-                </Card>
-              </div>
-
-              <div v-else-if="activeTab === 'budget'" class="business-projects__tab-panel">
-                <Table
-                  class="business-projects__table"
-                  :columns="budgetColumns"
-                  :data-source="detail.budgetExecutions"
-                  :pagination="false"
-                  row-key="id"
-                  :scroll="detailTableScroll"
-                  size="middle"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'adjustedAmount'">{{ formatMoney(record.adjustedAmount) }}</template>
-                    <template v-else-if="column.key === 'executedAmount'">{{ formatMoney(record.executedAmount) }}</template>
-                    <template v-else-if="column.key === 'varianceAmount'">
-                      <Tag :color="typeof record.varianceAmount === 'number' && record.varianceAmount > 0 ? 'red' : 'blue'">
-                        {{ formatMoney(record.varianceAmount) }}
-                      </Tag>
-                    </template>
-                  </template>
-                </Table>
-              </div>
-
-              <div v-else-if="activeTab === 'business'" class="business-projects__tab-grid">
-                <Card :bordered="false" title="商务链与分包链">
-                  <Table
-                    class="business-projects__table"
-                    :columns="businessColumns"
-                    :data-source="detail.businessChains"
-                    :pagination="false"
-                    row-key="id"
-                    :scroll="detailTableScroll"
-                    size="middle"
-                  />
-                </Card>
-
-                <Card :bordered="false" title="分包与采购台账">
-                  <Table
-                    class="business-projects__table"
-                    :columns="procurementColumns"
-                    :data-source="detail.procurements"
-                    :pagination="false"
-                    row-key="id"
-                    :scroll="detailTableScroll"
-                    size="middle"
-                  >
-                    <template #bodyCell="{ column, record }">
-                      <template v-if="column.key === 'amount'">{{ formatMoney(record.amount) }}</template>
-                    </template>
-                  </Table>
-                </Card>
-              </div>
-
-              <div v-else-if="activeTab === 'income'" class="business-projects__tab-grid">
-                <Card :bordered="false" title="合同关系链">
-                  <div class="business-projects__relation-list">
-                    <div v-for="relation in contractRelationItems" :key="relation.id" class="business-projects__relation-item">
-                      <div class="business-projects__relation-main">
-                        <div class="business-projects__relation-primary">
-                          <span class="business-projects__relation-label">收入合同</span>
-                          <strong>{{ relation.title }}</strong>
-                          <p>{{ relation.code }} · {{ relation.type }} · {{ relation.status }}</p>
-                        </div>
-                        <Tag v-if="relation.changeCode" color="gold">{{ relation.changeCode }}</Tag>
-                      </div>
-
-                      <div class="business-projects__relation-body">
-                        <div v-if="relation.childContracts.length > 0" class="business-projects__relation-sublist">
-                          <div v-for="contract in relation.childContracts" :key="contract.id" class="business-projects__relation-subitem">
-                            <span>衍生合同</span>
-                            <strong>{{ contract.title }}</strong>
-                            <p>{{ contract.contractCode }} · {{ contract.type }}</p>
-                          </div>
-                        </div>
-
-                        <div v-if="relation.linkedProcurements.length > 0" class="business-projects__relation-sublist">
-                          <div v-for="procurement in relation.linkedProcurements" :key="procurement.id" class="business-projects__relation-subitem">
-                            <span>分包/采购</span>
-                            <strong>{{ procurement.title }}</strong>
-                            <p>{{ procurement.procurementCode }} · {{ procurement.status }}</p>
-                          </div>
-                        </div>
-
-                        <div
-                          v-if="relation.childContracts.length === 0 && relation.linkedProcurements.length === 0"
-                          class="business-projects__relation-empty"
-                        >
-                          当前合同暂无衍生合同或分包/采购关联。
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                <Card :bordered="false" title="合同台账">
-                  <Table
-                    class="business-projects__table"
-                    :columns="contractColumns"
-                    :data-source="detail.contracts"
-                    :pagination="false"
-                    row-key="id"
-                    :scroll="detailTableScroll"
-                    size="middle"
-                  >
-                    <template #bodyCell="{ column, record }">
-                      <template v-if="column.key === 'amount'">{{ formatMoney(record.amount) }}</template>
-                    </template>
-                  </Table>
-                </Card>
-              </div>
-
-              <div v-else-if="activeTab === 'receivable'" class="business-projects__tab-grid">
-                <Card :bordered="false" title="收尾专项视图">
-                  <div class="business-projects__summary-grid">
-                    <div class="business-projects__summary-item"><span>经营收尾状态</span><strong>{{ detail.summary.businessCloseStatus }}</strong></div>
-                    <div class="business-projects__summary-item"><span>项目状态</span><strong>{{ detail.summary.status }}</strong></div>
-                    <div class="business-projects__summary-item"><span>待回款事项</span><strong>{{ detail.receivables.filter((item) => item.status.includes('待回款')).length }} 项</strong></div>
-                    <div class="business-projects__summary-item"><span>年底预计回款</span><strong>{{ formatMoney(detail.summary.yearEndReceivableForecast) }}</strong></div>
-                  </div>
-                </Card>
-
-                <Table
-                  class="business-projects__table"
-                  :columns="receivableColumns"
-                  :data-source="detail.receivables"
-                  :pagination="false"
-                  row-key="id"
-                  :scroll="detailTableScroll"
-                  size="middle"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'totalAmount'">{{ formatMoney(record.totalAmount) }}</template>
-                    <template v-else-if="column.key === 'receivedAmount'">{{ formatMoney(record.receivedAmount) }}</template>
-                  </template>
-                </Table>
-              </div>
-
-              <div v-else class="business-projects__tab-grid">
-                <Card :bordered="false" title="利润结果">
-                  <div class="business-projects__summary-grid">
-                    <div class="business-projects__summary-item"><span>合同收入</span><strong>{{ formatMoney(detail.summary.contractAmount) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>经营成本</span><strong>{{ formatMoney(detail.summary.costAmount) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>毛利额</span><strong>{{ formatMoney(detail.summary.grossProfitAmount) }}</strong></div>
-                    <div class="business-projects__summary-item"><span>毛利率</span><strong>{{ typeof detail.summary.grossProfitRate === 'number' ? `${detail.summary.grossProfitRate.toFixed(1)}%` : '--' }}</strong></div>
-                  </div>
-                </Card>
-
-                <Card :bordered="false" title="预测与历史">
-                  <Table
-                    class="business-projects__table"
-                    :columns="historyColumns"
-                    :data-source="detail.forecastHistories"
-                    :pagination="false"
-                    row-key="id"
-                    :scroll="detailTableScroll"
-                    size="middle"
-                  />
-                </Card>
-              </div>
+              <component :is="activeTabComponent" />
             </div>
           </Spin>
         </Card>
@@ -624,7 +281,7 @@ onMounted(async () => {
   </Page>
 </template>
 
-<style scoped>
+<style>
 .business-projects__shell {
   display: grid;
   gap: 16px;
@@ -791,7 +448,7 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.business-projects__detail-card :deep(.ant-card-body) {
+.business-projects__detail-card .ant-card-body {
   min-width: 0;
   overflow: hidden;
   width: 100%;
@@ -857,19 +514,19 @@ onMounted(async () => {
   font-size: 16px;
 }
 
-.business-projects__tabs :deep(.ant-tabs-nav) {
+.business-projects__tabs .ant-tabs-nav {
   margin-bottom: 20px;
 }
 
-.business-projects__tabs :deep(.ant-tabs-tab) {
+.business-projects__tabs .ant-tabs-tab {
   font-weight: 500;
   padding-left: 4px;
   padding-right: 4px;
 }
 
-.business-projects__tabs :deep(.ant-tabs-content-holder),
-.business-projects__tabs :deep(.ant-tabs-content),
-.business-projects__tabs :deep(.ant-tabs-tabpane) {
+.business-projects__tabs .ant-tabs-content-holder,
+.business-projects__tabs .ant-tabs-content,
+.business-projects__tabs .ant-tabs-tabpane {
   min-width: 0;
 }
 
@@ -879,13 +536,13 @@ onMounted(async () => {
   min-width: 0;
 }
 
-.business-projects__tab-grid > :deep(.ant-card),
-.business-projects__tab-panel > :deep(.ant-table-wrapper) {
+.business-projects__tab-grid > .ant-card,
+.business-projects__tab-panel > .ant-table-wrapper {
   min-width: 0;
 }
 
-.business-projects__tab-grid :deep(.ant-card-body),
-.business-projects__tab-panel :deep(.ant-card-body) {
+.business-projects__tab-grid .ant-card-body,
+.business-projects__tab-panel .ant-card-body {
   min-width: 0;
   overflow: hidden;
   width: 100%;
@@ -977,7 +634,7 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.business-projects__table :deep(.ant-table-cell),
+.business-projects__table .ant-table-cell,
 .business-projects__project-item-head strong,
 .business-projects__summary-item strong {
   white-space: nowrap;
@@ -988,16 +645,16 @@ onMounted(async () => {
   min-width: 0;
 }
 
-.business-projects__table :deep(.ant-table-wrapper),
-.business-projects__table :deep(.ant-spin-nested-loading),
-.business-projects__table :deep(.ant-spin-container),
-.business-projects__table :deep(.ant-table),
-.business-projects__table :deep(.ant-table-container) {
+.business-projects__table .ant-table-wrapper,
+.business-projects__table .ant-spin-nested-loading,
+.business-projects__table .ant-spin-container,
+.business-projects__table .ant-table,
+.business-projects__table .ant-table-container {
   min-width: 0;
   width: 100%;
 }
 
-.business-projects__table :deep(.ant-table-content) {
+.business-projects__table .ant-table-content {
   display: block;
   max-width: 100%;
   overflow-x: auto;
@@ -1012,7 +669,7 @@ onMounted(async () => {
   color: var(--ant-color-text);
 }
 
-.business-projects__table :deep(table) {
+.business-projects__table table {
   min-width: max-content;
 }
 

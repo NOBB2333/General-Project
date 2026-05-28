@@ -76,12 +76,18 @@ public abstract class AdminDbContextBase<TDbContext> :
     public DbSet<AppUpdateLog> AppUpdateLogs { get; set; }
     public DbSet<AppUserNotification> AppUserNotifications { get; set; }
     public DbSet<ProjectEntity> Projects { get; set; }
+    public DbSet<ProjectAcceptanceCriteria> ProjectAcceptanceCriteria { get; set; }
+    public DbSet<ProjectCharter> ProjectCharters { get; set; }
     public DbSet<ProjectCycle> ProjectCycles { get; set; }
     public DbSet<ProjectDocument> ProjectDocuments { get; set; }
     public DbSet<ProjectIssue> ProjectIssues { get; set; }
     public DbSet<ProjectMember> ProjectMembers { get; set; }
+    public DbSet<ProjectMemberRole> ProjectMemberRoles { get; set; }
     public DbSet<ProjectMilestone> ProjectMilestones { get; set; }
+    public DbSet<ProjectQualityChecklist> ProjectQualityChecklists { get; set; }
+    public DbSet<ProjectQualityInspection> ProjectQualityInspections { get; set; }
     public DbSet<ProjectTask> ProjectTasks { get; set; }
+    public DbSet<ProjectTaskDependency> ProjectTaskDependencies { get; set; }
     public DbSet<ProjectRaidItem> ProjectRaidItems { get; set; }
     public DbSet<ProjectWorklog> ProjectWorklogs { get; set; }
     public DbSet<PlatformScheduledJob> PlatformScheduledJobs { get; set; }
@@ -379,6 +385,21 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.HasIndex(x => new { x.OwnerUserId, x.Status });
         });
 
+        builder.Entity<ProjectCharter>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectCharters", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.ApprovalStatus).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Assumptions).HasMaxLength(2048);
+            b.Property(x => x.BusinessCase).IsRequired().HasMaxLength(2048);
+            b.Property(x => x.Constraints).HasMaxLength(2048);
+            b.Property(x => x.Objectives).IsRequired().HasMaxLength(2048);
+            b.Property(x => x.ScopeBoundary).IsRequired().HasMaxLength(2048);
+            b.Property(x => x.SuccessCriteria).IsRequired().HasMaxLength(2048);
+            b.HasIndex(x => x.ProjectId).IsUnique();
+            b.HasIndex(x => x.ApprovalStatus);
+        });
+
         builder.Entity<ProjectCycle>(b =>
         {
             b.ToTable($"{AdminConsts.DbTablePrefix}ProjectCycles", AdminConsts.DbSchema);
@@ -404,10 +425,25 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.ProductOwnerName).HasMaxLength(64);
             b.Property(x => x.DeveloperOwnerName).HasMaxLength(64);
             b.Property(x => x.TesterOwnerName).HasMaxLength(64);
+            b.Property(x => x.WbsCode).IsRequired().HasMaxLength(64);
+            b.HasIndex(x => x.ProductOwnerUserId);
+            b.HasIndex(x => x.DeveloperOwnerUserId);
+            b.HasIndex(x => x.TesterOwnerUserId);
             b.HasIndex(x => x.TaskCode).IsUnique();
             b.HasIndex(x => new { x.ProjectId, x.Status });
+            b.HasIndex(x => new { x.ProjectId, x.ParentTaskId, x.SortOrder });
+            b.HasIndex(x => new { x.ProjectId, x.WbsCode });
             b.HasIndex(x => new { x.OwnerUserId, x.Status });
             b.HasIndex(x => new { x.OrganizationUnitId, x.Status });
+        });
+
+        builder.Entity<ProjectTaskDependency>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectTaskDependencies", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.DependencyType).IsRequired().HasMaxLength(32);
+            b.HasIndex(x => new { x.ProjectId, x.PredecessorTaskId, x.SuccessorTaskId }).IsUnique();
+            b.HasIndex(x => new { x.ProjectId, x.SuccessorTaskId });
         });
 
         builder.Entity<ProjectRaidItem>(b =>
@@ -417,8 +453,12 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.Type).IsRequired().HasMaxLength(32);
             b.Property(x => x.Title).IsRequired().HasMaxLength(256);
             b.Property(x => x.Level).IsRequired().HasMaxLength(32);
+            b.Property(x => x.ContingencyPlan).HasMaxLength(1024);
+            b.Property(x => x.ResponseStrategy).HasMaxLength(32);
             b.Property(x => x.Status).IsRequired().HasMaxLength(32);
+            b.Property(x => x.TriggerCondition).HasMaxLength(1024);
             b.HasIndex(x => new { x.ProjectId, x.Type, x.Status });
+            b.HasIndex(x => new { x.ProjectId, x.RiskScore });
             b.HasIndex(x => new { x.OwnerUserId, x.Status });
         });
 
@@ -434,6 +474,11 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.ProductOwnerName).HasMaxLength(64);
             b.Property(x => x.DeveloperOwnerName).HasMaxLength(64);
             b.Property(x => x.TesterOwnerName).HasMaxLength(64);
+            b.HasIndex(x => x.AcceptanceCriteriaId);
+            b.HasIndex(x => x.QualityChecklistId);
+            b.HasIndex(x => x.ProductOwnerUserId);
+            b.HasIndex(x => x.DeveloperOwnerUserId);
+            b.HasIndex(x => x.TesterOwnerUserId);
             b.HasIndex(x => new { x.ProjectId, x.Type, x.Status });
             b.HasIndex(x => new { x.OwnerUserId, x.Status });
         });
@@ -458,6 +503,49 @@ public abstract class AdminDbContextBase<TDbContext> :
             b.Property(x => x.RoleNames).IsRequired().HasMaxLength(256);
             b.HasIndex(x => new { x.ProjectId, x.UserId }).IsUnique();
             b.HasIndex(x => new { x.UserId, x.LeaveDate });
+        });
+
+        builder.Entity<ProjectMemberRole>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectMemberRoles", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.RoleName).IsRequired().HasMaxLength(64);
+            b.HasIndex(x => new { x.ProjectMemberId, x.RoleName }).IsUnique();
+            b.HasIndex(x => new { x.ProjectId, x.RoleName });
+            b.HasIndex(x => new { x.ProjectId, x.UserId });
+        });
+
+        builder.Entity<ProjectAcceptanceCriteria>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectAcceptanceCriteria", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Description).IsRequired().HasMaxLength(1024);
+            b.Property(x => x.Status).IsRequired().HasMaxLength(32);
+            b.Property(x => x.Title).IsRequired().HasMaxLength(128);
+            b.HasIndex(x => new { x.ProjectId, x.Status });
+            b.HasIndex(x => x.MilestoneId);
+            b.HasIndex(x => x.TaskId);
+        });
+
+        builder.Entity<ProjectQualityChecklist>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectQualityChecklists", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.Category).IsRequired().HasMaxLength(64);
+            b.Property(x => x.Description).IsRequired().HasMaxLength(1024);
+            b.Property(x => x.Title).IsRequired().HasMaxLength(128);
+            b.HasIndex(x => new { x.ProjectId, x.Category });
+        });
+
+        builder.Entity<ProjectQualityInspection>(b =>
+        {
+            b.ToTable($"{AdminConsts.DbTablePrefix}ProjectQualityInspections", AdminConsts.DbSchema);
+            b.ConfigureByConvention();
+            b.Property(x => x.FindingSummary).HasMaxLength(1024);
+            b.Property(x => x.InspectionResult).IsRequired().HasMaxLength(32);
+            b.Property(x => x.RectificationRequirement).HasMaxLength(1024);
+            b.HasIndex(x => new { x.ProjectId, x.InspectionTime });
+            b.HasIndex(x => x.QualityChecklistId);
         });
 
         builder.Entity<ProjectWorklog>(b =>

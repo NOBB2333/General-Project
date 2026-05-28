@@ -224,7 +224,7 @@ onMounted(loadData);
             :columns="worklogColumns"
             :data-source="payload?.recentWorklogs || []"
             :loading="loading"
-            :pagination="false"
+            :pagination="{ pageSize: 10, showSizeChanger: true, showTotal: (total: number) => `共 ${total} 条` }"
             row-key="id"
             size="small"
           >

@@ -89,7 +89,7 @@ onMounted(loadConfigs);
   <Page description="配置参数用于维护允许在线调整的安全运行参数，基础设施连接与密钥仍应通过配置文件或环境变量管理。" title="配置参数">
     <Card :bordered="false" title="参数列表">
       <Table
-        :columns="columns.map((column) => column.key === 'groupName' ? { ...column, filters: groupFilters, onFilter: (value: string, record: ConfigApi.ConfigItem) => record.groupName === value } : column)"
+        :columns="columns.map((column) => column.key === 'groupName' ? { ...column, filters: groupFilters, onFilter: (value: boolean | number | string, record: ConfigApi.ConfigItem) => record.groupName === value } : column)"
         :data-source="items"
         :loading="loading"
         :pagination="{ pageSize: 10 }"

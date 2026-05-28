@@ -2,9 +2,13 @@ namespace General.Admin.Project;
 
 public class ProjectDetailDto
 {
+    public List<ProjectAcceptanceCriteriaDto> AcceptanceCriteria { get; set; } = [];
+
     public decimal? BudgetTotalAmount { get; set; }
 
     public List<ProjectCalendarItemDto> CalendarItems { get; set; } = [];
+
+    public ProjectCharterDto? Charter { get; set; }
 
     public decimal? ContractTotalAmount { get; set; }
 
@@ -15,6 +19,8 @@ public class ProjectDetailDto
     public List<ProjectDocumentItemDto> Documents { get; set; } = [];
 
     public int HighRiskCount { get; set; }
+
+    public int HealthRiskScore { get; set; }
 
     public Guid Id { get; set; }
 
@@ -50,6 +56,10 @@ public class ProjectDetailDto
 
     public List<ProjectIssueItemDto> Issues { get; set; } = [];
 
+    public List<ProjectQualityChecklistDto> QualityChecklists { get; set; } = [];
+
+    public List<ProjectQualityInspectionDto> QualityInspections { get; set; } = [];
+
     public List<ProjectRaidItemDto> RaidItems { get; set; } = [];
 
     public decimal? ReceivedAmount { get; set; }
@@ -59,6 +69,10 @@ public class ProjectDetailDto
     public string Status { get; set; } = string.Empty;
 
     public int TaskCompletionRate { get; set; }
+
+    public List<ProjectTaskDependencyDto> TaskDependencies { get; set; } = [];
+
+    public List<ProjectTaskScheduleImpactDto> TaskScheduleImpacts { get; set; } = [];
 
     public List<ProjectTaskItemDto> Tasks { get; set; } = [];
 

@@ -70,7 +70,7 @@ function setupCommonGuard(router: Router) {
     return true;
   });
 
-  router.afterEach((to) => {
+  router.afterEach((to, from) => {
     // 记录页面是否加载,如果已经加载，后续的页面切换动画等效果不在重复执行
     loadedPaths.add(to.path);
 
@@ -84,7 +84,8 @@ function setupCommonGuard(router: Router) {
     if (
       accessStore.accessToken &&
       !coreRouteNames.includes(to.name as string) &&
-      !to.meta?.ignoreAccess
+      !to.meta?.ignoreAccess &&
+      to.path !== from.path
     ) {
       const title = (to.meta?.title as string | undefined) ?? to.path;
       reportPageVisitApi({ menuPath: to.path, menuTitle: title }).catch(() => {});

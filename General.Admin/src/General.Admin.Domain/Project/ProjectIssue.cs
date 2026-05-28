@@ -2,9 +2,16 @@ using Volo.Abp.Domain.Entities.Auditing;
 
 namespace General.Admin.Project;
 
+/// <summary>
+/// 缺陷与问题：支持关联验收标准和质量检查单，责任人按产品/开发/测试结构化（UserId）。
+/// </summary>
 public class ProjectIssue : FullAuditedAggregateRoot<Guid>
 {
     public string? DeveloperOwnerName { get; private set; }
+
+    public Guid? DeveloperOwnerUserId { get; private set; }
+
+    public Guid? AcceptanceCriteriaId { get; private set; }
 
     public DateTime? DueDate { get; private set; }
 
@@ -16,11 +23,17 @@ public class ProjectIssue : FullAuditedAggregateRoot<Guid>
 
     public string? ProductOwnerName { get; private set; }
 
+    public Guid? ProductOwnerUserId { get; private set; }
+
+    public Guid? QualityChecklistId { get; private set; }
+
     public string? RequirementTitle { get; private set; }
 
     public string Status { get; private set; }
 
     public string? TesterOwnerName { get; private set; }
+
+    public Guid? TesterOwnerUserId { get; private set; }
 
     public string Title { get; private set; }
 
@@ -46,7 +59,12 @@ public class ProjectIssue : FullAuditedAggregateRoot<Guid>
         string? requirementTitle = null,
         string? productOwnerName = null,
         string? developerOwnerName = null,
-        string? testerOwnerName = null) : base(id)
+        string? testerOwnerName = null,
+        Guid? productOwnerUserId = null,
+        Guid? developerOwnerUserId = null,
+        Guid? testerOwnerUserId = null,
+        Guid? acceptanceCriteriaId = null,
+        Guid? qualityChecklistId = null) : base(id)
     {
         ProjectId = projectId;
         Type = Check.NotNullOrWhiteSpace(type, nameof(type), 32);
@@ -59,5 +77,16 @@ public class ProjectIssue : FullAuditedAggregateRoot<Guid>
         ProductOwnerName = productOwnerName?.Trim();
         DeveloperOwnerName = developerOwnerName?.Trim();
         TesterOwnerName = testerOwnerName?.Trim();
+        ProductOwnerUserId = productOwnerUserId;
+        DeveloperOwnerUserId = developerOwnerUserId;
+        TesterOwnerUserId = testerOwnerUserId;
+        AcceptanceCriteriaId = acceptanceCriteriaId;
+        QualityChecklistId = qualityChecklistId;
+    }
+
+    public void LinkQualityObjects(Guid? acceptanceCriteriaId, Guid? qualityChecklistId)
+    {
+        AcceptanceCriteriaId = acceptanceCriteriaId;
+        QualityChecklistId = qualityChecklistId;
     }
 }

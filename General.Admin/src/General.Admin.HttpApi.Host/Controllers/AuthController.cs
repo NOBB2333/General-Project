@@ -11,6 +11,7 @@ using Volo.Abp.Linq;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.TenantManagement;
+using Volo.Abp.Uow;
 using IdentityUser = Volo.Abp.Identity.IdentityUser;
 
 namespace General.Admin.Controllers;
@@ -204,7 +205,8 @@ public class AuthController : ControllerBase
             var userQueryable = await _userRepository.GetQueryableAsync();
             candidates = await _asyncQueryableExecuter.ToListAsync(
                 userQueryable
-                .Where(x => x.TenantId.HasValue && x.NormalizedUserName == normalizedUserName)
+                    .Where(x => x.TenantId.HasValue && x.NormalizedUserName == normalizedUserName)
+                    .OrderBy(x => x.Id)
                     .Take(2));
         }
         if (candidates.Count != 1)
@@ -212,10 +214,7 @@ public class AuthController : ControllerBase
             return null;
         }
 
-        using (_currentTenant.Change(candidates[0].TenantId))
-        {
-            return await _userManager.FindByNameAsync(userName);
-        }
+        return candidates[0];
     }
 
     private async Task<IdentityUser> GetCurrentHostUserAsync()

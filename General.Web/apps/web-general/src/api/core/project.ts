@@ -35,16 +35,23 @@ export namespace ProjectApi {
   }
 
   export interface IssueItem {
+    acceptanceCriteriaId?: null | string;
+    acceptanceCriteriaTitle: string;
     developerOwnerName?: null | string;
+    developerOwnerUserId?: null | string;
     dueDate?: null | string;
     id: string;
     isOverdue: boolean;
     level: string;
     ownerName: string;
     productOwnerName?: null | string;
+    productOwnerUserId?: null | string;
+    qualityChecklistId?: null | string;
+    qualityChecklistTitle: string;
     requirementTitle?: null | string;
     status: string;
     testerOwnerName?: null | string;
+    testerOwnerUserId?: null | string;
     title: string;
     type: string;
   }
@@ -59,6 +66,15 @@ export namespace ProjectApi {
     roleNames: string[];
     userId: string;
     userName: string;
+  }
+
+  export interface MemberRolesUpdateInput {
+    roleNames: string[];
+  }
+
+  export interface IssueQualityLinkInput {
+    acceptanceCriteriaId?: string;
+    qualityChecklistId?: string;
   }
 
   export interface MyRelatedItem {
@@ -80,14 +96,59 @@ export namespace ProjectApi {
     recentWorklogs: WorklogItem[];
   }
 
+  export interface AcceptanceCriteriaItem {
+    description: string;
+    id: string;
+    milestoneId?: null | string;
+    milestoneName: string;
+    projectId: string;
+    status: string;
+    taskId?: null | string;
+    taskTitle: string;
+    title: string;
+  }
+
+  export interface AcceptanceCriteriaSaveInput {
+    description: string;
+    milestoneId?: string;
+    status: string;
+    taskId?: string;
+    title: string;
+  }
+
+  export interface Charter {
+    approvalStatus: string;
+    assumptions: string;
+    businessCase: string;
+    constraints: string;
+    id: string;
+    objectives: string;
+    projectId: string;
+    scopeBoundary: string;
+    successCriteria: string;
+  }
+
+  export interface CharterSaveInput {
+    approvalStatus: string;
+    assumptions: string;
+    businessCase: string;
+    constraints: string;
+    objectives: string;
+    scopeBoundary: string;
+    successCriteria: string;
+  }
+
   export interface ProjectDetail {
+    acceptanceCriteria: AcceptanceCriteriaItem[];
     budgetTotalAmount?: null | number;
     calendarItems: CalendarItem[];
+    charter?: Charter | null;
     contractTotalAmount?: null | number;
     cycles: CycleItem[];
     description: string;
     documents: DocumentItem[];
     highRiskCount: number;
+    healthRiskScore: number;
     id: string;
     isKeyProject: boolean;
     issues: IssueItem[];
@@ -105,11 +166,15 @@ export namespace ProjectApi {
     projectCode: string;
     projectSource: string;
     projectType: string;
+    qualityChecklists: QualityChecklistItem[];
+    qualityInspections: QualityInspectionItem[];
     raidItems: RaidItem[];
     receivedAmount?: null | number;
     sponsorName: string;
     status: string;
     taskCompletionRate: number;
+    taskDependencies: TaskDependencyItem[];
+    taskScheduleImpacts: TaskScheduleImpactItem[];
     tasks: TaskItem[];
     totalWorklogHours: number;
     worklogs: WorklogItem[];
@@ -164,15 +229,21 @@ export namespace ProjectApi {
   }
 
   export interface RaidItem {
+    contingencyPlan: string;
     id: string;
+    impact: number;
     isOverdue: boolean;
     level: string;
     ownerName: string;
     plannedResolveDate?: null | string;
+    probability: number;
     projectId: string;
     projectName: string;
+    responseStrategy: string;
+    riskScore: number;
     status: string;
     title: string;
+    triggerCondition: string;
     type: string;
   }
 
@@ -182,25 +253,111 @@ export namespace ProjectApi {
     type?: string;
   }
 
+  export interface RaidRiskUpdateInput {
+    contingencyPlan: string;
+    impact: number;
+    probability: number;
+    responseStrategy: string;
+    triggerCondition: string;
+  }
+
+  export interface QualityChecklistItem {
+    category: string;
+    description: string;
+    id: string;
+    inspectionCount: number;
+    projectId: string;
+    title: string;
+  }
+
+  export interface QualityChecklistSaveInput {
+    category: string;
+    description: string;
+    title: string;
+  }
+
+  export interface QualityInspectionSaveInput {
+    findingSummary: string;
+    inspectionResult: string;
+    inspectionTime?: string;
+    inspectorUserId: string;
+    qualityChecklistId: string;
+    rectificationRequirement: string;
+  }
+
+  export interface QualityInspectionItem {
+    findingSummary: string;
+    id: string;
+    inspectionResult: string;
+    inspectionTime: string;
+    inspectorName: string;
+    projectId: string;
+    qualityChecklistId: string;
+    qualityChecklistTitle: string;
+    rectificationRequirement: string;
+  }
+
+  export interface TaskDependencyItem {
+    dependencyType: string;
+    id: string;
+    predecessorTaskId: string;
+    predecessorTaskTitle: string;
+    projectId: string;
+    successorTaskId: string;
+    successorTaskTitle: string;
+  }
+
+  export interface TaskDependencySaveInput {
+    dependencyType: string;
+    predecessorTaskId: string;
+    successorTaskId: string;
+  }
+
+  export interface TaskScheduleImpactItem {
+    impactReason: string;
+    predecessorPlannedEndTime?: null | string;
+    predecessorTaskId: string;
+    predecessorTaskTitle: string;
+    successorPlannedStartTime?: null | string;
+    successorTaskId: string;
+    successorTaskTitle: string;
+  }
+
+  export interface TaskWbsUpdateInput {
+    baselineEndTime?: string;
+    baselineStartTime?: string;
+    parentTaskId?: string;
+    sortOrder: number;
+    wbsCode: string;
+  }
+
   export interface TaskItem {
     actualEndTime?: null | string;
+    baselineEndTime?: null | string;
+    baselineStartTime?: null | string;
     blockReason?: null | string;
     contractClause?: null | string;
     developerOwnerName?: null | string;
+    developerOwnerUserId?: null | string;
     id: string;
     isBlocked: boolean;
     organizationUnitName: string;
     ownerName: string;
+    parentTaskId?: null | string;
     plannedEndTime?: null | string;
     plannedStartTime?: null | string;
     priority: string;
     productOwnerName?: null | string;
+    productOwnerUserId?: null | string;
     projectId: string;
     projectName: string;
     status: string;
     taskCode: string;
     testerOwnerName?: null | string;
+    testerOwnerUserId?: null | string;
     title: string;
+    sortOrder: number;
+    wbsCode: string;
   }
 
   export interface TaskListInput {
@@ -265,6 +422,34 @@ export async function createProjectApi(data: ProjectApi.ProjectSaveInput) {
   return requestClient.post<string>('/app/project', data);
 }
 
+export async function createProjectAcceptanceCriteriaApi(
+  projectId: string,
+  data: ProjectApi.AcceptanceCriteriaSaveInput,
+) {
+  return requestClient.post<string>(`/app/project/${projectId}/acceptance-criteria`, data);
+}
+
+export async function createProjectQualityChecklistApi(
+  projectId: string,
+  data: ProjectApi.QualityChecklistSaveInput,
+) {
+  return requestClient.post<string>(`/app/project/${projectId}/quality-checklists`, data);
+}
+
+export async function createProjectQualityInspectionApi(
+  projectId: string,
+  data: ProjectApi.QualityInspectionSaveInput,
+) {
+  return requestClient.post<string>(`/app/project/${projectId}/quality-inspections`, data);
+}
+
+export async function createProjectTaskDependencyApi(
+  projectId: string,
+  data: ProjectApi.TaskDependencySaveInput,
+) {
+  return requestClient.post<string>(`/app/project/${projectId}/task-dependencies`, data);
+}
+
 export async function getProjectMyRelatedApi() {
   return requestClient.get<ProjectApi.MyRelatedPayload>('/app/project/my-related');
 }
@@ -279,4 +464,30 @@ export async function getProjectRaidListApi(params?: ProjectApi.RaidListInput) {
   return requestClient.get<ProjectApi.RaidItem[]>('/app/project/raid/list', {
     params,
   });
+}
+
+export async function saveProjectCharterApi(projectId: string, data: ProjectApi.CharterSaveInput) {
+  return requestClient.post<string>(`/app/project/${projectId}/charter`, data);
+}
+
+export async function updateProjectRaidRiskApi(raidItemId: string, data: ProjectApi.RaidRiskUpdateInput) {
+  return requestClient.put<boolean>(`/app/project/raid/${raidItemId}/risk-assessment`, data);
+}
+
+export async function updateProjectMemberRolesApi(
+  projectMemberId: string,
+  data: ProjectApi.MemberRolesUpdateInput,
+) {
+  return requestClient.put<boolean>(`/app/project/members/${projectMemberId}/roles`, data);
+}
+
+export async function updateProjectIssueQualityLinkApi(
+  issueId: string,
+  data: ProjectApi.IssueQualityLinkInput,
+) {
+  return requestClient.put<boolean>(`/app/project/issues/${issueId}/quality-link`, data);
+}
+
+export async function updateProjectTaskWbsApi(taskId: string, data: ProjectApi.TaskWbsUpdateInput) {
+  return requestClient.put<boolean>(`/app/project/tasks/${taskId}/wbs`, data);
 }

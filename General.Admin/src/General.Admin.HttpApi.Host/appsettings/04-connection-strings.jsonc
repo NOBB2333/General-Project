@@ -1,13 +1,13 @@
 {
   "Database": {
     // Sqlite | PostgreSql | MySql
-    "Provider": "Sqlite"
-    //    "Provider": "PostgreSql"
+    // "Provider": "Sqlite"
+    "Provider": "PostgreSql"
   },
   "ConnectionStrings": {
-    "Default": "Data Source=build/data/general-admin.db"
-    //          PostgreSQL:
-    //    "Default": "HOST=127.0.0.1;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
+    // "Default": "Data Source=build/data/general-admin.db"
+    // PostgreSQL:
+    "Default": "HOST=nucbox-g3.local;Port=5432;Database=general_admin;Username=postgres;Password=1panel_postgresql"
     // MySQL:
     // "Default": "Server=127.0.0.1;Port=3306;Database=general_admin;Uid=root;Pwd=123456;AllowPublicKeyRetrieval=true"
   }

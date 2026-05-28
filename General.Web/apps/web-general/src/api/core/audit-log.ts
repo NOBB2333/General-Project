@@ -66,5 +66,7 @@ export async function getAuditLogDashboardApi(params?: AuditLogApi.AuditLogQuery
 }
 
 export async function reportPageVisitApi(input: AuditLogApi.PageVisitInput) {
-  return requestClient.post<boolean>('/app/audit-log/page-visit', input);
+  return requestClient.post<boolean>('/app/audit-log/page-visit', input, {
+    silentError: true,
+  });
 }

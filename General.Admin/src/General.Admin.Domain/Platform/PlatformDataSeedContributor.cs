@@ -31,6 +31,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
     private readonly IRepository<ProjectDocument, Guid> _projectDocumentRepository;
     private readonly IRepository<ProjectIssue, Guid> _projectIssueRepository;
     private readonly IRepository<ProjectMember, Guid> _projectMemberRepository;
+    private readonly IRepository<ProjectMemberRole, Guid> _projectMemberRoleRepository;
     private readonly IRepository<ProjectMilestone, Guid> _projectMilestoneRepository;
     private readonly IRepository<ProjectRaidItem, Guid> _projectRaidItemRepository;
     private readonly IRepository<ProjectTask, Guid> _projectTaskRepository;
@@ -71,6 +72,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IRepository<ProjectDocument, Guid> projectDocumentRepository,
         IRepository<ProjectIssue, Guid> projectIssueRepository,
         IRepository<ProjectMember, Guid> projectMemberRepository,
+        IRepository<ProjectMemberRole, Guid> projectMemberRoleRepository,
         IRepository<ProjectMilestone, Guid> projectMilestoneRepository,
         IRepository<ProjectRaidItem, Guid> projectRaidItemRepository,
         IRepository<ProjectTask, Guid> projectTaskRepository,
@@ -110,6 +112,7 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         _projectDocumentRepository = projectDocumentRepository;
         _projectIssueRepository = projectIssueRepository;
         _projectMemberRepository = projectMemberRepository;
+        _projectMemberRoleRepository = projectMemberRoleRepository;
         _projectMilestoneRepository = projectMilestoneRepository;
         _projectRaidItemRepository = projectRaidItemRepository;
         _projectTaskRepository = projectTaskRepository;
@@ -711,14 +714,14 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         {
             await _projectTaskRepository.InsertManyAsync(
             [
-                new(Guid.Parse("52000000-0000-0000-0000-000000000001"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-001", "梳理现场交付清单", pmUser.Id, "进行中", "高", new DateTime(2026, 4, 11), new DateTime(2026, 4, 15), estimatedWorkHours: 12, contractClause: "合同 3.2 现场联调条款", productOwnerName: "PMO 负责人", developerOwnerName: "项目成员", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000002"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-002", "输出验收前检查项", memberUser.Id, "阻塞", "高", new DateTime(2026, 4, 12), new DateTime(2026, 4, 14), true, "客户环境账号未开通", 8, contractClause: "合同 4.1 验收准备条款", productOwnerName: "项目经理", developerOwnerName: "项目成员", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000003"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-003", "回填项目风险基线", pmUser.Id, "已完成", "中", new DateTime(2026, 4, 9), new DateTime(2026, 4, 12), estimatedWorkHours: 6, actualWorkHours: 6, actualStartTime: new DateTime(2026, 4, 9), actualEndTime: new DateTime(2026, 4, 11), contractClause: "合同 2.4 项目治理条款", productOwnerName: "PMO 负责人", developerOwnerName: "项目经理", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000004"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-004", "补齐租户与审计接口", adminUser.Id, "进行中", "高", new DateTime(2026, 4, 10), new DateTime(2026, 4, 17), estimatedWorkHours: 16, contractClause: "内部目标 1.1 平台治理", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000005"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-005", "替换项目工作台占位页", pmUser.Id, "未开始", "中", new DateTime(2026, 4, 14), new DateTime(2026, 4, 19), estimatedWorkHours: 10, contractClause: "内部目标 1.3 项目经营驾驶舱", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000006"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-006", "处理文件上传异常", adminUser.Id, "已完成", "高", new DateTime(2026, 4, 10), new DateTime(2026, 4, 13), estimatedWorkHours: 4, actualWorkHours: 3.5, actualStartTime: new DateTime(2026, 4, 10), actualEndTime: new DateTime(2026, 4, 13), contractClause: "内部目标 1.2 基础能力修复", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000007"), projects[2].Id, PlatformSeedIds.FinanceDept, "TASK-007", "整理回款计划节点", viewerUser.Id, "未开始", "中", new DateTime(2026, 4, 15), new DateTime(2026, 4, 21), estimatedWorkHours: 6, contractClause: "补充协议 2.1 回款计划", productOwnerName: "PMO 负责人", developerOwnerName: "经营查看", testerOwnerName: "经营查看"),
-                new(Guid.Parse("52000000-0000-0000-0000-000000000008"), projects[2].Id, PlatformSeedIds.FinanceDept, "TASK-008", "输出联调接口说明", pmoUser.Id, "进行中", "中", new DateTime(2026, 4, 12), new DateTime(2026, 4, 18), estimatedWorkHours: 8, contractClause: "补充协议 3.5 系统联调", productOwnerName: "PMO 负责人", developerOwnerName: "经营查看", testerOwnerName: "经营查看")
+                new(Guid.Parse("52000000-0000-0000-0000-000000000001"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-001", "梳理现场交付清单", pmUser.Id, "进行中", "高", new DateTime(2026, 4, 11), new DateTime(2026, 4, 15), estimatedWorkHours: 12, contractClause: "合同 3.2 现场联调条款", productOwnerName: "PMO 负责人", developerOwnerName: "项目成员", testerOwnerName: "项目成员", productOwnerUserId: pmoUser.Id, developerOwnerUserId: memberUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000002"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-002", "输出验收前检查项", memberUser.Id, "阻塞", "高", new DateTime(2026, 4, 12), new DateTime(2026, 4, 14), true, "客户环境账号未开通", 8, contractClause: "合同 4.1 验收准备条款", productOwnerName: "项目经理", developerOwnerName: "项目成员", testerOwnerName: "项目成员", productOwnerUserId: pmUser.Id, developerOwnerUserId: memberUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000003"), projects[0].Id, PlatformSeedIds.PreSalesDept, "TASK-003", "回填项目风险基线", pmUser.Id, "已完成", "中", new DateTime(2026, 4, 9), new DateTime(2026, 4, 12), estimatedWorkHours: 6, actualWorkHours: 6, actualStartTime: new DateTime(2026, 4, 9), actualEndTime: new DateTime(2026, 4, 11), contractClause: "合同 2.4 项目治理条款", productOwnerName: "PMO 负责人", developerOwnerName: "项目经理", testerOwnerName: "项目成员", productOwnerUserId: pmoUser.Id, developerOwnerUserId: pmUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000004"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-004", "补齐租户与审计接口", adminUser.Id, "进行中", "高", new DateTime(2026, 4, 10), new DateTime(2026, 4, 17), estimatedWorkHours: 16, contractClause: "内部目标 1.1 平台治理", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员", productOwnerUserId: pmUser.Id, developerOwnerUserId: adminUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000005"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-005", "替换项目工作台占位页", pmUser.Id, "未开始", "中", new DateTime(2026, 4, 14), new DateTime(2026, 4, 19), estimatedWorkHours: 10, contractClause: "内部目标 1.3 项目经营驾驶舱", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员", productOwnerUserId: pmUser.Id, developerOwnerUserId: adminUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000006"), projects[1].Id, PlatformSeedIds.RndCenter, "TASK-006", "处理文件上传异常", adminUser.Id, "已完成", "高", new DateTime(2026, 4, 10), new DateTime(2026, 4, 13), estimatedWorkHours: 4, actualWorkHours: 3.5, actualStartTime: new DateTime(2026, 4, 10), actualEndTime: new DateTime(2026, 4, 13), contractClause: "内部目标 1.2 基础能力修复", productOwnerName: "项目经理", developerOwnerName: "系统管理员", testerOwnerName: "项目成员", productOwnerUserId: pmUser.Id, developerOwnerUserId: adminUser.Id, testerOwnerUserId: memberUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000007"), projects[2].Id, PlatformSeedIds.FinanceDept, "TASK-007", "整理回款计划节点", viewerUser.Id, "未开始", "中", new DateTime(2026, 4, 15), new DateTime(2026, 4, 21), estimatedWorkHours: 6, contractClause: "补充协议 2.1 回款计划", productOwnerName: "PMO 负责人", developerOwnerName: "经营查看", testerOwnerName: "经营查看", productOwnerUserId: pmoUser.Id, developerOwnerUserId: viewerUser.Id, testerOwnerUserId: viewerUser.Id),
+                new(Guid.Parse("52000000-0000-0000-0000-000000000008"), projects[2].Id, PlatformSeedIds.FinanceDept, "TASK-008", "输出联调接口说明", pmoUser.Id, "进行中", "中", new DateTime(2026, 4, 12), new DateTime(2026, 4, 18), estimatedWorkHours: 8, contractClause: "补充协议 3.5 系统联调", productOwnerName: "PMO 负责人", developerOwnerName: "经营查看", testerOwnerName: "经营查看", productOwnerUserId: pmoUser.Id, developerOwnerUserId: viewerUser.Id, testerOwnerUserId: viewerUser.Id)
             ], autoSave: true);
         }
 
@@ -750,11 +753,11 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         {
             await _projectIssueRepository.InsertManyAsync(
             [
-                new(Guid.Parse("55000000-0000-0000-0000-000000000001"), projects[0].Id, "缺陷", "现场接口鉴权失败", "高", memberUser.Id, "处理中", new DateTime(2026, 4, 15), "接口权限配置说明", "PMO 负责人", "项目成员", "项目成员"),
-                new(Guid.Parse("55000000-0000-0000-0000-000000000002"), projects[0].Id, "问题", "客户验收模板未最终确认", "中", pmUser.Id, "跟踪中", new DateTime(2026, 4, 17), "一期验收范围说明", "项目经理", "项目成员", "项目成员"),
-                new(Guid.Parse("55000000-0000-0000-0000-000000000003"), projects[1].Id, "缺陷", "暗色主题卡片背景残留白底", "高", adminUser.Id, "处理中", new DateTime(2026, 4, 16), "主题切换验收项", "项目经理", "系统管理员", "项目成员"),
-                new(Guid.Parse("55000000-0000-0000-0000-000000000004"), projects[1].Id, "问题", "项目详情聚合字段待补齐", "中", pmUser.Id, "已识别", new DateTime(2026, 4, 19), "项目详情字段矩阵", "项目经理", "系统管理员", "项目成员"),
-                new(Guid.Parse("55000000-0000-0000-0000-000000000005"), projects[2].Id, "问题", "财务测试环境开放时间未确认", "中", viewerUser.Id, "跟踪中", new DateTime(2026, 4, 22), "接口联调计划", "PMO 负责人", "经营查看", "经营查看")
+                new(Guid.Parse("55000000-0000-0000-0000-000000000001"), projects[0].Id, "缺陷", "现场接口鉴权失败", "高", memberUser.Id, "处理中", new DateTime(2026, 4, 15), "接口权限配置说明", "PMO 负责人", "项目成员", "项目成员", pmoUser.Id, memberUser.Id, memberUser.Id),
+                new(Guid.Parse("55000000-0000-0000-0000-000000000002"), projects[0].Id, "问题", "客户验收模板未最终确认", "中", pmUser.Id, "跟踪中", new DateTime(2026, 4, 17), "一期验收范围说明", "项目经理", "项目成员", "项目成员", pmUser.Id, memberUser.Id, memberUser.Id),
+                new(Guid.Parse("55000000-0000-0000-0000-000000000003"), projects[1].Id, "缺陷", "暗色主题卡片背景残留白底", "高", adminUser.Id, "处理中", new DateTime(2026, 4, 16), "主题切换验收项", "项目经理", "系统管理员", "项目成员", pmUser.Id, adminUser.Id, memberUser.Id),
+                new(Guid.Parse("55000000-0000-0000-0000-000000000004"), projects[1].Id, "问题", "项目详情聚合字段待补齐", "中", pmUser.Id, "已识别", new DateTime(2026, 4, 19), "项目详情字段矩阵", "项目经理", "系统管理员", "项目成员", pmUser.Id, adminUser.Id, memberUser.Id),
+                new(Guid.Parse("55000000-0000-0000-0000-000000000005"), projects[2].Id, "问题", "财务测试环境开放时间未确认", "中", viewerUser.Id, "跟踪中", new DateTime(2026, 4, 22), "接口联调计划", "PMO 负责人", "经营查看", "经营查看", pmoUser.Id, viewerUser.Id, viewerUser.Id)
             ], autoSave: true);
         }
 
@@ -774,45 +777,72 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         {
             await _projectMemberRepository.InsertManyAsync(
             [
-                new(Guid.Parse("57000000-0000-0000-0000-000000000001"), projects[0].Id, pmUser.Id, PlatformSeedIds.PreSalesDept, ["PM", "实施"], new DateTime(2026, 4, 1)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000002"), projects[0].Id, memberUser.Id, PlatformSeedIds.PreSalesDept, ["开发", "测试"], new DateTime(2026, 4, 2)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000003"), projects[0].Id, viewerUser.Id, PlatformSeedIds.FinanceDept, ["运维"], new DateTime(2026, 4, 8), new DateTime(2026, 4, 18), true),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000004"), projects[1].Id, adminUser.Id, PlatformSeedIds.RndCenter, ["架构", "开发"], new DateTime(2026, 3, 20)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000005"), projects[1].Id, pmUser.Id, PlatformSeedIds.PreSalesDept, ["PM"], new DateTime(2026, 3, 20)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000006"), projects[1].Id, memberUser.Id, PlatformSeedIds.PreSalesDept, ["测试", "运维"], new DateTime(2026, 4, 6)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000007"), projects[2].Id, pmoUser.Id, PlatformSeedIds.PmoCenter, ["PMO"], new DateTime(2026, 4, 10)),
-                new(Guid.Parse("57000000-0000-0000-0000-000000000008"), projects[2].Id, viewerUser.Id, PlatformSeedIds.FinanceDept, ["业务", "运维"], new DateTime(2026, 4, 10))
+                new(Guid.Parse("57000000-0000-0000-0000-000000000001"), projects[0].Id, pmUser.Id, PlatformSeedIds.PreSalesDept, ["产品"], new DateTime(2026, 4, 1)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000002"), projects[0].Id, memberUser.Id, PlatformSeedIds.PreSalesDept, ["研发"], new DateTime(2026, 4, 2)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000003"), projects[0].Id, viewerUser.Id, PlatformSeedIds.FinanceDept, ["研发"], new DateTime(2026, 4, 8), new DateTime(2026, 4, 18), true),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000004"), projects[1].Id, adminUser.Id, PlatformSeedIds.RndCenter, ["研发"], new DateTime(2026, 3, 20)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000005"), projects[1].Id, pmUser.Id, PlatformSeedIds.PreSalesDept, ["产品"], new DateTime(2026, 3, 20)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000006"), projects[1].Id, memberUser.Id, PlatformSeedIds.PreSalesDept, ["研发"], new DateTime(2026, 4, 6)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000007"), projects[2].Id, pmoUser.Id, PlatformSeedIds.PmoCenter, ["产品"], new DateTime(2026, 4, 10)),
+                new(Guid.Parse("57000000-0000-0000-0000-000000000008"), projects[2].Id, viewerUser.Id, PlatformSeedIds.FinanceDept, ["研发"], new DateTime(2026, 4, 10))
             ], autoSave: true);
-        }
-        else
-        {
-            await EnsureProjectMemberAsync(
-                Guid.Parse("57000000-0000-0000-0000-000000000101"),
-                projects[0].Id,
-                memberUser.Id,
-                PlatformSeedIds.PreSalesDept,
-                ["开发", "测试"],
-                new DateTime(2026, 4, 2));
-            await EnsureProjectMemberAsync(
-                Guid.Parse("57000000-0000-0000-0000-000000000106"),
-                projects[1].Id,
-                memberUser.Id,
-                PlatformSeedIds.PreSalesDept,
-                ["测试", "运维"],
-                new DateTime(2026, 4, 6));
         }
 
-        if (!await _projectWorklogRepository.AnyAsync())
+        var week1 = GetWeekStart(new DateTime(2026, 4, 14));
+        var week2 = GetWeekStart(new DateTime(2026, 4, 21));
+        var week3 = GetWeekStart(new DateTime(2026, 4, 28));
+        var week4 = GetWeekStart(new DateTime(2026, 5, 5));
+        var allWorklogs = new List<ProjectWorklog>
         {
-            var weekStart = GetWeekStart(new DateTime(2026, 4, 14));
-            await _projectWorklogRepository.InsertManyAsync(
-            [
-                new(Guid.Parse("58000000-0000-0000-0000-000000000001"), projects[0].Id, pmUser.Id, weekStart, new DateTime(2026, 4, 14), 1, "跟进现场交付清单和客户接口权限", Guid.Parse("52000000-0000-0000-0000-000000000001")),
-                new(Guid.Parse("58000000-0000-0000-0000-000000000002"), projects[0].Id, memberUser.Id, weekStart, new DateTime(2026, 4, 14), 1, "整理验收前检查项与联调问题", Guid.Parse("52000000-0000-0000-0000-000000000002")),
-                new(Guid.Parse("58000000-0000-0000-0000-000000000003"), projects[1].Id, adminUser.Id, weekStart, new DateTime(2026, 4, 14), 1, "补齐项目详情聚合接口", Guid.Parse("52000000-0000-0000-0000-000000000004")),
-                new(Guid.Parse("58000000-0000-0000-0000-000000000004"), projects[1].Id, pmUser.Id, weekStart, new DateTime(2026, 4, 15), 0.5, "梳理 PM 工作台与详情页结构", Guid.Parse("52000000-0000-0000-0000-000000000005")),
-                new(Guid.Parse("58000000-0000-0000-0000-000000000005"), projects[2].Id, viewerUser.Id, weekStart, new DateTime(2026, 4, 15), 1, "整理财务接口口径与回款节点", Guid.Parse("52000000-0000-0000-0000-000000000007"))
-            ], autoSave: true);
+            // 第1周 4/14 — 产品角色
+            new(Guid.Parse("58000000-0000-0000-0000-000000000001"), projects[0].Id, pmUser.Id, week1, new DateTime(2026, 4, 14), 2, "跟进现场交付清单和客户接口权限", Guid.Parse("52000000-0000-0000-0000-000000000001")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000002"), projects[0].Id, memberUser.Id, week1, new DateTime(2026, 4, 14), 4, "联调客户接口并排查鉴权问题", Guid.Parse("52000000-0000-0000-0000-000000000001")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000003"), projects[0].Id, pmUser.Id, week1, new DateTime(2026, 4, 15), 1.5, "与客户确认验收标准细节", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000004"), projects[0].Id, memberUser.Id, week1, new DateTime(2026, 4, 15), 6, "修复交付清单导出乱码", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000005"), projects[0].Id, pmUser.Id, week1, new DateTime(2026, 4, 16), 1, "编写项目周报并同步干系人", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000006"), projects[0].Id, memberUser.Id, week1, new DateTime(2026, 4, 17), 3, "补充验收检查项自动化脚本", Guid.Parse("52000000-0000-0000-0000-000000000003")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000007"), projects[1].Id, adminUser.Id, week1, new DateTime(2026, 4, 14), 8, "补齐租户审计接口与权限校验", Guid.Parse("52000000-0000-0000-0000-000000000004")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000008"), projects[1].Id, adminUser.Id, week1, new DateTime(2026, 4, 15), 6, "修复文件上传大小限制异常", Guid.Parse("52000000-0000-0000-0000-000000000006")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000009"), projects[1].Id, pmUser.Id, week1, new DateTime(2026, 4, 15), 2, "梳理 PM 工作台需求清单", Guid.Parse("52000000-0000-0000-0000-000000000005")),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000000A"), projects[1].Id, pmUser.Id, week1, new DateTime(2026, 4, 17), 1, "评审研发方案并确认排期", null),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000000B"), projects[2].Id, viewerUser.Id, week1, new DateTime(2026, 4, 15), 3, "整理财务接口口径与回款节点", Guid.Parse("52000000-0000-0000-0000-000000000007")),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000000C"), projects[2].Id, pmoUser.Id, week1, new DateTime(2026, 4, 16), 2, "协调财务与研发联调排期", Guid.Parse("52000000-0000-0000-0000-000000000008")),
+            // 第2周 4/21
+            new(Guid.Parse("58000000-0000-0000-0000-000000000010"), projects[0].Id, pmUser.Id, week2, new DateTime(2026, 4, 21), 1.5, "准备验收汇报材料", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000011"), projects[0].Id, pmUser.Id, week2, new DateTime(2026, 4, 23), 1, "跟进客户反馈问题闭环", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000012"), projects[0].Id, memberUser.Id, week2, new DateTime(2026, 4, 21), 8, "完成接口联调并通过冒烟测试", Guid.Parse("52000000-0000-0000-0000-000000000001")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000013"), projects[0].Id, memberUser.Id, week2, new DateTime(2026, 4, 22), 6, "修复数据同步延迟问题", Guid.Parse("52000000-0000-0000-0000-000000000003")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000014"), projects[0].Id, memberUser.Id, week2, new DateTime(2026, 4, 24), 4, "编写单元测试覆盖核心流程", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000015"), projects[1].Id, adminUser.Id, week2, new DateTime(2026, 4, 21), 4, "优化查询性能并添加缓存", Guid.Parse("52000000-0000-0000-0000-000000000004")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000016"), projects[1].Id, adminUser.Id, week2, new DateTime(2026, 4, 23), 3, "对接组织架构同步接口", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000017"), projects[1].Id, pmUser.Id, week2, new DateTime(2026, 4, 22), 2, "验收第一阶段交付物", Guid.Parse("52000000-0000-0000-0000-000000000005")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000018"), projects[2].Id, pmoUser.Id, week2, new DateTime(2026, 4, 21), 3, "输出联调接口文档", Guid.Parse("52000000-0000-0000-0000-000000000008")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000019"), projects[2].Id, viewerUser.Id, week2, new DateTime(2026, 4, 22), 2, "核对回款计划与发票信息", Guid.Parse("52000000-0000-0000-0000-000000000007")),
+            // 第3周 4/28
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001A"), projects[0].Id, pmUser.Id, week3, new DateTime(2026, 4, 28), 2, "组织验收评审会议", null),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001B"), projects[0].Id, pmUser.Id, week3, new DateTime(2026, 4, 30), 1, "整理验收遗留问题清单", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001C"), projects[0].Id, memberUser.Id, week3, new DateTime(2026, 4, 28), 6, "修复验收评审发现的缺陷", Guid.Parse("52000000-0000-0000-0000-000000000002")),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001D"), projects[0].Id, memberUser.Id, week3, new DateTime(2026, 4, 29), 4, "补充操作手册与部署文档", null),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001E"), projects[1].Id, adminUser.Id, week3, new DateTime(2026, 4, 28), 5, "实现数据导出 Excel 功能", Guid.Parse("52000000-0000-0000-0000-000000000004")),
+            new(Guid.Parse("58000000-0000-0000-0000-00000000001F"), projects[1].Id, adminUser.Id, week3, new DateTime(2026, 4, 30), 3, "修复权限越级访问漏洞", Guid.Parse("52000000-0000-0000-0000-000000000006")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000020"), projects[1].Id, pmUser.Id, week3, new DateTime(2026, 4, 29), 1.5, "编写第二阶段需求说明书", Guid.Parse("52000000-0000-0000-0000-000000000005")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000021"), projects[2].Id, pmoUser.Id, week3, new DateTime(2026, 4, 29), 4, "推动财务系统联调", Guid.Parse("52000000-0000-0000-0000-000000000008")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000022"), projects[2].Id, viewerUser.Id, week3, new DateTime(2026, 4, 30), 2, "确认回款到账并更新台账", Guid.Parse("52000000-0000-0000-0000-000000000007")),
+            // 第4周 5/5
+            new(Guid.Parse("58000000-0000-0000-0000-000000000023"), projects[0].Id, pmUser.Id, week4, new DateTime(2026, 5, 5), 1, "项目结项总结与复盘", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000024"), projects[0].Id, memberUser.Id, week4, new DateTime(2026, 5, 5), 3, "归档代码与配置到制品库", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000025"), projects[0].Id, memberUser.Id, week4, new DateTime(2026, 5, 6), 2, "协助运维完成生产部署", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000026"), projects[1].Id, adminUser.Id, week4, new DateTime(2026, 5, 5), 6, "开发消息通知模块", Guid.Parse("52000000-0000-0000-0000-000000000005")),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000027"), projects[1].Id, adminUser.Id, week4, new DateTime(2026, 5, 7), 4, "编写 API 接口文档", null),
+            new(Guid.Parse("58000000-0000-0000-0000-000000000028"), projects[1].Id, pmUser.Id, week4, new DateTime(2026, 5, 6), 2, "验收消息通知功能", Guid.Parse("52000000-0000-0000-0000-000000000005")),
+        };
+
+        var existingIds = new HashSet<Guid>(
+            (await _projectWorklogRepository.GetListAsync()).Select(x => x.Id));
+        var toInsert = allWorklogs.Where(x => !existingIds.Contains(x.Id)).ToList();
+        if (toInsert.Count > 0)
+        {
+            await _projectWorklogRepository.InsertManyAsync(toInsert, autoSave: true);
         }
     }
 
@@ -824,17 +854,46 @@ public class PlatformDataSeedContributor : IDataSeedContributor, ITransientDepen
         IEnumerable<string> roleNames,
         DateTime joinDate)
     {
+        var roles = roleNames
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         var exists = await _projectMemberRepository.AnyAsync(x =>
             x.ProjectId == projectId &&
             x.UserId == userId);
         if (exists)
         {
+            await EnsureProjectMemberRolesAsync(id, projectId, userId, roles);
             return;
         }
 
         await _projectMemberRepository.InsertAsync(
-            new ProjectMember(id, projectId, userId, organizationUnitId, roleNames, joinDate),
+            new ProjectMember(id, projectId, userId, organizationUnitId, roles, joinDate),
             autoSave: true);
+        await EnsureProjectMemberRolesAsync(id, projectId, userId, roles);
+    }
+
+    private async Task EnsureProjectMemberRolesAsync(
+        Guid projectMemberId,
+        Guid projectId,
+        Guid userId,
+        IReadOnlyCollection<string> roleNames)
+    {
+        foreach (var roleName in roleNames)
+        {
+            var exists = await _projectMemberRoleRepository.AnyAsync(x =>
+                x.ProjectMemberId == projectMemberId &&
+                x.RoleName == roleName);
+            if (exists)
+            {
+                continue;
+            }
+
+            await _projectMemberRoleRepository.InsertAsync(
+                new ProjectMemberRole(Guid.NewGuid(), projectId, projectMemberId, userId, roleName),
+                autoSave: true);
+        }
     }
 
     private async Task SeedPlatformScheduledJobsAsync()

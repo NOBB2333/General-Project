@@ -2,6 +2,9 @@ using Volo.Abp.Domain.Entities.Auditing;
 
 namespace General.Admin.Project;
 
+/// <summary>
+/// 项目里程碑：含状态流转，关闭/完成前需校验已确认的验收标准和质量检查记录。
+/// </summary>
 public class ProjectMilestone : FullAuditedAggregateRoot<Guid>
 {
     public DateTime? ActualCompletionDate { get; private set; }
@@ -35,6 +38,12 @@ public class ProjectMilestone : FullAuditedAggregateRoot<Guid>
         Name = Check.NotNullOrWhiteSpace(name, nameof(name), 128);
         OwnerUserId = ownerUserId;
         PlannedCompletionDate = plannedCompletionDate;
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        ActualCompletionDate = actualCompletionDate;
+    }
+
+    public void UpdateStatus(string status, DateTime? actualCompletionDate = null)
+    {
         Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
         ActualCompletionDate = actualCompletionDate;
     }

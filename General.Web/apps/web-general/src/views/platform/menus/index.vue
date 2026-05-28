@@ -45,7 +45,11 @@ const creating = ref(false);
 const editing = ref(false);
 const { actionLoadingKey, runAction } = useActionLoading();
 
-type MenuFormState = MenuApi.MenuSaveInput;
+type MenuFormState = Omit<MenuApi.MenuSaveInput, 'component' | 'icon' | 'permissionCode'> & {
+  component: string;
+  icon: string;
+  permissionCode: string;
+};
 
 const formState = reactive<MenuFormState>({
   appCode: 'platform',

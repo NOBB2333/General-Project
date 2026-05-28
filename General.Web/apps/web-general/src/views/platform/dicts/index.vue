@@ -265,8 +265,8 @@ onMounted(async () => {
           :loading="loadingTypes"
           :pagination="false"
           row-key="id"
-          :row-class-name="(record) => record.id === selectedTypeId ? 'platform-dict__row-active' : ''"
-          @row="(record) => ({ onClick: () => selectType(record.id) })"
+          :row-class-name="(record: DictApi.DictTypeItem) => record.id === selectedTypeId ? 'platform-dict__row-active' : ''"
+          @row="(record: DictApi.DictTypeItem) => ({ onClick: () => selectType(record.id) })"
         >
           <template #emptyText>
             <Empty description="暂无字典类型" />

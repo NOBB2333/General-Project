@@ -2,6 +2,9 @@ using Volo.Abp.Domain.Entities.Auditing;
 
 namespace General.Admin.Project;
 
+/// <summary>
+/// 项目主实体：包含基础信息、经营字段、状态流转（进入执行前需校验章程已批准）。
+/// </summary>
 public class Project : FullAuditedAggregateRoot<Guid>
 {
     public decimal? BudgetTotalAmount { get; private set; }
@@ -83,5 +86,10 @@ public class Project : FullAuditedAggregateRoot<Guid>
         BudgetTotalAmount = budgetTotalAmount;
         ContractTotalAmount = contractTotalAmount;
         ReceivedAmount = receivedAmount;
+    }
+
+    public void UpdateStatus(string status)
+    {
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
     }
 }
