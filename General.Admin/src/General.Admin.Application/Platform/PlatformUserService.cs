@@ -158,6 +158,11 @@ public class PlatformUserService : ITransientDependency
         try
         {
             var keyword = input.Keyword?.Trim();
+            var userName = input.UserName?.Trim();
+            var displayName = input.DisplayName?.Trim();
+            var email = input.Email?.Trim();
+            var employeeNo = input.EmployeeNo?.Trim();
+            var phoneNumber = input.PhoneNumber?.Trim();
             var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 100);
             var skipCount = Math.Max(0, input.SkipCount);
 
@@ -176,7 +181,8 @@ public class PlatformUserService : ITransientDependency
                         hostUsersQueryable = hostUsersQueryable.Where(x => roleUserIds.Contains(x.Id));
                     }
 
-                    hostUsersQueryable = ApplyUserListFilters(hostUsersQueryable, keyword, input.IsActive);
+                    hostUsersQueryable = ApplyUserListFilters(hostUsersQueryable, keyword, userName, displayName, email, input.IsActive);
+                    hostUsersQueryable = await ApplyUserProfileFiltersAsync(hostUsersQueryable, employeeNo, phoneNumber);
                     return await BuildUserListResultAsync(
                         hostUsersQueryable,
                         organizationUnitsForHost,
@@ -217,7 +223,8 @@ public class PlatformUserService : ITransientDependency
 
             var usersQueryable = await _userRepository.GetQueryableAsync();
             usersQueryable = usersQueryable.Where(x => visibleUserIds.Contains(x.Id));
-            usersQueryable = ApplyUserListFilters(usersQueryable, keyword, input.IsActive);
+            usersQueryable = ApplyUserListFilters(usersQueryable, keyword, userName, displayName, email, input.IsActive);
+            usersQueryable = await ApplyUserProfileFiltersAsync(usersQueryable, employeeNo, phoneNumber);
 
             return await BuildUserListResultAsync(
                 usersQueryable,
@@ -230,11 +237,16 @@ public class PlatformUserService : ITransientDependency
         {
             _logger.LogError(
                 ex,
-                "Failed to get user list. CurrentUserId={CurrentUserId}, Roles={Roles}, OrganizationUnitId={OrganizationUnitId}, Keyword={Keyword}, IsActive={IsActive}, RoleName={RoleName}",
+                "Failed to get user list. CurrentUserId={CurrentUserId}, Roles={Roles}, OrganizationUnitId={OrganizationUnitId}, Keyword={Keyword}, UserName={UserName}, DisplayName={DisplayName}, Email={Email}, EmployeeNo={EmployeeNo}, PhoneNumber={PhoneNumber}, IsActive={IsActive}, RoleName={RoleName}",
                 _currentUser.Id,
                 _currentUser.Roles == null ? string.Empty : string.Join(",", _currentUser.Roles),
                 input.OrganizationUnitId,
                 input.Keyword,
+                input.UserName,
+                input.DisplayName,
+                input.Email,
+                input.EmployeeNo,
+                input.PhoneNumber,
                 input.IsActive,
                 input.RoleName);
             throw;
@@ -249,6 +261,9 @@ public class PlatformUserService : ITransientDependency
     private static IQueryable<IdentityUser> ApplyUserListFilters(
         IQueryable<IdentityUser> usersQueryable,
         string? keyword,
+        string? userName,
+        string? displayName,
+        string? email,
         bool? isActive)
     {
         if (!string.IsNullOrWhiteSpace(keyword))
@@ -259,12 +274,57 @@ public class PlatformUserService : ITransientDependency
                 (x.Email != null && x.Email.Contains(keyword)));
         }
 
+        if (!string.IsNullOrWhiteSpace(userName))
+        {
+            usersQueryable = usersQueryable.Where(x => x.UserName != null && x.UserName.Contains(userName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            usersQueryable = usersQueryable.Where(x => x.Name != null && x.Name.Contains(displayName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            usersQueryable = usersQueryable.Where(x => x.Email != null && x.Email.Contains(email));
+        }
+
         if (isActive.HasValue)
         {
             usersQueryable = usersQueryable.Where(x => x.IsActive == isActive.Value);
         }
 
         return usersQueryable;
+    }
+
+    private async Task<IQueryable<IdentityUser>> ApplyUserProfileFiltersAsync(
+        IQueryable<IdentityUser> usersQueryable,
+        string? employeeNo,
+        string? phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(employeeNo) && string.IsNullOrWhiteSpace(phoneNumber))
+        {
+            return usersQueryable;
+        }
+
+        var profilesQueryable = await _userProfileRepository.GetQueryableAsync();
+        if (!string.IsNullOrWhiteSpace(employeeNo))
+        {
+            profilesQueryable = profilesQueryable.Where(x =>
+                x.EmployeeNo != null &&
+                x.EmployeeNo.Contains(employeeNo));
+        }
+
+        if (!string.IsNullOrWhiteSpace(phoneNumber))
+        {
+            profilesQueryable = profilesQueryable.Where(x =>
+                x.PhoneNumber != null &&
+                x.PhoneNumber.Contains(phoneNumber));
+        }
+
+        var userIds = await _asyncQueryableExecuter.ToListAsync(
+            profilesQueryable.Select(x => x.UserId).Distinct());
+        return usersQueryable.Where(x => userIds.Contains(x.Id));
     }
 
     private async Task<PlatformPagedResultDto<PlatformUserListItemDto>> BuildUserListResultAsync(

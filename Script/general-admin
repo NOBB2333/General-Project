@@ -1,0 +1,956 @@
+#!/usr/bin/env python3
+"""
+General Admin CLI.
+
+面向 AI Skill、本地诊断和受控 API 调用的轻量命令行入口。默认只读；写操作必须显式传入
+--confirm。认证信息通过环境变量传入，避免把 Token 写进 Skill 或脚本。
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+import zipfile
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SKILL_ROOT = ROOT / ".doc" / "07-七期建设" / "skills"
+DEFAULT_BASE_URL = os.environ.get("GENERAL_ADMIN_BASE_URL", "http://localhost:44315")
+DEFAULT_TOKEN = os.environ.get("GENERAL_ADMIN_TOKEN", "")
+
+
+@dataclass
+class CliContext:
+    base_url: str
+    token: str
+    format: str
+    dry_run: bool
+    confirm: bool
+
+
+class CliError(RuntimeError):
+    pass
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args(normalize_global_args(sys.argv[1:]))
+    context = CliContext(
+        base_url=args.base_url.rstrip("/"),
+        token=args.token,
+        format=args.format,
+        dry_run=args.dry_run,
+        confirm=args.confirm,
+    )
+
+    try:
+        result = args.func(args, context)
+        emit(result, context.format)
+        return 0
+    except CliError as exc:
+        emit({"success": False, "error": str(exc)}, "json")
+        return 2
+    except KeyboardInterrupt:
+        emit({"success": False, "error": "操作已取消。"}, "json")
+        return 130
+
+
+def normalize_global_args(argv: list[str]) -> list[str]:
+    """Allow global flags after subcommands, which is how humans and agents usually type them."""
+    globals_with_value = {"--base-url", "--token", "--format"}
+    globals_without_value = {"--dry-run", "--confirm"}
+    moved: list[str] = []
+    remaining: list[str] = []
+    index = 0
+    while index < len(argv):
+        item = argv[index]
+        if item in globals_without_value:
+            moved.append(item)
+            index += 1
+            continue
+        if item in globals_with_value:
+            moved.append(item)
+            if index + 1 < len(argv):
+                moved.append(argv[index + 1])
+                index += 2
+            else:
+                remaining.append(item)
+                index += 1
+            continue
+        if any(item.startswith(f"{name}=") for name in globals_with_value):
+            moved.append(item)
+            index += 1
+            continue
+        remaining.append(item)
+        index += 1
+    return moved + remaining
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="general-admin", description="General Admin 受控 CLI")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="General Admin API 地址，默认读取 GENERAL_ADMIN_BASE_URL")
+    parser.add_argument("--token", default=DEFAULT_TOKEN, help="Bearer Token，默认读取 GENERAL_ADMIN_TOKEN")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="输出格式")
+    parser.add_argument("--dry-run", action="store_true", help="只生成请求或检查结果，不执行写操作")
+    parser.add_argument("--confirm", action="store_true", help="允许执行写操作")
+
+    subcommands = parser.add_subparsers(dest="area", required=True)
+    build_project_parser(subcommands)
+    build_pmo_parser(subcommands)
+    build_business_parser(subcommands)
+    build_integration_parser(subcommands)
+    build_ops_parser(subcommands)
+    build_import_parser(subcommands)
+    build_skill_parser(subcommands)
+    return parser
+
+
+def build_project_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    project = parent.add_parser("project", help="项目查询与报告")
+    project_commands = project.add_subparsers(dest="command", required=True)
+
+    list_cmd = project_commands.add_parser("list", help="查询项目列表")
+    list_cmd.add_argument("--status", default="", help="项目状态")
+    list_cmd.set_defaults(func=lambda args, ctx: api_get(ctx, "/api/app/project/list", {"status": args.status}))
+
+    get_cmd = project_commands.add_parser("get", help="查询项目详情")
+    get_cmd.add_argument("--id", required=True, help="项目 ID")
+    get_cmd.set_defaults(func=lambda args, ctx: api_get(ctx, f"/api/app/project/detail/{args.id}", {}))
+
+    dashboard = project_commands.add_parser("dashboard", help="查询项目驾驶舱")
+    dashboard.add_argument("--role", choices=["my", "pm", "pmo"], default="my")
+    dashboard.set_defaults(func=handle_project_dashboard)
+
+    report = project_commands.add_parser("report", help="生成项目报告草稿")
+    report.add_argument("type", choices=["weekly", "monthly", "retrospective"])
+    report.add_argument("--project-id", required=True)
+    report.add_argument("--period", default="")
+    report.add_argument("--week-start", default="")
+    report.add_argument("--month", default="")
+    report.set_defaults(func=handle_project_report)
+
+    risk = project_commands.add_parser("risk", help="查询项目风险")
+    risk.add_argument("action", choices=["list", "summary", "matrix", "due"])
+    risk.add_argument("--project-id", required=True)
+    risk.add_argument("--status", default="")
+    risk.add_argument("--days", type=int, default=14)
+    risk.set_defaults(func=handle_project_risk)
+
+    for name, field, help_text in [
+        ("wbs", "wbsNodes", "查询项目 WBS"),
+        ("task", "tasks", "查询项目任务"),
+        ("schedule", "taskScheduleImpacts", "查询项目排期影响"),
+        ("milestone", "milestones", "查询项目里程碑"),
+        ("member", "members", "查询项目成员"),
+    ]:
+        command = project_commands.add_parser(name, help=help_text)
+        command.add_argument("action", choices=["list"])
+        command.add_argument("--project-id", required=True)
+        command.add_argument("--status", default="")
+        command.set_defaults(func=lambda args, ctx, field=field: filter_project_detail(ctx, args.project_id, field, args.status))
+
+    worklog = project_commands.add_parser("worklog", help="查询项目工时")
+    worklog.add_argument("action", choices=["list", "summary"])
+    worklog.add_argument("--project-id", required=True)
+    worklog.set_defaults(func=handle_project_worklog)
+
+    evm = project_commands.add_parser("evm", help="查询项目 EVM 快照")
+    evm.add_argument("action", choices=["snapshot"])
+    evm.add_argument("--project-id", required=True)
+    evm.add_argument("--latest", action="store_true")
+    evm.set_defaults(func=handle_project_evm)
+
+    health = project_commands.add_parser("health", help="解释项目健康度")
+    health.add_argument("action", choices=["explain"])
+    health.add_argument("--project-id", required=True)
+    health.set_defaults(func=handle_project_health)
+
+    meeting = project_commands.add_parser("meeting", help="会议纪要草稿")
+    meeting.add_argument("action", choices=["summarize", "actions", "draft-risk", "draft-issue"])
+    meeting.add_argument("--project-id", required=True)
+    meeting.add_argument("--file", required=True)
+    meeting.set_defaults(func=handle_meeting_file)
+
+
+def build_pmo_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    pmo = parent.add_parser("pmo", help="PMO 汇总查询与报告")
+    pmo_commands = pmo.add_subparsers(dest="command", required=True)
+
+    report = pmo_commands.add_parser("report", help="PMO 汇总报告草稿")
+    report.add_argument("type", choices=["summary"])
+    report.add_argument("--status", default="active")
+    report.add_argument("--month", default="")
+    report.set_defaults(func=handle_pmo_report)
+
+    risk = pmo_commands.add_parser("risk", help="PMO 风险汇总")
+    risk.add_argument("action", choices=["summary"])
+    risk.add_argument("--status", default="active")
+    risk.set_defaults(func=handle_pmo_risk)
+
+
+def build_business_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    business = parent.add_parser("business", help="经营查询与报告")
+    business_commands = business.add_subparsers(dest="command", required=True)
+
+    overview = business_commands.add_parser("overview", help="经营概览")
+    overview.add_argument("--project-id", default="")
+    overview.set_defaults(func=handle_business_overview)
+
+    project = business_commands.add_parser("project", help="项目经营详情")
+    project.add_argument("--project-id", required=True)
+    project.set_defaults(func=lambda args, ctx: api_get(ctx, f"/api/app/business/projects/{args.project_id}", {}))
+
+    warning = business_commands.add_parser("warning", help="经营预警")
+    warning.add_argument("action", choices=["list"], default="list")
+    warning.add_argument("--project-id", required=True)
+    warning.set_defaults(func=handle_business_warning)
+
+    receivable = business_commands.add_parser("receivable", help="回款分析")
+    receivable.add_argument("action", choices=["list", "overdue"])
+    receivable.add_argument("--project-id", required=True)
+    receivable.set_defaults(func=handle_business_receivable)
+
+    report = business_commands.add_parser("report", help="经营报告草稿")
+    report.add_argument("type", choices=["monthly"])
+    report.add_argument("--project-id", required=True)
+    report.add_argument("--month", required=True)
+    report.set_defaults(func=handle_business_report)
+
+
+def build_integration_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    integration = parent.add_parser("integration", help="外部系统集成")
+    integration_commands = integration.add_subparsers(dest="command", required=True)
+
+    connectors = integration_commands.add_parser("connectors", help="连接器列表")
+    connectors.set_defaults(func=lambda args, ctx: api_get(ctx, "/api/app/integration/connectors", {"includeDisabled": "true"}))
+
+    delivery = integration_commands.add_parser("delivery", help="投递日志")
+    delivery.add_argument("action", choices=["list", "summary"])
+    delivery.add_argument("--status", default="All")
+    delivery.add_argument("--connector-code", default="")
+    delivery.set_defaults(func=handle_integration_delivery)
+
+    webhook = integration_commands.add_parser("webhook", help="Webhook 模拟接收")
+    webhook.add_argument("receive", choices=["receive"])
+    webhook.add_argument("--connector-code", default="sandbox")
+    webhook.add_argument("--provider-type", default="Sandbox")
+    webhook.add_argument("--payload", required=True)
+    webhook.set_defaults(func=handle_webhook_receive)
+
+    sync = integration_commands.add_parser("sync", help="同步任务")
+    sync.add_argument("action", choices=["jobs", "records", "run"])
+    sync.add_argument("--job-id", default="")
+    sync.set_defaults(func=handle_integration_sync)
+
+
+def build_ops_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    ops = parent.add_parser("ops", help="构建、迁移和调度检查")
+    ops_commands = ops.add_subparsers(dest="command", required=True)
+
+    build = ops_commands.add_parser("build", help="运行构建检查")
+    build.add_argument("target", choices=["backend", "frontend"])
+    build.set_defaults(func=handle_ops_build)
+
+    scheduler = ops_commands.add_parser("scheduler", help="定时任务状态")
+    scheduler.add_argument("action", choices=["dashboard", "records"])
+    scheduler.add_argument("--job-key", default="")
+    scheduler.set_defaults(func=handle_ops_scheduler)
+
+    audit_log = ops_commands.add_parser("audit-log", help="审计日志摘要")
+    audit_log.add_argument("action", choices=["summary"])
+    audit_log.add_argument("--since", default="24h")
+    audit_log.set_defaults(func=handle_ops_audit_log)
+
+
+def build_import_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    import_cmd = parent.add_parser("import", help="导入文件检查")
+    import_commands = import_cmd.add_subparsers(dest="command", required=True)
+
+    for command_name, help_text in [
+        ("inspect", "检查 CSV/Excel 文件"),
+        ("map-fields", "生成字段映射建议"),
+        ("validate", "校验导入文件"),
+    ]:
+        command = import_commands.add_parser(command_name, help=help_text)
+        command.add_argument("--type", required=True)
+        command.add_argument("--file", required=True)
+        command.add_argument("--strict", action="store_true")
+        command.set_defaults(func=handle_import_inspect)
+
+
+def build_skill_parser(parent: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    skill = parent.add_parser("skill", help="Skill 包管理")
+    skill_commands = skill.add_subparsers(dest="command", required=True)
+
+    list_cmd = skill_commands.add_parser("list", help="列出 Skill 包")
+    list_cmd.set_defaults(func=handle_skill_list)
+
+    validate = skill_commands.add_parser("validate", help="校验 Skill 包")
+    validate.add_argument("--path", default=str(SKILL_ROOT))
+    validate.set_defaults(func=handle_skill_validate)
+
+    pack = skill_commands.add_parser("pack", help="打包 Skill 包")
+    pack.add_argument("--output", default=str(ROOT / "build" / "general-admin-skills.zip"))
+    pack.set_defaults(func=handle_skill_pack)
+
+    install = skill_commands.add_parser("install", help="复制 Skill 包到目标目录")
+    install.add_argument("--target", required=True)
+    install.set_defaults(func=handle_skill_install)
+
+
+def handle_project_dashboard(args: argparse.Namespace, ctx: CliContext) -> Any:
+    path = {
+        "my": "/api/app/project/dashboard/my-related",
+        "pm": "/api/app/project/dashboard/pm",
+        "pmo": "/api/app/project/dashboard/pmo",
+    }[args.role]
+    return api_get(ctx, path, {})
+
+
+def handle_project_report(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = api_get(ctx, f"/api/app/project/detail/{args.project_id}", {})
+    data = unwrap_api_response(detail)
+    period = args.period or args.week_start or args.month
+    return {
+        "success": True,
+        "type": args.type,
+        "period": period,
+        "dryRun": True,
+        "report": build_project_report_markdown(data, args.type, period),
+        "source": f"/api/app/project/detail/{args.project_id}",
+    }
+
+
+def handle_project_risk(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/project/detail/{args.project_id}", {}))
+    risks = detail.get("raidItems", []) if isinstance(detail, dict) else []
+    if args.status:
+        risks = filter_items_by_status(risks, args.status)
+    if args.action == "matrix":
+        return {"success": True, "projectId": args.project_id, "matrix": build_risk_matrix(risks), "items": risks}
+    if args.action == "due":
+        return {"success": True, "projectId": args.project_id, "days": args.days, "risks": filter_due_items(risks, args.days)}
+    if args.action == "summary":
+        return {"success": True, "projectId": args.project_id, "summary": summarize_risks(risks), "risks": risks}
+    return {"success": True, "projectId": args.project_id, "risks": risks}
+
+
+def handle_project_worklog(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/project/detail/{args.project_id}", {}))
+    worklogs = detail.get("worklogs", []) if isinstance(detail, dict) else []
+    if args.action == "summary":
+        return {
+            "success": True,
+            "projectId": args.project_id,
+            "totalHours": detail.get("totalWorklogHours", sum(to_number(item.get("hours")) for item in worklogs)) if isinstance(detail, dict) else 0,
+            "count": len(worklogs),
+            "items": worklogs,
+        }
+    return {"success": True, "projectId": args.project_id, "worklogs": worklogs}
+
+
+def handle_project_evm(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/project/detail/{args.project_id}", {}))
+    if not isinstance(detail, dict):
+        return {"success": True, "projectId": args.project_id, "snapshot": None}
+    snapshots = detail.get("performanceSnapshots", [])
+    snapshot = detail.get("performanceSnapshot")
+    if args.latest and snapshots:
+        snapshot = sorted(snapshots, key=lambda item: str(item.get("snapshotDate", "")), reverse=True)[0]
+    return {
+        "success": True,
+        "projectId": args.project_id,
+        "latest": args.latest,
+        "snapshot": snapshot,
+        "snapshots": snapshots if not args.latest else [],
+    }
+
+
+def handle_project_health(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/project/detail/{args.project_id}", {}))
+    project = detail if isinstance(detail, dict) else {}
+    reasons = project.get("healthReasons", [])
+    breakdowns = project.get("healthBreakdowns", [])
+    markdown = "\n".join([
+        "# 项目健康度说明",
+        "",
+        f"- 项目：{project.get('name', '-')}",
+        f"- 状态：{project.get('healthStatus', '-')}",
+        f"- 风险分：{project.get('healthRiskScore', '-')}",
+        f"- 计算时间：{project.get('healthCalculatedTime', '-')}",
+        "",
+        "## 主要原因",
+        "",
+        *[f"- {item}" for item in reasons],
+        "",
+        "## 分项",
+        "",
+        *[f"- {item.get('label', item.get('code', '-'))}: {item.get('reason', '-')}" for item in breakdowns],
+    ])
+    return {"success": True, "projectId": args.project_id, "report": markdown, "healthBreakdowns": breakdowns}
+
+
+def handle_meeting_file(args: argparse.Namespace, ctx: CliContext) -> Any:
+    path = Path(args.file).expanduser()
+    if not path.exists():
+        raise CliError(f"会议文件不存在：{path}")
+    content = path.read_text(encoding="utf-8")
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    action_lines = [line for line in lines if any(keyword in line for keyword in ["TODO", "行动", "负责人", "截止", "风险", "问题"])]
+    return {
+        "success": True,
+        "action": args.action,
+        "projectId": args.project_id,
+        "dryRun": True,
+        "summary": "\n".join(lines[:20]),
+        "actionItems": action_lines,
+        "safety": "仅生成会议草稿，写回项目对象前必须人工确认。",
+    }
+
+
+def handle_pmo_report(args: argparse.Namespace, ctx: CliContext) -> Any:
+    data = unwrap_api_response(api_get(ctx, "/api/app/project/dashboard/pmo", {}))
+    dashboard = data if isinstance(data, dict) else {}
+    report = build_pmo_summary_markdown(dashboard, args.month)
+    return {"success": True, "type": args.type, "status": args.status, "month": args.month, "dryRun": True, "report": report}
+
+
+def handle_pmo_risk(args: argparse.Namespace, ctx: CliContext) -> Any:
+    data = unwrap_api_response(api_get(ctx, "/api/app/project/dashboard/pmo", {}))
+    dashboard = data if isinstance(data, dict) else {}
+    action_items = dashboard.get("actionItems", [])
+    risks = [item for item in action_items if "risk" in str(item.get("sourceType", "")).lower() or "风险" in str(item.get("reason", ""))]
+    return {
+        "success": True,
+        "status": args.status,
+        "summary": summarize_risks(risks),
+        "risks": risks,
+        "exceptionProjects": dashboard.get("exceptionProjects", []),
+    }
+
+
+def handle_business_overview(args: argparse.Namespace, ctx: CliContext) -> Any:
+    if args.project_id:
+        return api_get(ctx, f"/api/app/business/projects/{args.project_id}", {})
+    return api_get(ctx, "/api/app/business/overview", {})
+
+
+def handle_business_receivable(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/business/projects/{args.project_id}", {}))
+    receivables = detail.get("receivables", []) if isinstance(detail, dict) else []
+    if args.action == "overdue":
+        receivables = [
+            item for item in receivables
+            if str(item.get("status", "")).lower() in {"overdue", "逾期"} or is_before_today(item.get("plannedDate"))
+        ]
+    return {"success": True, "projectId": args.project_id, "receivables": receivables, "count": len(receivables)}
+
+
+def handle_business_warning(args: argparse.Namespace, ctx: CliContext) -> Any:
+    overview = unwrap_api_response(api_get(ctx, "/api/app/business/overview", {}))
+    warnings = overview.get("warningItems", []) if isinstance(overview, dict) else []
+    warnings = [
+        item for item in warnings
+        if str(item.get("projectId", "")).lower() == args.project_id.lower()
+    ]
+    return {"success": True, "projectId": args.project_id, "warnings": warnings, "count": len(warnings)}
+
+
+def handle_business_report(args: argparse.Namespace, ctx: CliContext) -> Any:
+    detail = api_get(ctx, f"/api/app/business/projects/{args.project_id}", {})
+    data = unwrap_api_response(detail)
+    return {
+        "success": True,
+        "type": args.type,
+        "month": args.month,
+        "dryRun": True,
+        "report": build_business_report_markdown(data, args.month),
+        "safety": "经营金额、利润和回款字段必须按当前用户权限裁剪。",
+    }
+
+
+def handle_integration_delivery(args: argparse.Namespace, ctx: CliContext) -> Any:
+    params = {"status": args.status, "connectorCode": args.connector_code}
+    if args.action == "summary":
+        return api_get(ctx, "/api/app/integration/delivery-records/summary", params)
+    return api_get(ctx, "/api/app/integration/delivery-records", params)
+
+
+def handle_webhook_receive(args: argparse.Namespace, ctx: CliContext) -> Any:
+    payload = read_payload(args.payload)
+    return api_post(ctx, "/api/app/integration/webhook-events/receive", {
+        "connectorCode": args.connector_code,
+        "providerType": args.provider_type,
+        "rawBody": payload,
+        "rawPayloadJson": payload,
+        "signatureStatus": "Valid",
+        "sourceIp": "127.0.0.1",
+    }, write=True)
+
+
+def handle_integration_sync(args: argparse.Namespace, ctx: CliContext) -> Any:
+    if args.action == "jobs":
+        return api_get(ctx, "/api/app/integration/sync-jobs", {})
+    if args.action == "records":
+        return api_get(ctx, "/api/app/integration/sync-records", {})
+    if not args.job_id:
+        raise CliError("执行同步任务必须传入 --job-id。")
+    return api_post(ctx, f"/api/app/integration/sync-jobs/{args.job_id}/run", {
+        "force": True,
+        "requestJson": "{}",
+    }, write=True)
+
+
+def handle_ops_build(args: argparse.Namespace, ctx: CliContext) -> Any:
+    if args.target == "backend":
+        command = ["dotnet", "build", "General.Admin.slnx"]
+        cwd = ROOT / "General.Admin"
+    else:
+        command = ["pnpm", "build:general"]
+        cwd = ROOT / "General.Web"
+    if ctx.dry_run:
+        return {"success": True, "dryRun": True, "command": command, "cwd": str(cwd)}
+    return run_command(command, cwd)
+
+
+def handle_ops_scheduler(args: argparse.Namespace, ctx: CliContext) -> Any:
+    if args.action == "dashboard":
+        return api_get(ctx, "/api/app/platform/scheduler/dashboard", {})
+    if not args.job_key:
+        raise CliError("查询定时任务记录必须传入 --job-key。")
+    return api_get(ctx, f"/api/app/platform/scheduler/{urllib.parse.quote(args.job_key)}/records", {})
+
+
+def handle_ops_audit_log(args: argparse.Namespace, ctx: CliContext) -> Any:
+    params: dict[str, Any] = {}
+    start_time = resolve_since(args.since)
+    if start_time:
+        params["startTime"] = start_time.isoformat()
+    return api_get(ctx, "/api/app/audit-log/dashboard", params)
+
+
+def handle_import_inspect(args: argparse.Namespace, ctx: CliContext) -> Any:
+    path = Path(args.file).expanduser()
+    if not path.exists():
+        raise CliError(f"导入文件不存在：{path}")
+    rows = read_tabular_file(path)
+    headers = list(rows[0].keys()) if rows else []
+    empty_counts = {header: sum(1 for row in rows if not str(row.get(header, "")).strip()) for header in headers}
+    return {
+        "success": True,
+        "command": args.command,
+        "type": args.type,
+        "file": str(path),
+        "strict": args.strict,
+        "rowCount": len(rows),
+        "fieldCount": len(headers),
+        "headers": headers,
+        "emptyCounts": empty_counts,
+        "fieldMapping": build_field_mapping(headers),
+        "valid": not args.strict or all(header.strip() for header in headers),
+        "safety": "仅检查文件，不写库、不覆盖数据。",
+    }
+
+
+def handle_skill_list(args: argparse.Namespace, ctx: CliContext) -> Any:
+    del args, ctx
+    return {
+        "success": True,
+        "skills": [read_skill_summary(path) for path in sorted(SKILL_ROOT.glob("*/SKILL.md"))],
+    }
+
+
+def handle_skill_validate(args: argparse.Namespace, ctx: CliContext) -> Any:
+    del ctx
+    root = Path(args.path).expanduser()
+    skills = sorted(root.glob("*/SKILL.md")) if root.is_dir() else [root]
+    results = [validate_skill(path) for path in skills]
+    return {
+        "success": all(item["valid"] for item in results),
+        "checkedCount": len(results),
+        "results": results,
+    }
+
+
+def handle_skill_pack(args: argparse.Namespace, ctx: CliContext) -> Any:
+    output = Path(args.output).expanduser()
+    validation = handle_skill_validate(argparse.Namespace(path=str(SKILL_ROOT)), ctx)
+    if not validation["success"]:
+        raise CliError("Skill 校验未通过，拒绝打包。")
+    if ctx.dry_run:
+        return {"success": True, "dryRun": True, "output": str(output), "skillRoot": str(SKILL_ROOT)}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for file in sorted(SKILL_ROOT.rglob("*")):
+            if file.is_file() and file.name != ".DS_Store":
+                archive.write(file, file.relative_to(SKILL_ROOT.parent))
+    return {"success": True, "output": str(output), "size": output.stat().st_size}
+
+
+def handle_skill_install(args: argparse.Namespace, ctx: CliContext) -> Any:
+    target = Path(args.target).expanduser()
+    validation = handle_skill_validate(argparse.Namespace(path=str(SKILL_ROOT)), ctx)
+    if not validation["success"]:
+        raise CliError("Skill 校验未通过，拒绝安装。")
+    if ctx.dry_run:
+        return {"success": True, "dryRun": True, "target": str(target)}
+    target.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for skill_dir in sorted(SKILL_ROOT.iterdir()):
+        if not skill_dir.is_dir() or skill_dir.name.startswith("."):
+            continue
+        destination = target / skill_dir.name
+        destination.mkdir(parents=True, exist_ok=True)
+        for source in skill_dir.rglob("*"):
+            if source.is_file() and source.name != ".DS_Store":
+                relative = source.relative_to(skill_dir)
+                output = destination / relative
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(source.read_bytes())
+        copied.append(skill_dir.name)
+    return {"success": True, "target": str(target), "copied": copied}
+
+
+def filter_project_detail(ctx: CliContext, project_id: str, field: str, status: str = "") -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/project/detail/{project_id}", {}))
+    items = detail.get(field, []) if isinstance(detail, dict) else []
+    if status:
+        items = filter_items_by_status(items, status)
+    return {"success": True, "projectId": project_id, field: items}
+
+
+def filter_business_detail(ctx: CliContext, project_id: str, field: str) -> Any:
+    detail = unwrap_api_response(api_get(ctx, f"/api/app/business/projects/{project_id}", {}))
+    return {"success": True, "projectId": project_id, field: detail.get(field, []) if isinstance(detail, dict) else []}
+
+
+def api_get(ctx: CliContext, path: str, params: dict[str, Any]) -> Any:
+    query = {key: value for key, value in params.items() if value not in ("", None)}
+    url = f"{ctx.base_url}{path}"
+    if query:
+        url = f"{url}?{urllib.parse.urlencode(query)}"
+    return request_json(ctx, "GET", url, None, write=False)
+
+
+def api_post(ctx: CliContext, path: str, payload: dict[str, Any], write: bool) -> Any:
+    if write and ctx.dry_run:
+        return {"success": True, "dryRun": True, "path": path, "payload": payload}
+    if write and not ctx.confirm:
+        raise CliError("写操作需要显式传入 --confirm；如只想查看请求，请传入 --dry-run。")
+    return request_json(ctx, "POST", f"{ctx.base_url}{path}", payload, write=write)
+
+
+def request_json(ctx: CliContext, method: str, url: str, payload: dict[str, Any] | None, write: bool) -> Any:
+    if not ctx.token:
+        raise CliError("缺少 GENERAL_ADMIN_TOKEN 或 --token，不能调用受保护 API。")
+    data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(url, data=data, method=method)
+    request.add_header("Accept", "application/json")
+    request.add_header("Authorization", f"Bearer {ctx.token}")
+    if payload is not None:
+        request.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+            return json.loads(raw) if raw else {"success": True}
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise CliError(f"API 请求失败：HTTP {exc.code} {body[:1000]}")
+    except urllib.error.URLError as exc:
+        action = "写入" if write else "读取"
+        raise CliError(f"API {action}请求失败：{exc.reason}")
+
+
+def unwrap_api_response(value: Any) -> Any:
+    if isinstance(value, dict) and "data" in value:
+        return value["data"]
+    return value
+
+
+def read_payload(value: str) -> str:
+    path = Path(value).expanduser()
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return value
+
+
+def read_tabular_file(path: Path) -> list[dict[str, Any]]:
+    if path.suffix.lower() == ".csv":
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            return list(csv.DictReader(handle))
+    if path.suffix.lower() in {".xlsx", ".xlsm"}:
+        raise CliError("当前轻量 CLI 不内置 Excel 解析依赖，请先导出 CSV 或使用应用导入预检。")
+    raise CliError("当前仅支持 CSV 文件检查。")
+
+
+def build_project_report_markdown(data: Any, report_type: str, period: str) -> str:
+    project = data if isinstance(data, dict) else {}
+    return "\n".join([
+        f"# 项目{report_type}报告草稿",
+        "",
+        f"- 项目：{project.get('name', '-')}",
+        f"- 编码：{project.get('projectCode', '-')}",
+        f"- 周期：{period or '-'}",
+        f"- 状态：{project.get('status', '-')}",
+        "",
+        "## 本期概览",
+        "",
+        "- 进度、风险、问题和 EVM 指标以系统返回字段为准。",
+        "",
+        "## 数据来源",
+        "",
+        "- project detail API",
+    ])
+
+
+def build_business_report_markdown(data: Any, month: str) -> str:
+    project = data if isinstance(data, dict) else {}
+    return "\n".join([
+        "# 经营月报草稿",
+        "",
+        f"- 项目：{project.get('projectName', project.get('name', '-'))}",
+        f"- 月份：{month}",
+        "",
+        "## 经营概览",
+        "",
+        "- 合同、预算、回款、发票、验收和预警以系统返回字段为准。",
+        "",
+        "## 安全说明",
+        "",
+        "- 敏感金额和利润字段必须按当前用户权限裁剪。",
+    ])
+
+
+def build_pmo_summary_markdown(data: dict[str, Any], month: str) -> str:
+    evm = data.get("earnedValueSummary", {})
+    projects = data.get("projects", [])
+    exceptions = data.get("exceptionProjects", [])
+    actions = data.get("actionItems", [])
+    return "\n".join([
+        "# PMO 汇总报告草稿",
+        "",
+        f"- 月份：{month or '-'}",
+        f"- 项目数：{len(projects)}",
+        f"- 异常项目：{len(exceptions)}",
+        f"- 待治理行动：{len(actions)}",
+        f"- PV：{evm.get('plannedValue', '-')}",
+        f"- EV：{evm.get('earnedValue', '-')}",
+        f"- AC：{evm.get('actualCost', '-')}",
+        f"- SPI：{evm.get('schedulePerformanceIndex', '-')}",
+        f"- CPI：{evm.get('costPerformanceIndex', '-')}",
+        "",
+        "## 优先行动",
+        "",
+        *[f"- {item.get('projectName', '-')}: {item.get('title', '-')}（{item.get('reason', '-')}）" for item in actions[:10]],
+        "",
+        "## 数据来源",
+        "",
+        "- project dashboard pmo API",
+    ])
+
+
+def summarize_risks(items: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "totalCount": len(items),
+        "highCount": sum(1 for item in items if is_high_risk(item)),
+        "overdueCount": sum(1 for item in items if is_before_today(read_first(item, "dueDate", "plannedDate", "deadline"))),
+        "openCount": sum(1 for item in items if str(item.get("status", "")).lower() not in {"closed", "done", "resolved", "已关闭", "已完成"}),
+    }
+
+
+def build_risk_matrix(items: list[dict[str, Any]]) -> dict[str, int]:
+    matrix = {"high": 0, "medium": 0, "low": 0, "unknown": 0}
+    for item in items:
+        level = str(read_first(item, "level", "riskLevel", "severity")).lower()
+        if is_high_risk(item):
+            matrix["high"] += 1
+        elif "medium" in level or "中" in level:
+            matrix["medium"] += 1
+        elif "low" in level or "低" in level:
+            matrix["low"] += 1
+        else:
+            matrix["unknown"] += 1
+    return matrix
+
+
+def filter_due_items(items: list[dict[str, Any]], days: int) -> list[dict[str, Any]]:
+    now = datetime.now(timezone.utc)
+    result = []
+    for item in items:
+        value = parse_datetime(read_first(item, "dueDate", "plannedDate", "deadline"))
+        if value is None:
+            continue
+        delta_days = (value - now).days
+        if delta_days <= days:
+            result.append(item)
+    return result
+
+
+def filter_items_by_status(items: Any, status: str) -> list[dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    expected = status.strip().lower()
+    if not expected:
+        return [item for item in items if isinstance(item, dict)]
+    return [
+        item for item in items
+        if isinstance(item, dict) and str(item.get("status", "")).strip().lower() == expected
+    ]
+
+
+def build_field_mapping(headers: list[str]) -> list[dict[str, str]]:
+    return [{"source": header, "target": normalize_field_name(header), "confidence": "manual-review"} for header in headers]
+
+
+def normalize_field_name(value: str) -> str:
+    mapping = {
+        "任务": "title",
+        "任务名称": "title",
+        "负责人": "ownerName",
+        "截止": "dueDate",
+        "截止时间": "dueDate",
+        "项目": "projectName",
+        "金额": "amount",
+        "状态": "status",
+    }
+    return mapping.get(value.strip(), value.strip())
+
+
+def is_high_risk(item: dict[str, Any]) -> bool:
+    level = str(read_first(item, "level", "riskLevel", "severity")).lower()
+    score = to_number(read_first(item, "score", "riskScore", "healthRiskScore"))
+    return "high" in level or "高" in level or score >= 80
+
+
+def read_first(item: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in item and item[key] not in ("", None):
+            return item[key]
+    return None
+
+
+def to_number(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_before_today(value: Any) -> bool:
+    parsed = parse_datetime(value)
+    if parsed is None:
+        return False
+    return parsed.date() < datetime.now(timezone.utc).date()
+
+
+def parse_datetime(value: Any) -> datetime | None:
+    if value in ("", None):
+        return None
+    text = str(value).strip()
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        parsed = datetime.fromisoformat(text)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+    except ValueError:
+        return None
+
+
+def resolve_since(value: str) -> datetime | None:
+    text = (value or "").strip().lower()
+    if not text:
+        return None
+    now = datetime.now(timezone.utc)
+    try:
+        if text.endswith("h"):
+            return now.replace(microsecond=0) - timedelta(hours=int(text[:-1]))
+        if text.endswith("d"):
+            return now.replace(microsecond=0) - timedelta(days=int(text[:-1]))
+        return parse_datetime(text)
+    except ValueError:
+        raise CliError(f"无法解析时间范围：{value}，示例：24h、7d 或 ISO 时间。")
+
+
+def read_skill_summary(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    meta = parse_frontmatter(text)
+    return {"folder": path.parent.name, "name": meta.get("name", ""), "description": meta.get("description", "")}
+
+
+def validate_skill(path: Path) -> dict[str, Any]:
+    errors: list[str] = []
+    if not path.exists():
+        return {"path": str(path), "valid": False, "errors": ["SKILL.md 不存在。"]}
+    text = path.read_text(encoding="utf-8")
+    meta = parse_frontmatter(text)
+    if not meta.get("name"):
+        errors.append("frontmatter 缺少 name。")
+    if not meta.get("description"):
+        errors.append("frontmatter 缺少 description。")
+    unexpected = sorted(set(meta) - {"name", "description"})
+    if unexpected:
+        errors.append(f"frontmatter 存在非标准字段：{', '.join(unexpected)}。")
+    for section in ["## Preconditions", "## Commands", "## Workflow", "## Output Format", "## Safety Rules"]:
+        if section not in text:
+            errors.append(f"缺少章节 {section}。")
+    if "```bash" not in text:
+        errors.append("缺少 bash 命令示例。")
+    return {"path": str(path), "valid": not errors, "errors": errors}
+
+
+def parse_frontmatter(text: str) -> dict[str, str]:
+    if not text.startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}
+    meta: dict[str, str] = {}
+    for line in text[3:end].splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        meta[key.strip()] = value.strip().strip('"').strip("'")
+    return meta
+
+
+def run_command(command: list[str], cwd: Path) -> dict[str, Any]:
+    started = datetime.now(timezone.utc)
+    process = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False)
+    return {
+        "success": process.returncode == 0,
+        "command": command,
+        "cwd": str(cwd),
+        "exitCode": process.returncode,
+        "startedAt": started.isoformat(),
+        "stdout": process.stdout[-8000:],
+        "stderr": process.stderr[-8000:],
+    }
+
+
+def emit(value: Any, output_format: str) -> None:
+    if output_format == "markdown":
+        print(to_markdown(value))
+        return
+    print(json.dumps(value, ensure_ascii=False, indent=2, default=str))
+
+
+def to_markdown(value: Any) -> str:
+    if isinstance(value, dict) and isinstance(value.get("report"), str):
+        return value["report"]
+    return "```json\n" + json.dumps(value, ensure_ascii=False, indent=2, default=str) + "\n```"
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

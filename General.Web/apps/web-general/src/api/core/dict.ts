@@ -48,11 +48,20 @@ export async function getDictTypesApi() {
 }
 
 export async function createDictTypeApi(data: DictApi.DictTypeSaveInput) {
-  return requestClient.post<DictApi.DictTypeItem>('/app/platform/dict/types', data);
+  return requestClient.post<DictApi.DictTypeItem>(
+    '/app/platform/dict/types',
+    data,
+  );
 }
 
-export async function updateDictTypeApi(id: string, data: DictApi.DictTypeSaveInput) {
-  return requestClient.put<DictApi.DictTypeItem>(`/app/platform/dict/types/${id}`, data);
+export async function updateDictTypeApi(
+  id: string,
+  data: DictApi.DictTypeSaveInput,
+) {
+  return requestClient.put<DictApi.DictTypeItem>(
+    `/app/platform/dict/types/${id}`,
+    data,
+  );
 }
 
 export async function deleteDictTypeApi(id: string) {
@@ -60,15 +69,29 @@ export async function deleteDictTypeApi(id: string) {
 }
 
 export async function getDictDataApi(dictTypeCode: string) {
-  return requestClient.get<DictApi.DictDataItem[]>(`/app/platform/dict/${dictTypeCode}/data`);
+  return requestClient.get<DictApi.DictDataItem[]>(
+    `/app/platform/dict/${dictTypeCode}/data`,
+  );
 }
 
-export async function createDictDataApi(dictTypeCode: string, data: DictApi.DictDataSaveInput) {
-  return requestClient.post<DictApi.DictDataItem>(`/app/platform/dict/${dictTypeCode}/data`, data);
+export async function createDictDataApi(
+  dictTypeCode: string,
+  data: DictApi.DictDataSaveInput,
+) {
+  return requestClient.post<DictApi.DictDataItem>(
+    `/app/platform/dict/${dictTypeCode}/data`,
+    data,
+  );
 }
 
-export async function updateDictDataApi(id: string, data: DictApi.DictDataSaveInput) {
-  return requestClient.put<DictApi.DictDataItem>(`/app/platform/dict/data/${id}`, data);
+export async function updateDictDataApi(
+  id: string,
+  data: DictApi.DictDataSaveInput,
+) {
+  return requestClient.put<DictApi.DictDataItem>(
+    `/app/platform/dict/data/${id}`,
+    data,
+  );
 }
 
 export async function deleteDictDataApi(id: string) {
@@ -76,5 +99,16 @@ export async function deleteDictDataApi(id: string) {
 }
 
 export async function getDictItemsApi(dictTypeCode: string) {
-  return requestClient.get<DictApi.DictOptionItem[]>(`/app/platform/dict/${dictTypeCode}/items`);
+  return requestClient.get<DictApi.DictOptionItem[]>(
+    `/app/platform/dict/${dictTypeCode}/items`,
+  );
+}
+
+export async function getBatchDictItemsApi(dictTypeCodes: string[]) {
+  return requestClient.get<Record<string, DictApi.DictOptionItem[]>>(
+    '/app/platform/dict/items',
+    {
+      params: { codes: dictTypeCodes.join(',') },
+    },
+  );
 }

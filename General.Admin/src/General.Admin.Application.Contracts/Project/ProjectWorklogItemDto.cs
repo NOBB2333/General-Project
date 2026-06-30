@@ -12,6 +12,8 @@ public class ProjectWorklogItemDto
 
     public string Summary { get; set; } = string.Empty;
 
+    public Guid? TaskId { get; set; }
+
     public string TaskTitle { get; set; } = string.Empty;
 
     public Guid UserId { get; set; }

@@ -62,9 +62,13 @@ public class BusinessProjectSummaryDto
 
     public decimal? ProcurementAmount { get; set; }
 
+    public decimal? CostPerformanceIndex { get; set; }
+
     public string ProjectCode { get; set; } = string.Empty;
 
     public decimal? ReceivedAmount { get; set; }
+
+    public decimal? SchedulePerformanceIndex { get; set; }
 
     public string Status { get; set; } = string.Empty;
 
@@ -73,6 +77,8 @@ public class BusinessProjectSummaryDto
 
 public class BusinessProjectDetailDto
 {
+    public List<BusinessAcceptanceItemDto> Acceptances { get; set; } = [];
+
     public List<BusinessBudgetExecutionItemDto> BudgetExecutions { get; set; } = [];
 
     public List<BusinessChainItemDto> BusinessChains { get; set; } = [];
@@ -84,6 +90,8 @@ public class BusinessProjectDetailDto
     public List<BusinessContractItemDto> Contracts { get; set; } = [];
 
     public List<BusinessForecastHistoryItemDto> ForecastHistories { get; set; } = [];
+
+    public List<BusinessInvoiceItemDto> Invoices { get; set; } = [];
 
     public List<BusinessProcurementItemDto> Procurements { get; set; } = [];
 
@@ -144,7 +152,38 @@ public class BusinessBudgetExecutionItemDto
 
     public Guid Id { get; set; }
 
+    public Guid ProjectId { get; set; }
+
+    public string ProjectName { get; set; } = string.Empty;
+
+    public int SortOrder { get; set; }
+
     public decimal? VarianceAmount { get; set; }
+}
+
+public class BusinessAcceptanceItemDto
+{
+    public string AcceptanceCode { get; set; } = string.Empty;
+
+    public DateTime AcceptanceDate { get; set; }
+
+    public string AcceptanceResult { get; set; } = string.Empty;
+
+    public Guid Id { get; set; }
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public Guid? MilestoneId { get; set; }
+
+    public Guid ProjectId { get; set; }
+
+    public string ProjectName { get; set; } = string.Empty;
+
+    public string QualityInspectionCode { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
 }
 
 public class BusinessChainItemDto
@@ -156,6 +195,8 @@ public class BusinessChainItemDto
     public string LinkedContractCode { get; set; } = string.Empty;
 
     public string OwnerName { get; set; } = string.Empty;
+
+    public Guid OwnerUserId { get; set; }
 
     public string SourceChangeCode { get; set; } = string.Empty;
 
@@ -251,6 +292,31 @@ public class BusinessReceivableItemDto
     public decimal? TotalAmount { get; set; }
 }
 
+public class BusinessInvoiceItemDto
+{
+    public decimal? Amount { get; set; }
+
+    public Guid Id { get; set; }
+
+    public string InvoiceCode { get; set; } = string.Empty;
+
+    public DateTime InvoiceDate { get; set; }
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public Guid ProjectId { get; set; }
+
+    public string ProjectName { get; set; } = string.Empty;
+
+    public string ReceivableCode { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public decimal? TaxAmount { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+}
+
 public class BusinessForecastHistoryItemDto
 {
     public string ChangeType { get; set; } = string.Empty;
@@ -274,7 +340,13 @@ public class BusinessForecastHistoryItemDto
 
 public class BusinessReportDto
 {
+    public List<BusinessAcceptanceItemDto> AcceptanceItems { get; set; } = [];
+
+    public List<BusinessBudgetExecutionItemDto> BudgetItems { get; set; } = [];
+
     public List<BusinessContractItemDto> ContractItems { get; set; } = [];
+
+    public List<BusinessInvoiceItemDto> InvoiceItems { get; set; } = [];
 
     public List<BusinessProjectSummaryDto> ProfitItems { get; set; } = [];
 
@@ -310,4 +382,157 @@ public class BusinessReportQueryInput
     public DateTime? SignDateTo { get; set; }
 
     public string? SupplierName { get; set; }
+
+    public string? WarningLevel { get; set; }
+}
+
+public class BusinessReportExportInput : BusinessReportQueryInput
+{
+    public string LedgerKind { get; set; } = string.Empty;
+}
+
+public class BusinessReportExportResultDto
+{
+    public byte[] Content { get; set; } = [];
+
+    public string ContentType { get; set; } = "text/csv";
+
+    public string FileName { get; set; } = string.Empty;
+}
+
+public class BusinessBudgetExecutionSaveInput
+{
+    public decimal AdjustedAmount { get; set; }
+
+    public string BudgetCode { get; set; } = string.Empty;
+
+    public string Category { get; set; } = string.Empty;
+
+    public decimal ExecutedAmount { get; set; }
+
+    public int SortOrder { get; set; }
+
+    public decimal? VarianceAmount { get; set; }
+}
+
+public class BusinessAcceptanceSaveInput
+{
+    public string AcceptanceCode { get; set; } = string.Empty;
+
+    public DateTime? AcceptanceDate { get; set; }
+
+    public string AcceptanceResult { get; set; } = string.Empty;
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public Guid? MilestoneId { get; set; }
+
+    public string QualityInspectionCode { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+}
+
+public class BusinessChainSaveInput
+{
+    public string ChainCode { get; set; } = string.Empty;
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public Guid OwnerUserId { get; set; }
+
+    public string SourceChangeCode { get; set; } = string.Empty;
+
+    public string Stage { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string Summary { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+}
+
+public class BusinessContractSaveInput
+{
+    public decimal Amount { get; set; }
+
+    public string ContractCode { get; set; } = string.Empty;
+
+    public string CounterpartyName { get; set; } = string.Empty;
+
+    public bool IsRevenueContract { get; set; } = true;
+
+    public string ParentContractCode { get; set; } = string.Empty;
+
+    public DateTime? SignDate { get; set; }
+
+    public string SourceChangeCode { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public string Type { get; set; } = string.Empty;
+}
+
+public class BusinessProcurementSaveInput
+{
+    public decimal Amount { get; set; }
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public string ProcurementCode { get; set; } = string.Empty;
+
+    public DateTime? SignDate { get; set; }
+
+    public string SourceChangeCode { get; set; } = string.Empty;
+
+    public string Stage { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public string SupplierName { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+}
+
+public class BusinessReceivableSaveInput
+{
+    public string InvoiceCode { get; set; } = string.Empty;
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public DateTime? PlannedDate { get; set; }
+
+    public string ReceivableCode { get; set; } = string.Empty;
+
+    public decimal ReceivedAmount { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public decimal TotalAmount { get; set; }
+}
+
+public class BusinessInvoiceSaveInput
+{
+    public decimal Amount { get; set; }
+
+    public string InvoiceCode { get; set; } = string.Empty;
+
+    public DateTime? InvoiceDate { get; set; }
+
+    public string LinkedContractCode { get; set; } = string.Empty;
+
+    public string ReceivableCode { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public decimal TaxAmount { get; set; }
+
+    public string Title { get; set; } = string.Empty;
 }

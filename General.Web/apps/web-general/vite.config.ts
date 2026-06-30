@@ -4,6 +4,9 @@ export default defineConfig(async () => {
   return {
     application: {},
     vite: {
+      optimizeDeps: {
+        include: ['@flyfish-group/file-viewer3'],
+      },
       server: {
         proxy: {
           '/api': {

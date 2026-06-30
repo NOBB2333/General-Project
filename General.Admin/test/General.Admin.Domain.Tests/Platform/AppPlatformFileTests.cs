@@ -29,6 +29,44 @@ public class AppPlatformFileTests
         exception.Code.ShouldBe("Platform:FileMetadataTooLong");
     }
 
+    [Fact]
+    public void MarkAsVersion_Should_Set_Current_Version_Context()
+    {
+        var previousFileId = Guid.NewGuid();
+        var file = CreateFile();
+
+        file.MarkAsVersion(3, previousFileId);
+
+        file.VersionNo.ShouldBe(3);
+        file.PreviousVersionFileId.ShouldBe(previousFileId);
+        file.ReplacedByFileId.ShouldBeNull();
+        file.IsCurrentVersion.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void MarkReplacedBy_Should_Mark_File_As_Historical()
+    {
+        var replacingFileId = Guid.NewGuid();
+        var file = CreateFile();
+
+        file.MarkReplacedBy(replacingFileId);
+
+        file.ReplacedByFileId.ShouldBe(replacingFileId);
+        file.IsCurrentVersion.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void RestoreAsCurrentVersion_Should_Clear_Replaced_By_File()
+    {
+        var file = CreateFile();
+        file.MarkReplacedBy(Guid.NewGuid());
+
+        file.RestoreAsCurrentVersion();
+
+        file.ReplacedByFileId.ShouldBeNull();
+        file.IsCurrentVersion.ShouldBeTrue();
+    }
+
     private static AppPlatformFile CreateFile()
     {
         return new AppPlatformFile(

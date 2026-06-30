@@ -4,6 +4,8 @@ public class PlatformScheduledJobRecordQueryInput
 {
     public int MaxResultCount { get; set; } = 50;
 
+    public int SkipCount { get; set; }
+
     public DateTime? StartedFrom { get; set; }
 
     public DateTime? StartedTo { get; set; }

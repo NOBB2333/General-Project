@@ -53,4 +53,24 @@ public class BusinessReceivable : FullAuditedAggregateRoot<Guid>
         LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
         InvoiceCode = invoiceCode?.Trim() ?? string.Empty;
     }
+
+    public void Update(
+        string receivableCode,
+        string title,
+        DateTime plannedDate,
+        decimal totalAmount,
+        decimal receivedAmount,
+        string status,
+        string? linkedContractCode = null,
+        string? invoiceCode = null)
+    {
+        ReceivableCode = Check.NotNullOrWhiteSpace(receivableCode, nameof(receivableCode), 64);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
+        PlannedDate = plannedDate;
+        TotalAmount = totalAmount;
+        ReceivedAmount = receivedAmount;
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
+        InvoiceCode = invoiceCode?.Trim() ?? string.Empty;
+    }
 }

@@ -51,6 +51,9 @@ public static class PlatformSeedIds
     public static readonly Guid PlatformRecycleBinManage = Guid.Parse("20000000-0000-0000-0000-000000000030");
     public static readonly Guid PlatformSchedulerManage = Guid.Parse("20000000-0000-0000-0000-000000000033");
     public static readonly Guid PlatformSchedulerExecute = Guid.Parse("20000000-0000-0000-0000-000000000034");
+    public static readonly Guid DashboardRoot = Guid.Parse("20000000-0000-0000-0000-000000000035");
+    public static readonly Guid DashboardWorkspace = Guid.Parse("20000000-0000-0000-0000-000000000036");
+    public static readonly Guid DashboardAnalytics = Guid.Parse("20000000-0000-0000-0000-000000000037");
 
     public static readonly Guid ProjectRoot = Guid.Parse("30000000-0000-0000-0000-000000000001");
     public static readonly Guid ProjectWorkspace = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -68,10 +71,52 @@ public static class PlatformSeedIds
     public static readonly Guid BusinessRoot = Guid.Parse("40000000-0000-0000-0000-000000000001");
     public static readonly Guid BusinessOverview = Guid.Parse("40000000-0000-0000-0000-000000000002");
     public static readonly Guid BusinessProjects = Guid.Parse("40000000-0000-0000-0000-000000000003");
-    public static readonly Guid BusinessAcceptances = Guid.Parse("40000000-0000-0000-0000-000000000004");
-    public static readonly Guid BusinessInvoices = Guid.Parse("40000000-0000-0000-0000-000000000005");
-    public static readonly Guid BusinessReceivables = Guid.Parse("40000000-0000-0000-0000-000000000006");
     public static readonly Guid BusinessReports = Guid.Parse("40000000-0000-0000-0000-000000000007");
     public static readonly Guid BusinessBudgetSensitive = Guid.Parse("40000000-0000-0000-0000-000000000008");
     public static readonly Guid BusinessReportExport = Guid.Parse("40000000-0000-0000-0000-000000000009");
+
+    public static readonly Guid AiRoot = Guid.Parse("70000000-0000-0000-0000-000000000001");
+    public static readonly Guid AiDashboard = Guid.Parse("70000000-0000-0000-0000-000000000002");
+    public static readonly Guid AiConversations = Guid.Parse("70000000-0000-0000-0000-000000000003");
+    public static readonly Guid AiConversationManagement = Guid.Parse("70000000-0000-0000-0000-000000000014");
+    public static readonly Guid AiProviders = Guid.Parse("70000000-0000-0000-0000-000000000004");
+    public static readonly Guid AiAssistants = Guid.Parse("70000000-0000-0000-0000-000000000005");
+    public static readonly Guid AiPrompts = Guid.Parse("70000000-0000-0000-0000-000000000006");
+    public static readonly Guid AiMcp = Guid.Parse("70000000-0000-0000-0000-000000000007");
+    public static readonly Guid AiMemory = Guid.Parse("70000000-0000-0000-0000-000000000008");
+    public static readonly Guid AiJobs = Guid.Parse("70000000-0000-0000-0000-000000000009");
+    public static readonly Guid AiUsage = Guid.Parse("70000000-0000-0000-0000-000000000010");
+    public static readonly Guid AiProviderManage = Guid.Parse("70000000-0000-0000-0000-000000000011");
+    public static readonly Guid AiWritebacks = Guid.Parse("70000000-0000-0000-0000-000000000012");
+    public static readonly Guid AiWritebackApprove = Guid.Parse("70000000-0000-0000-0000-000000000013");
+    public static readonly Guid AiAgentDesign = Guid.Parse("70000000-0000-0000-0000-000000000015");
+    public static readonly Guid AiArtifacts = Guid.Parse("70000000-0000-0000-0000-000000000016");
+    public static readonly Guid AiWebSearch = Guid.Parse("70000000-0000-0000-0000-000000000017");
+    public static readonly Guid AiAgentManage = Guid.Parse("70000000-0000-0000-0000-000000000018");
+    public static readonly Guid AiArtifactManage = Guid.Parse("70000000-0000-0000-0000-000000000019");
+    public static readonly Guid AiWebSearchManage = Guid.Parse("70000000-0000-0000-0000-000000000020");
+
+    public static readonly Guid IntegrationRoot = Guid.Parse("80000000-0000-0000-0000-000000000001");
+    public static readonly Guid IntegrationConnectors = Guid.Parse("80000000-0000-0000-0000-000000000002");
+    public static readonly Guid IntegrationConnectorManage = Guid.Parse("80000000-0000-0000-0000-000000000003");
+    public static readonly Guid IntegrationConnectorTest = Guid.Parse("80000000-0000-0000-0000-000000000004");
+    public static readonly Guid IntegrationConnectorRotateSecret = Guid.Parse("80000000-0000-0000-0000-000000000021");
+    public static readonly Guid IntegrationDeliveryRecords = Guid.Parse("80000000-0000-0000-0000-000000000005");
+    public static readonly Guid IntegrationDeliveryManage = Guid.Parse("80000000-0000-0000-0000-000000000006");
+    public static readonly Guid IntegrationDeliveryExport = Guid.Parse("80000000-0000-0000-0000-000000000020");
+    public static readonly Guid IntegrationBindings = Guid.Parse("80000000-0000-0000-0000-000000000007");
+    public static readonly Guid IntegrationBindingManage = Guid.Parse("80000000-0000-0000-0000-000000000008");
+    public static readonly Guid IntegrationBindingImport = Guid.Parse("80000000-0000-0000-0000-000000000009");
+    public static readonly Guid IntegrationGroups = Guid.Parse("80000000-0000-0000-0000-000000000022");
+    public static readonly Guid IntegrationGroupManage = Guid.Parse("80000000-0000-0000-0000-000000000023");
+    public static readonly Guid IntegrationTemplates = Guid.Parse("80000000-0000-0000-0000-000000000010");
+    public static readonly Guid IntegrationTemplateManage = Guid.Parse("80000000-0000-0000-0000-000000000011");
+    public static readonly Guid IntegrationTemplateTest = Guid.Parse("80000000-0000-0000-0000-000000000012");
+    public static readonly Guid IntegrationRules = Guid.Parse("80000000-0000-0000-0000-000000000013");
+    public static readonly Guid IntegrationRuleManage = Guid.Parse("80000000-0000-0000-0000-000000000014");
+    public static readonly Guid IntegrationWebhookEvents = Guid.Parse("80000000-0000-0000-0000-000000000015");
+    public static readonly Guid IntegrationWebhookManage = Guid.Parse("80000000-0000-0000-0000-000000000016");
+    public static readonly Guid IntegrationSyncJobs = Guid.Parse("80000000-0000-0000-0000-000000000017");
+    public static readonly Guid IntegrationSyncManage = Guid.Parse("80000000-0000-0000-0000-000000000018");
+    public static readonly Guid IntegrationSyncRun = Guid.Parse("80000000-0000-0000-0000-000000000019");
 }

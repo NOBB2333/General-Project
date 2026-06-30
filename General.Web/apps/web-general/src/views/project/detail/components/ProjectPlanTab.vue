@@ -1,174 +1,345 @@
 <script lang="ts" setup>
-import { Button, Card, Col, Form, Input, InputNumber, Progress, Row, Select, Table, Tag } from 'ant-design-vue';
+import type { VxeGridProps } from '#/adapter/vxe-table';
 
+import { computed } from 'vue';
+
+import { Alert, Button, Card, Input, Popconfirm, Select, Space, Tag } from 'ant-design-vue';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import type { ProjectApi } from '#/api/core';
 
 import { useProjectDetailContext } from '../context';
+import ProjectWbsPanel from './ProjectWbsPanel.vue';
+
+type MilestonePlanRow = {
+  __editing?: boolean;
+  closeState: {
+    acceptanceCriteria: ProjectApi.AcceptanceCriteriaItem[];
+    acceptanceRecordCount: number;
+    conditions: {
+      count: number;
+      done: boolean;
+      key: string;
+      label: string;
+      targetTabKey: string;
+    }[];
+    sprintName: string;
+  };
+  form: ProjectApi.ProjectMilestoneStatusUpdateInput;
+  id: string;
+  item: ProjectApi.WorkspaceMilestoneItem;
+};
+
+type MilestoneTableRow = MilestonePlanRow | { __editing: true; id: string };
+
+function formatAcceptanceCriteriaTitles(
+  items: ProjectApi.AcceptanceCriteriaItem[],
+  limit?: number,
+) {
+  const source = typeof limit === 'number' ? items.slice(0, limit) : items;
+  return source.map((item) => item.title).join('、');
+}
 
 const {
-  cycleColumns,
-  dependencyTypeOptions,
+  communicationItems,
+  deletingMilestoneId,
   detail,
+  editingMilestoneId,
   formatDate,
-  handleCreateTaskDependency,
-  handleUpdateTaskWbs,
+  handleCancelMilestoneEdit,
+  handleCreateMilestoneDraft,
+  handleDeleteMilestone,
+  handleEditMilestone,
+  handleMilestoneCloseAdviceAction,
+  handleSaveMilestone,
   loading,
+  memberSelectOptions,
   milestoneColumns,
-  reportColumns,
-  reportItems,
-  savingTaskDependency,
-  savingTaskWbsId,
-  taskDependencyForm,
-  taskParentOptions,
-  taskSelectOptions,
-  taskWbsRows,
+  milestoneCloseAdvice,
+  milestoneForm,
+  milestoneRows,
+  milestoneSelectOptions,
+  refreshSelectedProjectDetail,
+  sprintOptions,
+  savingMilestone,
+  selectedProjectId,
+  switchProjectDetailTab,
+  showMilestoneForm,
 } = useProjectDetailContext();
+
+const milestoneTableRows = computed<MilestoneTableRow[]>(() => {
+  const rows = milestoneRows.value as MilestonePlanRow[];
+  if (!showMilestoneForm.value) {
+    return rows;
+  }
+
+  const editingRow = {
+    __editing: true,
+    id: editingMilestoneId.value || '__new_milestone__',
+  } as const;
+
+  if (editingMilestoneId.value) {
+    return rows.map((row) => (row.item.id === editingMilestoneId.value ? editingRow : row));
+  }
+
+  return [editingRow, ...rows];
+});
+
+const milestoneGridOptions = computed<VxeGridProps<MilestoneTableRow>>(() => ({
+  columns: milestoneColumns,
+  data: milestoneTableRows.value,
+  emptyText: '暂无里程碑',
+  expandConfig: {
+    visibleMethod: ({ row }) => !isMilestoneEditingRow(row as MilestoneTableRow),
+  },
+  loading: loading.value,
+  pagerConfig: { enabled: false },
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+  size: 'small',
+}));
+
+const [MilestoneGrid] = useVbenVxeGrid<MilestoneTableRow>({ gridOptions: {} });
+
+function isMilestoneEditingRow(record: MilestoneTableRow) {
+  return Boolean(record.__editing);
+}
+
+function asMilestonePlanRow(record: MilestoneTableRow) {
+  return record as MilestonePlanRow;
+}
+
+function resolveMilestoneStatusColor(status?: null | string) {
+  if (status === '已关闭') {
+    return 'success';
+  }
+
+  if (status === '已完成') {
+    return 'processing';
+  }
+
+  return 'default';
+}
 </script>
 
 <template>
 <section class="project-detail__section">
-  <Row :gutter="[16, 16]">
-    <Col :lg="14" :span="24">
-      <Card :bordered="false" class="project-detail__inner-card" title="阶段 / 周期 / 发布计划">
-        <Table
-          :columns="cycleColumns"
-          :data-source="detail?.cycles || []"
-          :loading="loading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'progress'">
-              <Progress :percent="(record as ProjectApi.CycleItem).progress" size="small" />
-            </template>
-            <template v-else-if="column.key === 'endDate'">
-              {{ formatDate((record as ProjectApi.CycleItem).endDate) }}
-            </template>
-          </template>
-        </Table>
-      </Card>
-    </Col>
-    <Col :lg="10" :span="24">
-      <Card :bordered="false" class="project-detail__inner-card" title="里程碑">
-        <Table
-          :columns="milestoneColumns"
-          :data-source="detail?.milestones || []"
-          :loading="loading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'plannedCompletionDate'">
-              {{ formatDate((record as ProjectApi.WorkspaceMilestoneItem).plannedCompletionDate) }}
-            </template>
-          </template>
-        </Table>
-      </Card>
-    </Col>
-  </Row>
-
-  <Card :bordered="false" class="project-detail__inner-card" title="日报 / 周报 / 月报">
-    <div v-if="reportItems.length === 0" class="project-detail__muted">
-      当前未归档日报 / 周报 / 月报，后续可直接关联项目文档与周期。
-    </div>
-    <Table
-      v-else
-      :columns="reportColumns"
-      :data-source="reportItems"
-      :pagination="false"
-      row-key="id"
-      size="small"
-    />
-  </Card>
-
-  <Card :bordered="false" class="project-detail__inner-card" title="WBS 任务拆解 / 依赖关系">
-    <div class="project-detail__overview-list project-detail__overview-list--metrics">
-      <div class="project-detail__overview-item">
-        <span>WBS 编码任务</span>
-        <strong>{{ (detail?.tasks || []).filter((item: ProjectApi.TaskItem) => item.wbsCode).length }}</strong>
+  <div class="project-detail__plan-stack">
+    <Card :bordered="false" class="project-detail__inner-card project-detail__plan-card--milestones rounded-2xl" title="里程碑">
+      <div class="project-detail__muted project-detail__card-note">
+        里程碑用于管理关键节点；每个里程碑可展开维护对应 WBS 工作包，需求与排期在「需求与排期」里维护。
       </div>
-      <div class="project-detail__overview-item">
-        <span>父子任务</span>
-        <strong>{{ (detail?.tasks || []).filter((item: ProjectApi.TaskItem) => item.parentTaskId).length }}</strong>
+      <Alert
+        v-if="milestoneCloseAdvice"
+        class="project-detail__alert"
+        show-icon
+        type="warning"
+      >
+        <template #message>
+          {{ milestoneCloseAdvice.milestoneName }} 暂不能关闭
+        </template>
+        <template #description>
+          <div class="project-detail__alert-stack">
+            <span>{{ milestoneCloseAdvice.message }}</span>
+            <span>
+              待补齐：
+              {{ milestoneCloseAdvice.missingItems.join('、') }}
+            </span>
+            <Space wrap>
+              <Button
+                v-for="action in milestoneCloseAdvice.actions"
+                :key="action.tabKey"
+                size="small"
+                type="link"
+                @click="handleMilestoneCloseAdviceAction(action.tabKey)"
+              >
+                {{ action.label }}
+              </Button>
+            </Space>
+          </div>
+        </template>
+      </Alert>
+      <div class="project-detail__section-head">
+        <Button type="primary" @click="handleCreateMilestoneDraft">新增里程碑</Button>
       </div>
-      <div class="project-detail__overview-item">
-        <span>依赖关系</span>
-        <strong>{{ detail?.taskDependencies.length || 0 }}</strong>
-      </div>
-    </div>
-    <Form class="project-detail__inline-form" layout="vertical">
-      <Row :gutter="[12, 0]">
-        <Col :span="12">
-          <Form.Item label="前置任务">
-            <Select v-model:value="taskDependencyForm.predecessorTaskId" :options="taskSelectOptions" show-search />
-          </Form.Item>
-        </Col>
-        <Col :span="12">
-          <Form.Item label="后续任务">
-            <Select v-model:value="taskDependencyForm.successorTaskId" :options="taskSelectOptions" show-search />
-          </Form.Item>
-        </Col>
-        <Col :span="12">
-          <Form.Item label="依赖类型">
-            <Select v-model:value="taskDependencyForm.dependencyType" :options="dependencyTypeOptions" />
-          </Form.Item>
-        </Col>
-        <Col :span="12">
-          <Form.Item label="操作">
-            <Button :loading="savingTaskDependency" type="primary" @click="handleCreateTaskDependency">新增依赖</Button>
-          </Form.Item>
-        </Col>
-      </Row>
-    </Form>
-    <div class="project-detail__stack-list">
-      <article v-for="{ form, item } in taskWbsRows.slice(0, 8)" :key="item.id" class="project-detail__stack-item">
-        <div class="project-detail__item-head">
-          <Tag>{{ item.status }}</Tag>
-          <strong>{{ item.title }}</strong>
-        </div>
-        <div class="project-detail__wbs-grid">
-          <Form.Item label="WBS 编码">
-            <Input :value="form.wbsCode" :maxlength="64" @update:value="(val) => { form.wbsCode = val; }" />
-          </Form.Item>
-          <Form.Item label="父任务">
-            <Select
-              :value="form.parentTaskId"
-              allow-clear
-              :options="taskParentOptions.filter((option: { value: string }) => option.value !== item.id)"
-              show-search
-              @update:value="(val) => { form.parentTaskId = typeof val === 'string' ? val : undefined; }"
+      <MilestoneGrid
+        class="app-vxe-card-grid"
+        grid-class="project-detail__milestone-grid"
+        :grid-options="milestoneGridOptions"
+      >
+        <template #name="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Input
+              v-model:value="milestoneForm.name"
+              :maxlength="128"
+              placeholder="需求确认 / UAT 完成 / 正式上线"
             />
-          </Form.Item>
-          <Form.Item label="排序">
-            <InputNumber :value="form.sortOrder" :min="0" @update:value="(val) => { form.sortOrder = typeof val === 'number' ? val : 0; }" />
-          </Form.Item>
-          <Form.Item label="基线开始">
-            <Input :value="form.baselineStartTime" type="date" @update:value="(val) => { form.baselineStartTime = val; }" />
-          </Form.Item>
-          <Form.Item label="基线结束">
-            <Input :value="form.baselineEndTime" type="date" @update:value="(val) => { form.baselineEndTime = val; }" />
-          </Form.Item>
-        </div>
-        <Button :loading="savingTaskWbsId === item.id" size="small" type="primary" @click="handleUpdateTaskWbs(item.id)">保存 WBS</Button>
-      </article>
+          </template>
+          <template v-else>
+            {{ asMilestonePlanRow(row).item.name }}
+          </template>
+        </template>
+
+        <template #ownerName="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Select
+              v-model:value="milestoneForm.ownerUserId"
+              :options="memberSelectOptions"
+              show-search
+              style="width: 120px"
+            />
+          </template>
+          <template v-else>
+            {{ asMilestonePlanRow(row).item.ownerName }}
+          </template>
+        </template>
+
+        <template #sprintName="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Select
+              v-model:value="milestoneForm.sprintId"
+              allow-clear
+              :options="sprintOptions"
+              placeholder="所属排期"
+              show-search
+              style="width: 160px"
+            />
+          </template>
+          <template v-else>
+            {{ asMilestonePlanRow(row).closeState.sprintName }}
+          </template>
+        </template>
+
+        <template #plannedCompletionDate="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Input v-model:value="milestoneForm.plannedCompletionDate" type="date" />
+          </template>
+          <template v-else>
+            {{ formatDate(asMilestonePlanRow(row).item.plannedCompletionDate) }}
+          </template>
+        </template>
+
+        <template #status="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Select
+              v-model:value="milestoneForm.status"
+              :options="[
+                { label: '未开始', value: '未开始' },
+                { label: '进行中', value: '进行中' },
+                { label: '已完成', value: '已完成' },
+                { label: '已关闭', value: '已关闭' },
+              ]"
+              style="width: 104px"
+            />
+          </template>
+          <Tag v-else :color="resolveMilestoneStatusColor(asMilestonePlanRow(row).item.status)">
+            {{ asMilestonePlanRow(row).item.status || '-' }}
+          </Tag>
+        </template>
+
+        <template #actualCompletionDate="{ row }">
+          <template v-if="isMilestoneEditingRow(row)">
+            <Input v-model:value="milestoneForm.actualCompletionDate" type="date" />
+          </template>
+          <template v-else>
+            {{ formatDate(asMilestonePlanRow(row).item.actualCompletionDate) }}
+          </template>
+        </template>
+
+        <template #closeConditions="{ row }">
+          <span v-if="isMilestoneEditingRow(row)" class="project-detail__muted">-</span>
+          <template v-else>
+            <div class="project-detail__tag-list">
+              <Tag
+                v-for="condition in asMilestonePlanRow(row).closeState.conditions"
+                :key="condition.key"
+                :color="condition.done ? 'success' : 'warning'"
+              >
+                {{ condition.label }} {{ condition.count }}
+              </Tag>
+              <Button
+                size="small"
+                type="link"
+                @click="switchProjectDetailTab('delivery')"
+              >
+                验收与交付
+              </Button>
+              <Button
+                size="small"
+                type="link"
+                @click="switchProjectDetailTab('docs')"
+              >
+                文件
+              </Button>
+            </div>
+            <div
+              v-if="asMilestonePlanRow(row).closeState.acceptanceCriteria.length > 0"
+              class="project-detail__muted"
+            >
+              {{ formatAcceptanceCriteriaTitles(asMilestonePlanRow(row).closeState.acceptanceCriteria, 2) }}
+            </div>
+          </template>
+        </template>
+
+        <template #actions="{ row }">
+          <Space v-if="isMilestoneEditingRow(row)">
+            <Button :loading="savingMilestone" size="small" type="primary" @click="handleSaveMilestone">
+              保存
+            </Button>
+            <Button size="small" @click="handleCancelMilestoneEdit">取消</Button>
+          </Space>
+          <Space v-else>
+            <Button size="small" type="link" @click="handleEditMilestone(asMilestonePlanRow(row).item)">
+              编辑
+            </Button>
+            <Popconfirm title="确认删除这个里程碑？" @confirm="handleDeleteMilestone(asMilestonePlanRow(row).item.id)">
+              <Button
+                danger
+                :loading="deletingMilestoneId === asMilestonePlanRow(row).item.id"
+                size="small"
+                type="link"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        </template>
+
+        <template #wbs="{ row }">
+          <ProjectWbsPanel
+            v-if="!isMilestoneEditingRow(row)"
+            embedded
+            :sprint-options="sprintOptions"
+            :member-options="memberSelectOptions"
+            :milestone-id="asMilestonePlanRow(row).item.id"
+            :milestone-name="asMilestonePlanRow(row).item.name"
+            :milestone-options="milestoneSelectOptions"
+            :project-id="selectedProjectId"
+            :tasks="detail?.tasks || []"
+            :wbs-nodes="detail?.wbsNodes || []"
+            @refreshed="refreshSelectedProjectDetail"
+          />
+        </template>
+      </MilestoneGrid>
+    </Card>
+  </div>
+
+  <Card :bordered="false" class="project-detail__inner-card rounded-2xl" title="近期项目报告 / 会议记录">
+    <div class="project-detail__section-head">
+      <span>计划页只展示近期摘要，完整日报、周报、月报和会议记录统一在「文档与知识」维护。</span>
+      <Button size="small" type="link" @click="switchProjectDetailTab('docs')">查看全部</Button>
     </div>
-    <div v-if="(detail?.taskDependencies || []).length === 0" class="project-detail__muted">暂无任务依赖。</div>
+    <div v-if="communicationItems.length === 0" class="project-detail__muted">
+      当前未归档项目报告或会议记录。
+    </div>
     <div v-else class="project-detail__stack-list">
-      <article v-for="item in detail?.taskDependencies || []" :key="item.id" class="project-detail__stack-item">
-        <strong>{{ item.predecessorTaskTitle }} -> {{ item.successorTaskTitle }}</strong>
-        <span>{{ item.dependencyType }}</span>
-      </article>
-    </div>
-    <div v-if="(detail?.taskScheduleImpacts || []).length > 0" class="project-detail__stack-list">
-      <article v-for="item in detail?.taskScheduleImpacts || []" :key="`${item.predecessorTaskId}-${item.successorTaskId}`" class="project-detail__stack-item">
+      <article v-for="item in communicationItems.slice(0, 3)" :key="item.id" class="project-detail__stack-item">
         <div class="project-detail__item-head">
-          <Tag color="error">影响识别</Tag>
-          <strong>{{ item.successorTaskTitle }}</strong>
+          <Tag>{{ item.type }}</Tag>
+          <Tag>{{ item.status }}</Tag>
         </div>
-        <span>{{ item.predecessorTaskTitle }} -> {{ item.successorTaskTitle }}</span>
-        <span>{{ item.impactReason }}</span>
+        <strong>{{ item.title }}</strong>
+        <span>{{ item.ownerName }} / {{ item.periodText }}</span>
       </article>
     </div>
   </Card>

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
+
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -7,22 +9,19 @@ import { useAccess } from '@vben/access';
 import {
   Button,
   Card,
-  Col,
   Drawer,
-  Empty,
   Form,
   Input,
-  Modal,
   Popconfirm,
-  Row,
   Select,
   Space,
   Statistic,
   Switch,
-  Table,
   Tag,
   message,
 } from 'ant-design-vue';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 
 import {
   cancelSchedulerJobApi,
@@ -47,6 +46,7 @@ import {
   updateSchedulerJobTriggerApi,
   type SchedulerApi,
 } from '#/api/core';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'PlatformSchedulerPage' });
 
@@ -66,14 +66,21 @@ const triggerDrawerOpen = ref(false);
 const triggerLoading = ref(false);
 const nodeDrawerOpen = ref(false);
 const nodeLoading = ref(false);
-const jobModalOpen = ref(false);
-const triggerModalOpen = ref(false);
+const jobDrawerOpen = ref(false);
+const triggerEditorDrawerOpen = ref(false);
 const selectedJob = ref<SchedulerApi.JobItem>();
 const editingJobKey = ref('');
 const editingTriggerKey = ref('');
 const jobRecords = ref<SchedulerApi.JobRecordItem[]>([]);
 const jobTriggers = ref<SchedulerApi.TriggerItem[]>([]);
 const clusterNodes = ref<SchedulerApi.ClusterNodeItem[]>([]);
+const jobPagination = useLocalVxePagination(items, { defaultPageSize: 10 });
+const triggerPagination = useLocalVxePagination(jobTriggers, { defaultPageSize: 10 });
+const nodePagination = useLocalVxePagination(clusterNodes, { defaultPageSize: 10 });
+const totalCount = ref(0);
+const recordPageIndex = ref(1);
+const recordPageSize = ref(10);
+const recordTotalCount = ref(0);
 const canExecuteScheduler = computed(() => hasAccessByCodes([SCHEDULER_EXECUTE_CODE]));
 const canManageScheduler = computed(() => hasAccessByCodes([SCHEDULER_MANAGE_CODE]));
 
@@ -115,62 +122,46 @@ const handlerOptions = computed(() =>
   })),
 );
 
-const rowSelection = computed(() => {
-  if (!canExecuteScheduler.value && !canManageScheduler.value) {
-    return undefined;
-  }
-
-  return {
-    getCheckboxProps: (record: SchedulerApi.JobItem) => ({
-      disabled: record.isRunning,
-    }),
-    onChange: (keys: (number | string)[]) => {
-      selectedJobKeys.value = keys.map((key) => `${key}`);
-    },
-    selectedRowKeys: selectedJobKeys.value,
-  };
-});
-
 const columns = [
-  { dataIndex: 'title', key: 'title', title: '任务名称', width: 180 },
-  { dataIndex: 'jobKey', key: 'jobKey', title: '任务键', width: 170 },
-  { dataIndex: 'handlerKey', key: 'handlerKey', title: '执行器', width: 190 },
-  { dataIndex: 'cronExpression', key: 'cronExpression', title: '默认 Cron', width: 160 },
-  { dataIndex: 'triggerCount', key: 'triggerCount', title: '触发器', width: 90 },
-  { dataIndex: 'nextRunTime', key: 'nextRunTime', title: '下次执行', width: 160 },
-  { dataIndex: 'lastRunResult', key: 'lastRunResult', title: '最近结果', width: 240 },
-  { dataIndex: 'isEnabled', key: 'isEnabled', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 430 },
+  { field: 'title', title: '任务名称', width: 180 },
+  { field: 'jobKey', title: '任务键', width: 170 },
+  { field: 'handlerKey', slots: { default: 'handlerKey' }, title: '执行器', width: 190 },
+  { field: 'cronExpression', title: '默认 Cron', width: 160 },
+  { field: 'triggerCount', title: '触发器', width: 90 },
+  { field: 'nextRunTime', slots: { default: 'nextRunTime' }, title: '下次执行', width: 160 },
+  { field: 'lastRunResult', slots: { default: 'lastRunResult' }, title: '最近结果', width: 240 },
+  { field: 'isEnabled', slots: { default: 'isEnabled' }, title: '状态', width: 100 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 430 },
 ];
 
 const recordColumns = [
-  { dataIndex: 'status', key: 'status', title: '状态', width: 90 },
-  { dataIndex: 'triggerKey', key: 'triggerKey', title: '触发器', width: 120 },
-  { dataIndex: 'triggerMode', key: 'triggerMode', title: '触发', width: 90 },
-  { dataIndex: 'startTime', key: 'startTime', title: '开始时间', width: 170 },
-  { dataIndex: 'endTime', key: 'endTime', title: '结束时间', width: 170 },
-  { dataIndex: 'durationMilliseconds', key: 'durationMilliseconds', title: '耗时', width: 100 },
-  { dataIndex: 'result', key: 'result', title: '结果', ellipsis: true, width: 360 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 90 },
+  { field: 'triggerKey', slots: { default: 'triggerKey' }, title: '触发器', width: 120 },
+  { field: 'triggerMode', slots: { default: 'triggerMode' }, title: '触发', width: 90 },
+  { field: 'startTime', slots: { default: 'startTime' }, title: '开始时间', width: 170 },
+  { field: 'endTime', slots: { default: 'endTime' }, title: '结束时间', width: 170 },
+  { field: 'durationMilliseconds', slots: { default: 'durationMilliseconds' }, title: '耗时', width: 100 },
+  { field: 'result', slots: { default: 'result' }, title: '结果', width: 360 },
 ];
 
 const triggerColumns = [
-  { dataIndex: 'title', key: 'title', title: '触发器', width: 160 },
-  { dataIndex: 'triggerKey', key: 'triggerKey', title: '触发器键', width: 140 },
-  { dataIndex: 'cronExpression', key: 'cronExpression', title: 'Cron', width: 160 },
-  { dataIndex: 'nextRunTime', key: 'nextRunTime', title: '下次执行', width: 160 },
-  { dataIndex: 'lastRunResult', key: 'lastRunResult', title: '最近结果', width: 220 },
-  { dataIndex: 'isEnabled', key: 'isEnabled', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 220 },
+  { field: 'title', title: '触发器', width: 160 },
+  { field: 'triggerKey', title: '触发器键', width: 140 },
+  { field: 'cronExpression', title: 'Cron', width: 160 },
+  { field: 'nextRunTime', slots: { default: 'nextRunTime' }, title: '下次执行', width: 160 },
+  { field: 'lastRunResult', title: '最近结果', width: 220 },
+  { field: 'isEnabled', slots: { default: 'isEnabled' }, title: '状态', width: 100 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 220 },
 ];
 
 const nodeColumns = [
-  { dataIndex: 'status', key: 'status', title: '状态', width: 90 },
-  { dataIndex: 'hostName', key: 'hostName', title: '主机', width: 150 },
-  { dataIndex: 'processId', key: 'processId', title: '进程', width: 90 },
-  { dataIndex: 'instanceId', key: 'instanceId', title: '实例', width: 280 },
-  { dataIndex: 'startedAt', key: 'startedAt', title: '启动时间', width: 170 },
-  { dataIndex: 'lastHeartbeatTime', key: 'lastHeartbeatTime', title: '心跳时间', width: 170 },
-  { dataIndex: 'description', key: 'description', title: '说明', ellipsis: true, width: 260 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 90 },
+  { field: 'hostName', title: '主机', width: 150 },
+  { field: 'processId', title: '进程', width: 90 },
+  { field: 'instanceId', title: '实例', width: 280 },
+  { field: 'startedAt', slots: { default: 'startedAt' }, title: '启动时间', width: 170 },
+  { field: 'lastHeartbeatTime', slots: { default: 'lastHeartbeatTime' }, title: '心跳时间', width: 170 },
+  { field: 'description', title: '说明', width: 260 },
 ];
 
 async function loadData() {
@@ -185,10 +176,110 @@ async function loadData() {
     handlers.value = handlerList;
     dashboard.value = dashboardData;
     selectedJobKeys.value = selectedJobKeys.value.filter((key) => jobList.some((item) => item.jobKey === key));
+    totalCount.value = jobList.length;
   } finally {
     loading.value = false;
   }
 }
+
+const jobGridOptions = computed<VxeGridProps<SchedulerApi.JobItem>>(() => ({
+  checkboxConfig: canExecuteScheduler.value || canManageScheduler.value
+    ? {
+        checkMethod: ({ row }: { row: SchedulerApi.JobItem }) => !row.isRunning,
+      }
+    : undefined,
+  cellConfig: {
+    height: 58,
+  },
+  cellClassName: ({ column }: { column: { field?: string } }) =>
+    column.field === 'lastRunResult' ? 'scheduler__last-result-column' : '',
+  columns: columns as VxeGridProps<SchedulerApi.JobItem>['columns'],
+  data: jobPagination.pagedRows.value,
+  emptyText: '暂无定时任务',
+  loading: loading.value,
+  pagerConfig: jobPagination.pagerConfig.value,
+  rowConfig: { keyField: 'jobKey' },
+  scrollX: { enabled: true },
+}));
+
+const jobGridEvents: NativeVxeGridEvents<SchedulerApi.JobItem> = {
+  'checkbox-all': ({ records }: { records: SchedulerApi.JobItem[] }) => {
+    selectedJobKeys.value = records.map((r) => r.jobKey);
+  },
+  'checkbox-change': ({ records }: { records: SchedulerApi.JobItem[] }) => {
+    selectedJobKeys.value = records.map((r) => r.jobKey);
+  },
+  'page-change': jobPagination.handlePageChange,
+};
+
+const recordGridOptions = computed<VxeGridProps<SchedulerApi.JobRecordItem>>(() => ({
+  columns: recordColumns as VxeGridProps<SchedulerApi.JobRecordItem>['columns'],
+  data: jobRecords.value,
+  emptyText: '暂无执行记录',
+  loading: recordLoading.value,
+  pagerConfig: {
+    currentPage: recordPageIndex.value,
+    pageSize: recordPageSize.value,
+    total: recordTotalCount.value,
+    pageSizes: [10, 20, 50],
+  },
+  rowConfig: { keyField: 'startTime' },
+  scrollX: { enabled: true },
+}));
+
+const recordGridEvents: NativeVxeGridEvents<SchedulerApi.JobRecordItem> = {
+  'page-change': ({ currentPage, pageSize: nextPageSize }) => {
+    const normalizedPageSize = nextPageSize || recordPageSize.value;
+    recordPageIndex.value = normalizedPageSize === recordPageSize.value ? currentPage || 1 : 1;
+    recordPageSize.value = normalizedPageSize;
+    if (selectedJob.value) {
+      void loadJobRecords(selectedJob.value);
+    }
+  },
+};
+
+const triggerGridOptions = computed<VxeGridProps<SchedulerApi.TriggerItem>>(() => ({
+  columns: triggerColumns as VxeGridProps<SchedulerApi.TriggerItem>['columns'],
+  data: triggerPagination.pagedRows.value,
+  emptyText: '暂无触发器',
+  loading: triggerLoading.value,
+  pagerConfig: triggerPagination.pagerConfig.value,
+  rowConfig: { keyField: 'triggerKey' },
+  scrollX: { enabled: true },
+}));
+
+const nodeGridOptions = computed<VxeGridProps<SchedulerApi.ClusterNodeItem>>(() => ({
+  columns: nodeColumns as VxeGridProps<SchedulerApi.ClusterNodeItem>['columns'],
+  data: nodePagination.pagedRows.value,
+  emptyText: '暂无在线节点',
+  loading: nodeLoading.value,
+  pagerConfig: nodePagination.pagerConfig.value,
+  rowConfig: { keyField: 'instanceId' },
+  scrollX: { enabled: true },
+}));
+
+const [JobGrid] = useVbenVxeGrid<SchedulerApi.JobItem>({
+  gridEvents: jobGridEvents,
+  gridOptions: {},
+});
+const [RecordGrid] = useVbenVxeGrid<SchedulerApi.JobRecordItem>({
+  gridEvents: recordGridEvents,
+  gridOptions: {},
+});
+const triggerGridEvents: NativeVxeGridEvents<SchedulerApi.TriggerItem> = {
+  'page-change': triggerPagination.handlePageChange,
+};
+const nodeGridEvents: NativeVxeGridEvents<SchedulerApi.ClusterNodeItem> = {
+  'page-change': nodePagination.handlePageChange,
+};
+const [TriggerGrid] = useVbenVxeGrid<SchedulerApi.TriggerItem>({
+  gridEvents: triggerGridEvents,
+  gridOptions: {},
+});
+const [NodeGrid] = useVbenVxeGrid<SchedulerApi.ClusterNodeItem>({
+  gridEvents: nodeGridEvents,
+  gridOptions: {},
+});
 
 function formatDate(value?: null | string) {
   return value ? new Date(value).toLocaleString() : '-';
@@ -264,12 +355,12 @@ function validateTriggerForm() {
 
 function openCreateJob() {
   patchJobForm();
-  jobModalOpen.value = true;
+  jobDrawerOpen.value = true;
 }
 
 function openEditJob(item: SchedulerApi.JobItem) {
   patchJobForm(item);
-  jobModalOpen.value = true;
+  jobDrawerOpen.value = true;
 }
 
 async function submitJob() {
@@ -286,7 +377,7 @@ async function submitJob() {
       await createSchedulerJobApi({ ...jobForm });
       message.success('已新增任务');
     }
-    jobModalOpen.value = false;
+    jobDrawerOpen.value = false;
     await loadData();
   } finally {
     actionLoadingKey.value = '';
@@ -407,9 +498,12 @@ async function loadJobRecords(item: SchedulerApi.JobItem) {
   selectedJob.value = item;
   recordLoading.value = true;
   try {
-    jobRecords.value = await getSchedulerJobRecordsApi(item.jobKey, {
-      maxResultCount: 100,
+    const result = await getSchedulerJobRecordsApi(item.jobKey, {
+      maxResultCount: recordPageSize.value,
+      skipCount: (recordPageIndex.value - 1) * recordPageSize.value,
     });
+    jobRecords.value = result.items;
+    recordTotalCount.value = result.totalCount;
   } finally {
     recordLoading.value = false;
   }
@@ -417,6 +511,7 @@ async function loadJobRecords(item: SchedulerApi.JobItem) {
 
 async function openJobRecords(item: SchedulerApi.JobItem) {
   recordDrawerOpen.value = true;
+  recordPageIndex.value = 1;
   await loadJobRecords(item);
 }
 
@@ -452,12 +547,12 @@ async function openJobTriggers(item: SchedulerApi.JobItem) {
 
 function openCreateTrigger() {
   patchTriggerForm();
-  triggerModalOpen.value = true;
+  triggerEditorDrawerOpen.value = true;
 }
 
 function openEditTrigger(item: SchedulerApi.TriggerItem) {
   patchTriggerForm(item);
-  triggerModalOpen.value = true;
+  triggerEditorDrawerOpen.value = true;
 }
 
 async function submitTrigger() {
@@ -474,7 +569,7 @@ async function submitTrigger() {
       await createSchedulerJobTriggerApi(selectedJob.value.jobKey, { ...triggerForm });
       message.success('已新增触发器');
     }
-    triggerModalOpen.value = false;
+    triggerEditorDrawerOpen.value = false;
     await loadJobTriggers(selectedJob.value);
     await loadData();
   } finally {
@@ -528,15 +623,13 @@ onMounted(loadData);
 
 <template>
   <Page description="定时任务中心支持任务定义、触发器、执行记录、取消执行和集群节点心跳。" title="定时任务">
-    <Row :gutter="[16, 16]" class="mb-1">
-      <Col v-for="metric in metrics" :key="metric.label" :lg="6" :md="12" :span="24">
-        <Card :bordered="false">
-          <Statistic :title="metric.label" :value="metric.value" />
-        </Card>
-      </Col>
-    </Row>
+    <div class="scheduler__metrics">
+      <Card v-for="metric in metrics" :key="metric.label" :bordered="false" class="rounded-2xl">
+        <Statistic :title="metric.label" :value="metric.value" />
+      </Card>
+    </div>
 
-    <Card :bordered="false" title="任务中心">
+    <Card :bordered="false" class="rounded-2xl" title="任务中心">
       <template #extra>
         <Space>
           <Tag v-if="selectedJobKeys.length" color="blue">已选 {{ selectedJobKeys.length }}</Tag>
@@ -580,130 +673,117 @@ onMounted(loadData);
         </Space>
       </template>
 
-      <div v-if="!loading && items.length === 0" class="scheduler__empty">
-        <Empty description="暂无定时任务" />
-      </div>
-      <Table
-        v-else
-        :columns="columns"
-        :data-source="items"
-        :loading="loading"
-        :pagination="false"
-        row-key="jobKey"
-        :row-selection="rowSelection"
-        :scroll="{ x: 1660 }"
+      <JobGrid
+        class="app-vxe-card-grid"
+        grid-class="scheduler__job-grid"
+        :grid-events="jobGridEvents"
+        :grid-options="jobGridOptions"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'handlerKey'">
-            <Tag>{{ (record as SchedulerApi.JobItem).handlerKey }}</Tag>
-          </template>
-          <template v-else-if="column.key === 'triggerCount'">
-            {{ (record as SchedulerApi.JobItem).triggerCount }}
-          </template>
-          <template v-else-if="column.key === 'nextRunTime'">
-            {{ formatDate((record as SchedulerApi.JobItem).nextRunTime) }}
-          </template>
-          <template v-else-if="column.key === 'lastRunResult'">
-            <div class="scheduler__cell">
-              <Tag
-                :color="
-                  (record as SchedulerApi.JobItem).lastRunResult.includes('失败')
-                    ? 'error'
-                    : (record as SchedulerApi.JobItem).lastRunResult
-                      ? 'success'
-                      : 'default'
-                "
-              >
-                {{
-                  (record as SchedulerApi.JobItem).lastRunResult.includes('失败')
-                    ? '失败'
-                    : (record as SchedulerApi.JobItem).lastRunResult
-                      ? '成功'
-                      : '未执行'
-                }}
-              </Tag>
-              <small>{{ (record as SchedulerApi.JobItem).lastRunResult || '-' }}</small>
-            </div>
-          </template>
-          <template v-else-if="column.key === 'isEnabled'">
+        <template #handlerKey="{ row }">
+          <Tag>{{ row.handlerKey }}</Tag>
+        </template>
+        <template #nextRunTime="{ row }">
+          {{ formatDate(row.nextRunTime) }}
+        </template>
+        <template #lastRunResult="{ row }">
+          <div class="scheduler__cell scheduler__cell--last-result">
             <Tag
               :color="
-                (record as SchedulerApi.JobItem).isRunning
-                  ? 'processing'
-                  : (record as SchedulerApi.JobItem).isEnabled
+                row.lastRunResult.includes('失败')
+                  ? 'error'
+                  : row.lastRunResult
                     ? 'success'
                     : 'default'
               "
             >
               {{
-                (record as SchedulerApi.JobItem).isRunning
-                  ? '执行中'
-                  : (record as SchedulerApi.JobItem).isEnabled
-                    ? '运行中'
-                    : '已停用'
+                row.lastRunResult.includes('失败')
+                  ? '失败'
+                  : row.lastRunResult
+                    ? '成功'
+                    : '未执行'
               }}
             </Tag>
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <Space>
-              <Switch
+            <small>{{ row.lastRunResult || '-' }}</small>
+          </div>
+        </template>
+        <template #isEnabled="{ row }">
+          <Tag
+            :color="
+              row.isRunning
+                ? 'processing'
+                : row.isEnabled
+                  ? 'success'
+                  : 'default'
+            "
+          >
+            {{
+              row.isRunning
+                ? '执行中'
+                : row.isEnabled
+                  ? '运行中'
+                  : '已停用'
+            }}
+          </Tag>
+        </template>
+        <template #actions="{ row }">
+          <Space>
+            <Switch
+              v-if="canManageScheduler"
+              :checked="row.isEnabled"
+              :loading="actionLoadingKey === `${row.jobKey}:toggle`"
+              :disabled="row.isRunning"
+              @change="(checked) => toggleJob(row, Boolean(checked))"
+            />
+            <Button
+              v-if="canExecuteScheduler"
+              size="small"
+              :loading="actionLoadingKey === `${row.jobKey}:run`"
+              :disabled="row.isRunning"
+              @click="runJob(row)"
+            >
+              立即执行
+            </Button>
+            <Button size="small" @click="openJobTriggers(row)">触发器</Button>
+            <Button size="small" @click="openJobRecords(row)">记录</Button>
+            <Button
+              v-if="canManageScheduler"
+              size="small"
+              :disabled="row.isRunning"
+              @click="openEditJob(row)"
+            >
+              编辑
+            </Button>
+            <Button
+              v-if="canExecuteScheduler && row.isRunning"
+              danger
+              size="small"
+              :loading="actionLoadingKey === `${row.jobKey}:cancel`"
+              @click="cancelJob(row)"
+            >
+              取消
+            </Button>
+            <Popconfirm title="删除任务会同时清理触发器和执行记录，确认删除？" @confirm="deleteJob(row)">
+              <Button
                 v-if="canManageScheduler"
-                :checked="(record as SchedulerApi.JobItem).isEnabled"
-                :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:toggle`"
-                :disabled="(record as SchedulerApi.JobItem).isRunning"
-                @change="(checked) => toggleJob(record as SchedulerApi.JobItem, Boolean(checked))"
-              />
-              <Button
-                v-if="canExecuteScheduler"
-                size="small"
-                :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:run`"
-                :disabled="(record as SchedulerApi.JobItem).isRunning"
-                @click="runJob(record as SchedulerApi.JobItem)"
-              >
-                立即执行
-              </Button>
-              <Button size="small" @click="openJobTriggers(record as SchedulerApi.JobItem)">触发器</Button>
-              <Button size="small" @click="openJobRecords(record as SchedulerApi.JobItem)">记录</Button>
-              <Button
-                v-if="canManageScheduler"
-                size="small"
-                :disabled="(record as SchedulerApi.JobItem).isRunning"
-                @click="openEditJob(record as SchedulerApi.JobItem)"
-              >
-                编辑
-              </Button>
-              <Button
-                v-if="canExecuteScheduler && (record as SchedulerApi.JobItem).isRunning"
                 danger
                 size="small"
-                :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:cancel`"
-                @click="cancelJob(record as SchedulerApi.JobItem)"
+                :disabled="row.isRunning"
+                :loading="actionLoadingKey === `${row.jobKey}:delete`"
               >
-                取消
+                删除
               </Button>
-              <Popconfirm title="删除任务会同时清理触发器和执行记录，确认删除？" @confirm="deleteJob(record as SchedulerApi.JobItem)">
-                <Button
-                  v-if="canManageScheduler"
-                  danger
-                  size="small"
-                  :disabled="(record as SchedulerApi.JobItem).isRunning"
-                  :loading="actionLoadingKey === `${(record as SchedulerApi.JobItem).jobKey}:delete`"
-                >
-                  删除
-                </Button>
-              </Popconfirm>
-            </Space>
-          </template>
+            </Popconfirm>
+          </Space>
         </template>
-      </Table>
+      </JobGrid>
     </Card>
 
-    <Modal
-      v-model:open="jobModalOpen"
-      :confirm-loading="actionLoadingKey === 'job:save'"
+    <Drawer
+      v-model:open="jobDrawerOpen"
       :title="editingJobKey ? '编辑任务' : '新增任务'"
+      destroy-on-close
       width="640px"
-      @ok="submitJob"
     >
       <Form layout="vertical">
         <Form.Item label="任务键" required>
@@ -725,7 +805,13 @@ onMounted(loadData);
           <Input.TextArea v-model:value="jobForm.description" :auto-size="{ minRows: 3, maxRows: 5 }" />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="jobDrawerOpen = false">取消</Button>
+          <Button :loading="actionLoadingKey === 'job:save'" type="primary" @click="submitJob">保存</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <Drawer
       v-model:open="triggerDrawerOpen"
@@ -739,57 +825,44 @@ onMounted(loadData);
         </Space>
       </template>
 
-      <Table
-        :columns="triggerColumns"
-        :data-source="jobTriggers"
-        :loading="triggerLoading"
-        :pagination="{ pageSize: 10, showSizeChanger: false }"
-        row-key="triggerKey"
-        :scroll="{ x: 1210 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'nextRunTime'">
-            {{ formatDate((record as SchedulerApi.TriggerItem).nextRunTime) }}
-          </template>
-          <template v-else-if="column.key === 'lastRunResult'">
-            {{ (record as SchedulerApi.TriggerItem).lastRunResult || '-' }}
-          </template>
-          <template v-else-if="column.key === 'isEnabled'">
-            <Tag :color="(record as SchedulerApi.TriggerItem).isEnabled ? 'success' : 'default'">
-              {{ (record as SchedulerApi.TriggerItem).isEnabled ? '启用' : '停用' }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <Space>
-              <Switch
-                v-if="canManageScheduler"
-                :checked="(record as SchedulerApi.TriggerItem).isEnabled"
-                :loading="actionLoadingKey === `${(record as SchedulerApi.TriggerItem).triggerKey}:toggle`"
-                @change="(checked) => toggleTrigger(record as SchedulerApi.TriggerItem, Boolean(checked))"
-              />
-              <Button v-if="canManageScheduler" size="small" @click="openEditTrigger(record as SchedulerApi.TriggerItem)">编辑</Button>
-              <Popconfirm title="确认删除该触发器？" @confirm="deleteTrigger(record as SchedulerApi.TriggerItem)">
-                <Button
-                  v-if="canManageScheduler"
-                  danger
-                  size="small"
-                  :loading="actionLoadingKey === `${(record as SchedulerApi.TriggerItem).triggerKey}:delete`"
-                >
-                  删除
-                </Button>
-              </Popconfirm>
-            </Space>
-          </template>
+      <TriggerGrid class="app-vxe-card-grid" :grid-events="triggerGridEvents" :grid-options="triggerGridOptions">
+        <template #nextRunTime="{ row }">
+          {{ formatDate(row.nextRunTime) }}
         </template>
-      </Table>
+        <template #isEnabled="{ row }">
+          <Tag :color="row.isEnabled ? 'success' : 'default'">
+            {{ row.isEnabled ? '启用' : '停用' }}
+          </Tag>
+        </template>
+        <template #actions="{ row }">
+          <Space>
+            <Switch
+              v-if="canManageScheduler"
+              :checked="row.isEnabled"
+              :loading="actionLoadingKey === `${row.triggerKey}:toggle`"
+              @change="(checked) => toggleTrigger(row, Boolean(checked))"
+            />
+            <Button v-if="canManageScheduler" size="small" @click="openEditTrigger(row)">编辑</Button>
+            <Popconfirm title="确认删除该触发器？" @confirm="deleteTrigger(row)">
+              <Button
+                v-if="canManageScheduler"
+                danger
+                size="small"
+                :loading="actionLoadingKey === `${row.triggerKey}:delete`"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        </template>
+      </TriggerGrid>
     </Drawer>
 
-    <Modal
-      v-model:open="triggerModalOpen"
-      :confirm-loading="actionLoadingKey === 'trigger:save'"
+    <Drawer
+      v-model:open="triggerEditorDrawerOpen"
       :title="editingTriggerKey ? '编辑触发器' : '新增触发器'"
+      destroy-on-close
       width="600px"
-      @ok="submitTrigger"
     >
       <Form layout="vertical">
         <Form.Item label="触发器键" required>
@@ -808,7 +881,13 @@ onMounted(loadData);
           <Input.TextArea v-model:value="triggerForm.description" :auto-size="{ minRows: 3, maxRows: 5 }" />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="triggerEditorDrawerOpen = false">取消</Button>
+          <Button :loading="actionLoadingKey === 'trigger:save'" type="primary" @click="submitTrigger">保存</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <Drawer
       v-model:open="recordDrawerOpen"
@@ -831,87 +910,104 @@ onMounted(loadData);
         </Space>
       </template>
 
-      <Table
-        :columns="recordColumns"
-        :data-source="jobRecords"
-        :loading="recordLoading"
-        :pagination="{ pageSize: 10, showSizeChanger: false }"
-        row-key="startTime"
-        :scroll="{ x: 1100 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="getRecordStatusColor((record as SchedulerApi.JobRecordItem).status)">
-              {{ (record as SchedulerApi.JobRecordItem).status }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'triggerKey'">
-            {{ (record as SchedulerApi.JobRecordItem).triggerKey || '-' }}
-          </template>
-          <template v-else-if="column.key === 'triggerMode'">
-            {{ (record as SchedulerApi.JobRecordItem).triggerMode === 'manual' ? '手动' : '自动' }}
-          </template>
-          <template v-else-if="column.key === 'startTime'">
-            {{ formatDate((record as SchedulerApi.JobRecordItem).startTime) }}
-          </template>
-          <template v-else-if="column.key === 'endTime'">
-            {{ formatDate((record as SchedulerApi.JobRecordItem).endTime) }}
-          </template>
-          <template v-else-if="column.key === 'durationMilliseconds'">
-            {{ formatDuration((record as SchedulerApi.JobRecordItem).durationMilliseconds) }}
-          </template>
-          <template v-else-if="column.key === 'result'">
-            <span :title="(record as SchedulerApi.JobRecordItem).errorMessage || (record as SchedulerApi.JobRecordItem).result || ''">
-              {{ (record as SchedulerApi.JobRecordItem).result || '-' }}
-            </span>
-          </template>
+      <RecordGrid class="app-vxe-card-grid" :grid-events="recordGridEvents" :grid-options="recordGridOptions">
+        <template #status="{ row }">
+          <Tag :color="getRecordStatusColor(row.status)">
+            {{ row.status }}
+          </Tag>
         </template>
-      </Table>
+        <template #triggerKey="{ row }">
+          {{ row.triggerKey || '-' }}
+        </template>
+        <template #triggerMode="{ row }">
+          {{ row.triggerMode === 'manual' ? '手动' : '自动' }}
+        </template>
+        <template #startTime="{ row }">
+          {{ formatDate(row.startTime) }}
+        </template>
+        <template #endTime="{ row }">
+          {{ formatDate(row.endTime) }}
+        </template>
+        <template #durationMilliseconds="{ row }">
+          {{ formatDuration(row.durationMilliseconds) }}
+        </template>
+        <template #result="{ row }">
+          <span :title="row.errorMessage || row.result || ''">
+            {{ row.result || '-' }}
+          </span>
+        </template>
+      </RecordGrid>
     </Drawer>
 
     <Drawer v-model:open="nodeDrawerOpen" title="集群节点" width="980">
       <template #extra>
         <Button :loading="nodeLoading" @click="openClusterNodes">刷新</Button>
       </template>
-      <Table
-        :columns="nodeColumns"
-        :data-source="clusterNodes"
-        :loading="nodeLoading"
-        :pagination="{ pageSize: 10, showSizeChanger: false }"
-        row-key="instanceId"
-        :scroll="{ x: 1210 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="(record as SchedulerApi.ClusterNodeItem).status === 'Online' ? 'success' : 'default'">
-              {{ (record as SchedulerApi.ClusterNodeItem).status === 'Online' ? '在线' : '离线' }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'startedAt'">
-            {{ formatDate((record as SchedulerApi.ClusterNodeItem).startedAt) }}
-          </template>
-          <template v-else-if="column.key === 'lastHeartbeatTime'">
-            {{ formatDate((record as SchedulerApi.ClusterNodeItem).lastHeartbeatTime) }}
-          </template>
+      <NodeGrid class="app-vxe-card-grid" :grid-events="nodeGridEvents" :grid-options="nodeGridOptions">
+        <template #status="{ row }">
+          <Tag :color="row.status === 'Online' ? 'success' : 'default'">
+            {{ row.status === 'Online' ? '在线' : '离线' }}
+          </Tag>
         </template>
-      </Table>
+        <template #startedAt="{ row }">
+          {{ formatDate(row.startedAt) }}
+        </template>
+        <template #lastHeartbeatTime="{ row }">
+          {{ formatDate(row.lastHeartbeatTime) }}
+        </template>
+      </NodeGrid>
     </Drawer>
   </Page>
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
+.scheduler__metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  @apply gap-4;
+  @apply mb-4;
+}
+
 .scheduler__empty {
   display: grid;
-  min-height: 260px;
   place-items: center;
+  min-height: 260px;
 }
 
 .scheduler__cell {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.scheduler__cell--last-result {
+  @apply gap-1;
+  justify-content: center;
+  min-height: 44px;
 }
 
 .scheduler__cell small {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
   color: var(--ant-color-text-secondary);
+  text-align: left;
+  white-space: nowrap;
+}
+
+:deep(.scheduler__job-grid .scheduler__last-result-column) {
+  text-align: left;
+}
+
+:deep(.scheduler__job-grid .scheduler__last-result-column .vxe-cell) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 </style>

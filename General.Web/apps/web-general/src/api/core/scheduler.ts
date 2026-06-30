@@ -44,8 +44,14 @@ export namespace SchedulerApi {
     triggerMode: string;
   }
 
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
+  }
+
   export interface JobRecordQuery {
     maxResultCount?: number;
+    skipCount?: number;
     startedFrom?: string;
     startedTo?: string;
     status?: string;
@@ -150,7 +156,7 @@ export async function deleteSchedulerJobApi(jobKey: string) {
 }
 
 export async function getSchedulerJobRecordsApi(jobKey: string, params?: SchedulerApi.JobRecordQuery) {
-  return requestClient.get<SchedulerApi.JobRecordItem[]>(`/app/platform/scheduler/${jobKey}/records`, {
+  return requestClient.get<SchedulerApi.PagedResult<SchedulerApi.JobRecordItem>>(`/app/platform/scheduler/${jobKey}/records`, {
     params,
   });
 }

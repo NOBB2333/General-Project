@@ -24,6 +24,12 @@ public class TenantController : ControllerBase
         return ApiResponse<List<PlatformTenantListItemDto>>.Ok(await _tenantService.GetListAsync());
     }
 
+    [HttpGet("paged")]
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformTenantListItemDto>>>> GetPagedAsync([FromQuery] PlatformTenantQueryInput input)
+    {
+        return ApiResponse<PlatformPagedResultDto<PlatformTenantListItemDto>>.Ok(await _tenantService.GetPagedAsync(input));
+    }
+
     [HttpGet("{id:guid}/authorization")]
     public async Task<ActionResult<ApiResponse<PlatformTenantAuthorizationDto>>> GetAuthorizationAsync(Guid id)
     {

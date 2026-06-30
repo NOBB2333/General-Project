@@ -42,8 +42,8 @@ public static class JsoncAppSettingsExtensions
     {
         return hostBuilder.ConfigureAppConfiguration((context, configurationBuilder) =>
         {
-            var directoryPath = Path.Combine(context.HostingEnvironment.ContentRootPath, relativePath);
-            if (!Directory.Exists(directoryPath))
+            var directoryPath = ResolveAppSettingsDirectory(context.HostingEnvironment.ContentRootPath, relativePath);
+            if (directoryPath == null)
             {
                 return;
             }
@@ -61,6 +61,18 @@ public static class JsoncAppSettingsExtensions
                 configurationBuilder.Add(new JsoncFileConfigurationSource(filePath));
             }
         });
+    }
+
+    private static string? ResolveAppSettingsDirectory(string contentRootPath, string relativePath)
+    {
+        var contentRootDirectory = Path.Combine(contentRootPath, relativePath);
+        if (Directory.Exists(contentRootDirectory))
+        {
+            return contentRootDirectory;
+        }
+
+        var outputDirectory = Path.Combine(AppContext.BaseDirectory, relativePath);
+        return Directory.Exists(outputDirectory) ? outputDirectory : null;
     }
 
     private sealed class JsoncFileConfigurationSource : IConfigurationSource

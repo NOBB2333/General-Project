@@ -18,7 +18,8 @@ public static class AdminDesignTimeDbContextFactoryHelper
         var builder = new ConfigurationBuilder()
             .SetBasePath(basePath)
             .AddJsonFile("appsettings.json", optional: true)
-            .AddJsoncAppSettingsDirectory(basePath);
+            .AddJsoncAppSettingsDirectory(basePath)
+            .AddEnvironmentVariables();
 
         return builder.Build();
     }

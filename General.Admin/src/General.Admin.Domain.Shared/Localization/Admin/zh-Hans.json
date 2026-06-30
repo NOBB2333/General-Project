@@ -4,6 +4,26 @@
     "AppName": "Admin",
     "Menu:Home": "首页",
     "Welcome": "欢迎",
-    "LongWelcomeMessage": "欢迎使用本应用程序。这是一个基于 ABP 框架的启动项目。更多信息，请访问 abp.io。"
+    "LongWelcomeMessage": "欢迎使用本应用程序。这是一个基于 ABP 框架的启动项目。更多信息，请访问 abp.io。",
+    "Permission:Ai.Agent.Manage": "管理 AI Agent 编排",
+    "Permission:Ai.Artifact.Manage": "管理 AI 安全构件",
+    "Permission:Ai.WebSearch.Manage": "管理 AI 联网搜索",
+    "Permission:Integration.Connector.RotateSecret": "轮换外部系统连接器密钥",
+    "Permission:Integration.Delivery.View": "查看外部系统投递日志",
+    "Permission:Integration.Delivery.Manage": "管理外部系统失败投递",
+    "Permission:Integration.Delivery.Export": "导出外部系统投递审计",
+    "Permission:Integration.Binding.View": "查看外部系统账号绑定",
+    "Permission:Integration.Binding.Manage": "管理外部系统账号绑定",
+    "Permission:Integration.Binding.Import": "导入外部系统账号",
+    "Permission:Integration.Template.View": "查看外部系统消息模板",
+    "Permission:Integration.Template.Manage": "管理外部系统消息模板",
+    "Permission:Integration.Template.Test": "预览外部系统消息模板",
+    "Permission:Integration.Rule.View": "查看外部系统通知规则",
+    "Permission:Integration.Rule.Manage": "管理外部系统通知规则",
+    "Permission:Integration.Sync.View": "查看外部系统同步任务",
+    "Permission:Integration.Sync.Manage": "管理外部系统同步任务",
+    "Permission:Integration.Sync.Run": "执行外部系统同步任务",
+    "Permission:Integration.Webhook.View": "查看外部系统 Webhook 事件",
+    "Permission:Integration.Webhook.Manage": "管理外部系统 Webhook 事件"
   }
 }

@@ -38,12 +38,17 @@ export namespace UserApi {
   }
 
   export interface UserListInput {
+    displayName?: string;
+    email?: string;
+    employeeNo?: string;
     isActive?: boolean;
     keyword?: string;
     maxResultCount?: number;
     organizationUnitId?: string;
+    phoneNumber?: string;
     roleName?: string;
     skipCount?: number;
+    userName?: string;
   }
 
   export interface PagedResult<T> {

@@ -42,6 +42,12 @@ class Program
             .AddJsoncAppSettingsDirectory()
             .ConfigureAppConfiguration((_, configurationBuilder) =>
             {
+                configurationBuilder.AddEnvironmentVariables();
+                if (args.Length > 0)
+                {
+                    configurationBuilder.AddCommandLine(args);
+                }
+
                 var configuration = configurationBuilder.Build();
                 var rawConnectionString = configuration.GetConnectionString("Default");
                 var provider = DatabaseProviderDetector.Detect(configuration);

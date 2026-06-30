@@ -106,6 +106,67 @@ public class PlatformTenantService : ITransientDependency
             .ToList();
     }
 
+    public async Task<PlatformPagedResultDto<PlatformTenantListItemDto>> GetPagedAsync(PlatformTenantQueryInput input)
+    {
+        EnsureHostTenantManagement();
+        var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 500);
+        var skipCount = Math.Max(input.SkipCount, 0);
+
+        var orderedTenants = (await _tenantRepository.GetListAsync(includeDetails: true))
+            .OrderBy(x => x.Name)
+            .ToList();
+        var totalCount = orderedTenants.Count;
+        var tenants = orderedTenants
+            .Skip(skipCount)
+            .Take(maxResultCount)
+            .ToList();
+
+        var tenantIdsReturned = tenants.Select(x => x.Id).ToList();
+
+        var authorizations = (await _tenantAuthorizationRepository.GetListAsync())
+            .Where(x => tenantIdsReturned.Contains(x.TenantId))
+            .ToDictionary(x => x.TenantId);
+        var adminUsers = await ResolveTenantAdminUsersAsync(authorizations);
+
+        var items = tenants
+            .Select(x => new PlatformTenantListItemDto
+            {
+                AdminEmail = authorizations.GetValueOrDefault(x.Id) is { AdminUserId: { } adminUserId } authorizationForAdmin &&
+                             adminUsers.TryGetValue(adminUserId, out var adminUser)
+                    ? adminUser.Email
+                    : null,
+                AdminUserId = authorizations.GetValueOrDefault(x.Id)?.AdminUserId,
+                AdminUserName = authorizations.GetValueOrDefault(x.Id) is { AdminUserId: { } adminUserId2 } authorizationForName &&
+                                 adminUsers.TryGetValue(adminUserId2, out var adminUserForName)
+                    ? adminUserForName.UserName
+                    : null,
+                ApiBlacklist = authorizations.GetValueOrDefault(x.Id) is { } authorization
+                    ? PlatformSerializationHelper.DeserializeStringList(authorization.ApiBlacklist)
+                    : [],
+                CreationTime = x.CreationTime,
+                DefaultConnectionStringDisplay = BuildConnectionStringDisplay(
+                    x.ConnectionStrings
+                        .FirstOrDefault(item => item.Name == ConnectionStrings.DefaultConnectionStringName)
+                        ?.Value),
+                HasDefaultConnectionString = x.ConnectionStrings
+                    .Any(item =>
+                        item.Name == ConnectionStrings.DefaultConnectionStringName &&
+                        !string.IsNullOrWhiteSpace(item.Value)),
+                Id = x.Id,
+                HasExplicitAuthorization = authorizations.ContainsKey(x.Id),
+                IsActive = authorizations.GetValueOrDefault(x.Id)?.IsActive ?? true,
+                Name = x.Name,
+                Remark = authorizations.GetValueOrDefault(x.Id)?.Remark
+            })
+            .ToList();
+
+        return new PlatformPagedResultDto<PlatformTenantListItemDto>
+        {
+            Items = items,
+            TotalCount = totalCount
+        };
+    }
+
     private async Task<Dictionary<Guid, IdentityUser>> ResolveTenantAdminUsersAsync(
         IReadOnlyDictionary<Guid, AppTenantAuthorization> authorizations)
     {

@@ -17,13 +17,19 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
 
     public string? ContractClause { get; private set; }
 
+    public Guid? SprintId { get; private set; }
+
     public string? DeveloperOwnerName { get; private set; }
 
     public Guid? DeveloperOwnerUserId { get; private set; }
 
+    public string Description { get; private set; }
+
     public double? EstimatedWorkHours { get; private set; }
 
     public bool IsBlocked { get; private set; }
+
+    public bool IsOutOfContract { get; private set; }
 
     public DateTime? BaselineEndTime { get; private set; }
 
@@ -47,6 +53,8 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
 
     public Guid ProjectId { get; private set; }
 
+    public Guid? RequirementId { get; private set; }
+
     public string Status { get; private set; }
 
     public string TaskCode { get; private set; }
@@ -61,9 +69,12 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
 
     public string WbsCode { get; private set; }
 
+    public Guid? WbsNodeId { get; private set; }
+
     protected ProjectTask()
     {
         Priority = string.Empty;
+        Description = string.Empty;
         Status = string.Empty;
         TaskCode = string.Empty;
         Title = string.Empty;
@@ -95,10 +106,15 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
         Guid? developerOwnerUserId = null,
         Guid? testerOwnerUserId = null,
         Guid? parentTaskId = null,
+        Guid? sprintId = null,
         string? wbsCode = null,
         int sortOrder = 0,
         DateTime? baselineStartTime = null,
-        DateTime? baselineEndTime = null) : base(id)
+        DateTime? baselineEndTime = null,
+        Guid? wbsNodeId = null,
+        Guid? requirementId = null,
+        string? description = null,
+        bool isOutOfContract = false) : base(id)
     {
         ProjectId = projectId;
         OrganizationUnitId = organizationUnitId;
@@ -114,7 +130,9 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
         BaselineEndTime = baselineEndTime;
         IsBlocked = isBlocked;
         BlockReason = blockReason?.Trim();
+        Description = description?.Trim() ?? string.Empty;
         EstimatedWorkHours = estimatedWorkHours;
+        IsOutOfContract = isOutOfContract;
         ActualWorkHours = actualWorkHours;
         ActualStartTime = actualStartTime;
         ActualEndTime = actualEndTime;
@@ -125,21 +143,97 @@ public class ProjectTask : FullAuditedAggregateRoot<Guid>
         ProductOwnerUserId = productOwnerUserId;
         DeveloperOwnerUserId = developerOwnerUserId;
         TesterOwnerUserId = testerOwnerUserId;
+        SprintId = sprintId;
         WbsCode = wbsCode?.Trim() ?? string.Empty;
+        WbsNodeId = wbsNodeId;
+        RequirementId = requirementId;
         SortOrder = sortOrder;
     }
 
     public void UpdateWbs(
         Guid? parentTaskId,
+        Guid? sprintId,
         string? wbsCode,
         int sortOrder,
         DateTime? baselineStartTime,
-        DateTime? baselineEndTime)
+        DateTime? baselineEndTime,
+        Guid? wbsNodeId = null,
+        Guid? requirementId = null)
     {
         ParentTaskId = parentTaskId;
+        SprintId = sprintId;
         WbsCode = wbsCode?.Trim() ?? string.Empty;
+        WbsNodeId = wbsNodeId;
+        RequirementId = requirementId;
         SortOrder = sortOrder;
         BaselineStartTime = baselineStartTime;
         BaselineEndTime = baselineEndTime;
+    }
+
+    public void UpdateBasicInfo(
+        string taskCode,
+        string title,
+        Guid ownerUserId,
+        string status,
+        string priority,
+        DateTime? plannedStartTime,
+        DateTime? plannedEndTime,
+        double? estimatedWorkHours,
+        Guid? sprintId,
+        Guid? wbsNodeId,
+        string? wbsCode,
+        string? productOwnerName = null,
+        string? developerOwnerName = null,
+        string? testerOwnerName = null,
+        Guid? productOwnerUserId = null,
+        Guid? developerOwnerUserId = null,
+        Guid? testerOwnerUserId = null,
+        string? description = null,
+        bool isOutOfContract = false)
+    {
+        TaskCode = Check.NotNullOrWhiteSpace(taskCode, nameof(taskCode), 64);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 256);
+        Description = description?.Trim() ?? string.Empty;
+        OwnerUserId = ownerUserId;
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        Priority = Check.NotNullOrWhiteSpace(priority, nameof(priority), 32);
+        PlannedStartTime = plannedStartTime;
+        PlannedEndTime = plannedEndTime;
+        EstimatedWorkHours = estimatedWorkHours;
+        SprintId = sprintId;
+        WbsNodeId = wbsNodeId;
+        WbsCode = wbsCode?.Trim() ?? string.Empty;
+        ProductOwnerName = productOwnerName?.Trim();
+        DeveloperOwnerName = developerOwnerName?.Trim();
+        TesterOwnerName = testerOwnerName?.Trim();
+        ProductOwnerUserId = productOwnerUserId;
+        DeveloperOwnerUserId = developerOwnerUserId;
+        TesterOwnerUserId = testerOwnerUserId;
+        IsOutOfContract = isOutOfContract;
+    }
+
+    public void RecordProgress(
+        string status,
+        bool isBlocked,
+        string? blockReason,
+        double actualWorkHours,
+        DateTime workDate)
+    {
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        IsBlocked = isBlocked;
+        BlockReason = isBlocked
+            ? Check.NotNullOrWhiteSpace(blockReason, nameof(blockReason), 512).Trim()
+            : null;
+        ActualWorkHours = Math.Round(actualWorkHours, 1);
+
+        if (ActualStartTime == null && actualWorkHours > 0)
+        {
+            ActualStartTime = workDate.Date;
+        }
+
+        if (ProjectStatuses.IsClosed(Status))
+        {
+            ActualEndTime = workDate.Date;
+        }
     }
 }

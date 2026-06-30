@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { OrganizationApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -22,12 +23,12 @@ import {
   Select,
   Space,
   Statistic,
-  Table,
   Tag,
   TreeSelect,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createProjectApi,
   getOrganizationTreeApi,
@@ -35,6 +36,11 @@ import {
   getUserListApi,
   type ProjectApi,
 } from '#/api/core';
+import {
+  createDictOptionsFallback,
+  useDictOptions,
+} from '#/composables/platform/use-dict-options';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'ProjectListPage' });
 
@@ -65,11 +71,14 @@ type ProjectSaveFormState = Omit<
 
 const router = useRouter();
 const { hasAccessByCodes } = useAccess();
-const canCreateProject = computed(() => hasAccessByCodes([PROJECT_CREATE_CODE]));
+const canCreateProject = computed(() =>
+  hasAccessByCodes([PROJECT_CREATE_CODE]),
+);
 const loading = ref(false);
 const saving = ref(false);
 const createVisible = ref(false);
 const items = ref<ProjectApi.ProjectListItem[]>([]);
+const pagination = useLocalVxePagination(items, { defaultPageSize: 10 });
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const userOptions = ref<Array<{ label: string; value: string }>>([]);
 const filters = reactive<ProjectApi.ProjectListInput>({
@@ -87,7 +96,7 @@ const formState = reactive<ProjectSaveFormState>({
   organizationUnitId: '',
   plannedEndDate: undefined,
   plannedStartDate: undefined,
-  priority: '中',
+  priority: 'P1',
   projectCode: '',
   projectSource: undefined,
   projectType: undefined,
@@ -96,44 +105,70 @@ const formState = reactive<ProjectSaveFormState>({
   sponsorUserId: '',
   status: '待规划',
 });
+const projectDicts = useDictOptions(
+  ['project_status', 'task_priority', 'project_type', 'project_source'],
+  createDictOptionsFallback({
+    project_source: ['公司立项', '客户需求', '部门提报', '经营规划'],
+    project_status: ['待规划', '进行中', '已完成', '已关闭'],
+    project_type: ['平台建设', '业务项目', '客户交付', '内部优化'],
+    task_priority: ['P0', 'P1', 'P2', 'P3'],
+  }),
+);
 
 const columns = [
-  { dataIndex: 'projectCode', key: 'projectCode', title: '项目编号', width: 140 },
-  { dataIndex: 'name', key: 'name', title: '项目名称', width: 220 },
-  { dataIndex: 'organizationUnitName', key: 'organizationUnitName', title: '主责部门', width: 140 },
-  { dataIndex: 'managerName', key: 'managerName', title: '项目经理', width: 120 },
-  { dataIndex: 'memberCount', key: 'memberCount', title: '成员数', width: 96 },
-  { dataIndex: 'myRelation', key: 'myRelation', title: '我的关系', width: 160 },
-  { dataIndex: 'status', key: 'status', title: '状态', width: 110 },
-  { dataIndex: 'priority', key: 'priority', title: '优先级', width: 96 },
-  { dataIndex: 'highRiskCount', key: 'highRiskCount', title: '高风险', width: 90 },
-  { dataIndex: 'plannedEndDate', key: 'plannedEndDate', title: '计划结束', width: 140 },
-  { key: 'actions', title: '操作', width: 120 },
-];
+  { field: 'projectCode', title: '项目编号', width: 140 },
+  { align: 'left', field: 'name', slots: { default: 'name' }, title: '项目名称', width: 220 },
+  { field: 'organizationUnitName', title: '主责部门', width: 140 },
+  { field: 'managerName', title: '项目经理', width: 120 },
+  { field: 'memberCount', title: '成员数', width: 96 },
+  { field: 'myRelation', slots: { default: 'myRelation' }, title: '我的关系', width: 160 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 110 },
+  { field: 'priority', slots: { default: 'priority' }, title: '优先级', width: 96 },
+  { field: 'highRiskCount', title: '高风险', width: 90 },
+  { field: 'plannedEndDate', slots: { default: 'plannedEndDate' }, title: '计划结束', width: 140 },
+  { fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 120 },
+] satisfies VxeGridProps<ProjectApi.ProjectListItem>['columns'];
 
 const metrics = computed(() => [
   { label: '项目总数', value: items.value.length },
-  { label: '重点项目', value: items.value.filter((item) => item.isKeyProject).length },
-  { label: '与我相关', value: items.value.filter((item) => item.myRelation !== '组织可见').length },
+  {
+    label: '重点项目',
+    value: items.value.filter((item) => item.isKeyProject).length,
+  },
+  {
+    label: '与我相关',
+    value: items.value.filter((item) => item.myRelation !== '组织可见').length,
+  },
   {
     label: '异常项目',
-    value: items.value.filter((item) => item.highRiskCount > 0 || item.overdueTaskCount > 0).length,
+    value: items.value.filter(
+      (item) => item.highRiskCount > 0 || item.overdueTaskCount > 0,
+    ).length,
   },
 ]);
 
-const statusOptions = ['待规划', '进行中', '已完成', '已关闭'].map((value) => ({
-  label: value,
-  value,
+const statusOptions = projectDicts.getOptions('project_status');
+const priorityOptions = projectDicts.getOptions('task_priority');
+const projectTypeOptions = projectDicts.getOptions('project_type');
+const projectSourceOptions = projectDicts.getOptions('project_source');
+
+const gridOptions = computed<VxeGridProps<ProjectApi.ProjectListItem>>(() => ({
+  columns,
+  data: pagination.pagedRows.value,
+  loading: loading.value,
+  pagerConfig: pagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
 }));
-const priorityOptions = ['高', '中', '低'].map((value) => ({ label: value, value }));
-const projectTypeOptions = ['平台建设', '业务项目', '客户交付', '内部优化'].map((value) => ({
-  label: value,
-  value,
-}));
-const projectSourceOptions = ['公司立项', '客户需求', '部门提报', '经营规划'].map((value) => ({
-  label: value,
-  value,
-}));
+
+const gridEvents: NativeVxeGridEvents<ProjectApi.ProjectListItem> = {
+  'page-change': pagination.handlePageChange,
+};
+
+const [Grid] = useVbenVxeGrid<ProjectApi.ProjectListItem>({
+  gridEvents,
+  gridOptions: {},
+});
 
 function normalizeTreeSelect(
   items: OrganizationApi.OrganizationTreeItem[],
@@ -153,6 +188,7 @@ async function loadProjects() {
       onlyMyRelated: filters.onlyMyRelated,
       status: filters.status || undefined,
     });
+    pagination.resetPage();
   } finally {
     loading.value = false;
   }
@@ -178,9 +214,6 @@ function openDetail(record: ProjectApi.ProjectListItem) {
   localStorage.setItem('general:last-project-id', record.id);
   router.push({
     path: '/project/detail',
-    query: {
-      projectId: record.id,
-    },
   });
 }
 
@@ -194,7 +227,7 @@ function resetForm() {
   formState.organizationUnitId = '';
   formState.plannedEndDate = undefined;
   formState.plannedStartDate = undefined;
-  formState.priority = '中';
+  formState.priority = 'P1';
   formState.projectCode = '';
   formState.projectSource = undefined;
   formState.projectType = undefined;
@@ -221,7 +254,11 @@ async function handleCreate() {
     message.warning('请输入项目编号和项目名称');
     return;
   }
-  if (!formState.organizationUnitId || !formState.managerUserId || !formState.sponsorUserId) {
+  if (
+    !formState.organizationUnitId ||
+    !formState.managerUserId ||
+    !formState.sponsorUserId
+  ) {
     message.warning('请选择主责部门、项目经理和发起人');
     return;
   }
@@ -240,29 +277,39 @@ async function handleCreate() {
     message.success('项目已创建');
     createVisible.value = false;
     await loadProjects();
-    router.push({ path: '/project/detail', query: { projectId } });
+    localStorage.setItem('general:last-project-id', projectId);
+    router.push({ path: '/project/detail' });
   } finally {
     saving.value = false;
   }
 }
 
 onMounted(async () => {
-  await loadProjects();
+  await Promise.all([projectDicts.load(), loadProjects()]);
 });
 </script>
 
 <template>
-  <Page description="项目列表按组织范围叠加项目成员覆盖返回，并支持直接进入项目详情横向页。" title="项目列表">
+  <Page
+    description="项目列表按组织范围叠加项目成员覆盖返回，并支持直接进入项目详情横向页。"
+    title="项目列表"
+  >
     <section class="project-list">
       <Row :gutter="[16, 16]">
-        <Col v-for="metric in metrics" :key="metric.label" :lg="6" :md="12" :span="24">
-          <Card :bordered="false" class="project-list__metric">
+        <Col
+          v-for="metric in metrics"
+          :key="metric.label"
+          :lg="6"
+          :md="12"
+          :span="24"
+        >
+          <Card :bordered="false" class="project-list__metric rounded-2xl">
             <Statistic :title="metric.label" :value="metric.value" />
           </Card>
         </Col>
       </Row>
 
-      <Card :bordered="false" title="项目清单">
+      <Card :bordered="false" class="project-list__table-card rounded-2xl" title="项目清单">
         <template #extra>
           <div class="project-list__toolbar">
             <Input
@@ -278,11 +325,16 @@ onMounted(async () => {
               :options="statusOptions"
               placeholder="状态"
             />
-            <Button :type="filters.onlyMyRelated ? 'primary' : 'default'" @click="filters.onlyMyRelated = !filters.onlyMyRelated">
+            <Button
+              :type="filters.onlyMyRelated ? 'primary' : 'default'"
+              @click="filters.onlyMyRelated = !filters.onlyMyRelated"
+            >
               与我相关
             </Button>
             <Button type="primary" @click="loadProjects">查询</Button>
-            <Button v-if="canCreateProject" type="primary" @click="openCreate">新建项目</Button>
+            <Button v-if="canCreateProject" type="primary" @click="openCreate"
+              >新建项目</Button
+            >
           </div>
         </template>
 
@@ -290,46 +342,62 @@ onMounted(async () => {
           <Empty description="暂无项目数据" />
         </div>
 
-        <Table
+        <Grid
           v-else
-          :columns="columns"
-          :data-source="items"
-          :loading="loading"
-          :pagination="{ pageSize: 10 }"
-          row-key="id"
-          :scroll="{ x: 1360 }"
+          class="app-vxe-card-grid"
+          grid-class="project-list__grid"
+          :grid-events="gridEvents"
+          :grid-options="gridOptions"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'name'">
-              <button class="project-list__link" type="button" @click="openDetail(record as ProjectApi.ProjectListItem)">
-                {{ (record as ProjectApi.ProjectListItem).name }}
-              </button>
-            </template>
-            <template v-else-if="column.key === 'myRelation'">
-              <Tag color="processing">{{ (record as ProjectApi.ProjectListItem).myRelation }}</Tag>
-            </template>
-            <template v-else-if="column.key === 'status'">
-              <Tag :color="(record as ProjectApi.ProjectListItem).isKeyProject ? 'gold' : 'blue'">
-                {{ (record as ProjectApi.ProjectListItem).status }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'priority'">
-              <Tag :color="(record as ProjectApi.ProjectListItem).priority === '高' ? 'error' : 'processing'">
-                {{ (record as ProjectApi.ProjectListItem).priority }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'plannedEndDate'">
-              {{ formatDate((record as ProjectApi.ProjectListItem).plannedEndDate) }}
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <Space>
-                <Button size="small" type="link" @click="openDetail(record as ProjectApi.ProjectListItem)">
-                  查看详情
-                </Button>
-              </Space>
-            </template>
+          <template #name="{ row }">
+            <button
+              class="project-list__link"
+              type="button"
+              @click="openDetail(row)"
+            >
+              {{ row.name }}
+            </button>
           </template>
-        </Table>
+          <template #myRelation="{ row }">
+            <Tag color="processing">{{ row.myRelation }}</Tag>
+          </template>
+          <template #status="{ row }">
+            <Tag
+              :color="
+                projectDicts.getColor(
+                  'project_status',
+                  row.status,
+                  row.isKeyProject ? 'gold' : 'blue',
+                )
+              "
+            >
+              {{ row.status }}
+            </Tag>
+          </template>
+          <template #priority="{ row }">
+            <Tag
+              :color="
+                projectDicts.getColor(
+                  'task_priority',
+                  row.priority,
+                  'processing',
+                )
+              "
+            >
+              {{ row.priority }}
+            </Tag>
+          </template>
+          <template #plannedEndDate="{ row }">
+            {{ formatDate(row.plannedEndDate) }}
+          </template>
+          <template #actions="{ row }">
+            <Space>
+              <Button size="small" type="link" @click="openDetail(row)">
+                查看详情
+              </Button>
+            </Space>
+          </template>
+        </Grid>
       </Card>
 
       <Drawer
@@ -343,17 +411,29 @@ onMounted(async () => {
           <Row :gutter="16">
             <Col :md="12" :span="24">
               <Form.Item label="项目编号" required>
-                <Input v-model:value="formState.projectCode" :maxlength="64" placeholder="例如：PRJ-2026-001" />
+                <Input
+                  v-model:value="formState.projectCode"
+                  :maxlength="64"
+                  placeholder="例如：PRJ-2026-001"
+                />
               </Form.Item>
             </Col>
             <Col :md="12" :span="24">
               <Form.Item label="项目名称" required>
-                <Input v-model:value="formState.name" :maxlength="128" placeholder="输入项目名称" />
+                <Input
+                  v-model:value="formState.name"
+                  :maxlength="128"
+                  placeholder="输入项目名称"
+                />
               </Form.Item>
             </Col>
             <Col :md="12" :span="24">
               <Form.Item label="项目简称">
-                <Input v-model:value="formState.shortName" :maxlength="64" placeholder="可选" />
+                <Input
+                  v-model:value="formState.shortName"
+                  :maxlength="64"
+                  placeholder="可选"
+                />
               </Form.Item>
             </Col>
             <Col :md="12" :span="24">
@@ -390,17 +470,25 @@ onMounted(async () => {
             </Col>
             <Col :md="8" :span="24">
               <Form.Item label="状态">
-                <Select v-model:value="formState.status" :options="statusOptions" />
+                <Select
+                  v-model:value="formState.status"
+                  :options="statusOptions"
+                />
               </Form.Item>
             </Col>
             <Col :md="8" :span="24">
               <Form.Item label="优先级">
-                <Select v-model:value="formState.priority" :options="priorityOptions" />
+                <Select
+                  v-model:value="formState.priority"
+                  :options="priorityOptions"
+                />
               </Form.Item>
             </Col>
             <Col :md="8" :span="24">
               <Form.Item label="重点项目">
-                <Checkbox v-model:checked="formState.isKeyProject">标记为重点</Checkbox>
+                <Checkbox v-model:checked="formState.isKeyProject"
+                  >标记为重点</Checkbox
+                >
               </Form.Item>
             </Col>
             <Col :md="12" :span="24">
@@ -473,14 +561,20 @@ onMounted(async () => {
             </Col>
             <Col :span="24">
               <Form.Item label="项目说明">
-                <Input.TextArea v-model:value="formState.description" :maxlength="512" :rows="4" />
+                <Input.TextArea
+                  v-model:value="formState.description"
+                  :maxlength="512"
+                  :rows="4"
+                />
               </Form.Item>
             </Col>
           </Row>
         </Form>
         <div class="project-form__footer">
           <Button @click="createVisible = false">取消</Button>
-          <Button :loading="saving" type="primary" @click="handleCreate">保存并进入详情</Button>
+          <Button :loading="saving" type="primary" @click="handleCreate"
+            >保存并进入详情</Button
+          >
         </div>
       </Drawer>
     </section>
@@ -488,10 +582,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .project-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .project-list__metric {
@@ -500,7 +595,7 @@ onMounted(async () => {
 
 .project-list__toolbar {
   display: flex;
-  gap: 12px;
+  @apply gap-3;
 }
 
 .project-list__select {
@@ -514,7 +609,7 @@ onMounted(async () => {
 }
 
 .project-list__link {
-  padding: 0;
+  @apply p-0;
   color: var(--ant-color-primary);
   background: transparent;
   border: 0;
@@ -523,7 +618,7 @@ onMounted(async () => {
 }
 
 .project-form {
-  padding-bottom: 72px;
+  @apply pb-18;
 }
 
 .project-form__full {
@@ -535,9 +630,9 @@ onMounted(async () => {
   bottom: 0;
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin: 0 -24px;
-  padding: 16px 24px;
+  @apply gap-3;
+  @apply -mx-6;
+  @apply px-6 py-4;
   border-top: 1px solid var(--ant-color-border-secondary);
   background: var(--ant-color-bg-container);
 }

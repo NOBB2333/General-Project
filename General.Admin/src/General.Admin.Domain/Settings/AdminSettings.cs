@@ -10,4 +10,9 @@ public static class AdminSettings
     public const string DefaultPageSize = PlatformPrefix + ".DefaultPageSize";
     public const string SchedulerRecordKeepLastN = PlatformPrefix + ".SchedulerRecordKeepLastN";
     public const string AuditLogRetentionDays = PlatformPrefix + ".AuditLogRetentionDays";
+    public const string ProjectEvmWorklogHourlyRate = PlatformPrefix + ".ProjectEvmWorklogHourlyRate";
+    public const string AiAllowPublicProviderEndpoints = PlatformPrefix + ".AiAllowPublicProviderEndpoints";
+    public const string IntegrationWebhookIpWhitelist = PlatformPrefix + ".IntegrationWebhookIpWhitelist";
+    public const string IntegrationWebhookRequestLimitPerMinute = PlatformPrefix + ".IntegrationWebhookRequestLimitPerMinute";
+    public const string IntegrationMessageSendLimitPerMinute = PlatformPrefix + ".IntegrationMessageSendLimitPerMinute";
 }

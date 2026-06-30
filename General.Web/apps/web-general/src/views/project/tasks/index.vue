@@ -1,37 +1,75 @@
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from 'vue';
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
+
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Empty, Input, Select, Switch, Table, Tag } from 'ant-design-vue';
+import {
+  Button,
+  Card,
+  Empty,
+  Input,
+  Select,
+  Switch,
+  Tag,
+} from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getProjectTaskListApi, type ProjectApi } from '#/api/core';
+import {
+  createDictOptionsFallback,
+  useDictOptions,
+} from '#/composables/platform/use-dict-options';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'ProjectTaskPage' });
 
 const loading = ref(false);
 const items = ref<ProjectApi.TaskItem[]>([]);
+const pagination = useLocalVxePagination(items, { defaultPageSize: 10 });
 const filters = reactive<ProjectApi.TaskListInput>({
   keyword: '',
   onlyMine: false,
   status: undefined,
 });
+const taskDicts = useDictOptions(
+  ['task_status', 'task_priority'],
+  createDictOptionsFallback({
+    task_priority: ['P0', 'P1', 'P2', 'P3'],
+    task_status: ['未开始', '进行中', '阻塞', '已完成', '已关闭'],
+  }),
+);
 
 const columns = [
-  { dataIndex: 'taskCode', key: 'taskCode', title: '任务编号', width: 120 },
-  { dataIndex: 'title', key: 'title', title: '任务标题', width: 220 },
-  { dataIndex: 'projectName', key: 'projectName', title: '所属项目', width: 180 },
-  { dataIndex: 'ownerName', key: 'ownerName', title: '负责人', width: 120 },
-  { dataIndex: 'organizationUnitName', key: 'organizationUnitName', title: '部门', width: 120 },
-  { dataIndex: 'status', key: 'status', title: '状态', width: 120 },
-  { dataIndex: 'priority', key: 'priority', title: '优先级', width: 100 },
-  { dataIndex: 'plannedEndTime', key: 'plannedEndTime', title: '计划结束', width: 160 },
-];
+  { field: 'taskCode', title: '任务编号', width: 120 },
+  { align: 'left', field: 'title', slots: { default: 'title' }, title: '任务标题', width: 220 },
+  { field: 'projectName', title: '所属项目', width: 180 },
+  { field: 'ownerName', title: '负责人', width: 120 },
+  { field: 'organizationUnitName', title: '部门', width: 120 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 120 },
+  { field: 'priority', slots: { default: 'priority' }, title: '优先级', width: 100 },
+  { field: 'plannedEndTime', slots: { default: 'plannedEndTime' }, title: '计划结束', width: 160 },
+] satisfies VxeGridProps<ProjectApi.TaskItem>['columns'];
 
-const statusOptions = ['未开始', '进行中', '阻塞', '已完成', '已关闭'].map((value) => ({
-  label: value,
-  value,
+const statusOptions = taskDicts.getOptions('task_status');
+
+const gridOptions = computed<VxeGridProps<ProjectApi.TaskItem>>(() => ({
+  columns,
+  data: pagination.pagedRows.value,
+  loading: loading.value,
+  pagerConfig: pagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
 }));
+
+const gridEvents: NativeVxeGridEvents<ProjectApi.TaskItem> = {
+  'page-change': pagination.handlePageChange,
+};
+
+const [Grid] = useVbenVxeGrid<ProjectApi.TaskItem>({
+  gridEvents,
+  gridOptions: {},
+});
 
 async function loadTasks() {
   loading.value = true;
@@ -50,12 +88,17 @@ function formatDate(value?: null | string) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
-onMounted(loadTasks);
+onMounted(async () => {
+  await Promise.all([taskDicts.load(), loadTasks()]);
+});
 </script>
 
 <template>
-  <Page description="任务页按项目范围展示负责人、阻塞原因和计划完成时间，支持只看我的任务。" title="任务">
-    <Card :bordered="false" title="执行任务">
+  <Page
+    description="任务页按项目范围展示负责人、阻塞原因和计划完成时间，支持只看我的任务。"
+    title="任务"
+  >
+    <Card class="rounded-2xl" :bordered="false" title="执行任务">
       <template #extra>
         <div class="project-task__toolbar">
           <Input
@@ -82,46 +125,58 @@ onMounted(loadTasks);
       <div v-if="!loading && items.length === 0" class="project-task__empty">
         <Empty description="暂无任务数据" />
       </div>
-      <Table
+      <Grid
         v-else
-        :columns="columns"
-        :data-source="items"
-        :loading="loading"
-        :pagination="{ pageSize: 10 }"
-        row-key="id"
+        :grid-events="gridEvents"
+        :grid-options="gridOptions"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="(record as ProjectApi.TaskItem).isBlocked ? 'error' : 'processing'">
-              {{ (record as ProjectApi.TaskItem).status }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'priority'">
-            <Tag :color="(record as ProjectApi.TaskItem).priority === '高' ? 'error' : 'blue'">
-              {{ (record as ProjectApi.TaskItem).priority }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'plannedEndTime'">
-            {{ formatDate((record as ProjectApi.TaskItem).plannedEndTime) }}
-          </template>
-          <template v-else-if="column.key === 'title'">
-            <div class="project-task__title">
-              <strong>{{ (record as ProjectApi.TaskItem).title }}</strong>
-              <span v-if="(record as ProjectApi.TaskItem).blockReason">
-                {{ (record as ProjectApi.TaskItem).blockReason }}
-              </span>
-            </div>
-          </template>
+        <template #status="{ row }">
+          <Tag
+            :color="
+              taskDicts.getColor(
+                'task_status',
+                row.status,
+                row.isBlocked ? 'error' : 'processing',
+              )
+            "
+          >
+            {{ row.status }}
+          </Tag>
         </template>
-      </Table>
+        <template #priority="{ row }">
+          <Tag
+            :color="
+              taskDicts.getColor(
+                'task_priority',
+                row.priority,
+                'blue',
+              )
+            "
+          >
+            {{ row.priority }}
+          </Tag>
+        </template>
+        <template #plannedEndTime="{ row }">
+          {{ formatDate(row.plannedEndTime) }}
+        </template>
+        <template #title="{ row }">
+          <div class="project-task__title">
+            <strong>{{ row.title }}</strong>
+            <span v-if="row.blockReason">
+              {{ row.blockReason }}
+            </span>
+          </div>
+        </template>
+      </Grid>
     </Card>
   </Page>
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .project-task__toolbar {
   display: flex;
-  gap: 12px;
+  @apply gap-3;
   align-items: center;
 }
 
@@ -131,7 +186,7 @@ onMounted(loadTasks);
 
 .project-task__switch {
   display: inline-flex;
-  gap: 8px;
+  @apply gap-2;
   align-items: center;
   color: var(--ant-color-text-secondary);
 }
@@ -145,7 +200,7 @@ onMounted(loadTasks);
 .project-task__title {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  @apply gap-1;
 }
 
 .project-task__title span {

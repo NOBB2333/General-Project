@@ -2,8 +2,13 @@ import { requestClient } from '#/api/request';
 
 export namespace FileApi {
   export interface FileListQuery {
+    businessId?: string;
+    businessKeyword?: string;
+    businessProjectId?: string;
+    businessScope?: string;
     businessType?: string;
     category?: string;
+    categoryPrefix?: string;
     keyword?: string;
     maxResultCount?: number;
     parentPath?: string;
@@ -16,15 +21,26 @@ export namespace FileApi {
 
   export interface FileItem {
     businessId?: null | string;
+    businessJumpPath?: null | string;
+    businessJumpQuery?: Record<string, null | string>;
+    businessObjectCode?: null | string;
+    businessObjectName?: null | string;
+    businessObjectTypeName?: null | string;
+    businessProjectId?: null | string;
+    businessProjectName?: null | string;
     businessType?: null | string;
     bucketName?: null | string;
     category: string;
     contentType: string;
     fileKey: string;
     fileName: string;
+    id: string;
+    isCurrentVersion?: boolean;
     isPublic: boolean;
     parentPath?: null | string;
+    previousVersionFileId?: null | string;
     relativePath: string;
+    replacedByFileId?: null | string;
     size: number;
     storageLocation: string;
     storageProvider: string;
@@ -32,9 +48,11 @@ export namespace FileApi {
     storageSourceName?: null | string;
     uploadedAt: string;
     uploadedBy?: null | string;
+    versionNo?: number;
   }
 
   export interface TreeItem {
+    businessType?: null | string;
     category: string;
     parentPath?: null | string;
   }
@@ -128,12 +146,14 @@ export async function batchDeleteFileApi(fileKeys: string[]) {
 
 export async function downloadFileApi(fileKey: string) {
   return requestClient.get<Blob>(`/app/file/download/${fileKey}`, {
+    responseReturn: 'body',
     responseType: 'blob',
   });
 }
 
 export async function previewFileApi(fileKey: string) {
   return requestClient.get<Blob>(`/app/file/preview/${fileKey}`, {
+    responseReturn: 'body',
     responseType: 'blob',
   });
 }

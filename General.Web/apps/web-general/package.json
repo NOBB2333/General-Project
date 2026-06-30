@@ -30,6 +30,8 @@
     "#/*": "./src/*"
   },
   "dependencies": {
+    "@antv/x6": "^3.1.7",
+    "@flyfish-group/file-viewer3": "1.0.15",
     "@vben/access": "workspace:*",
     "@vben/common-ui": "workspace:*",
     "@vben/constants": "workspace:*",
@@ -47,6 +49,8 @@
     "@vueuse/core": "catalog:",
     "ant-design-vue": "catalog:",
     "dayjs": "catalog:",
+    "marked": "^18.0.4",
+    "markstream-vue": "1.0.5-beta.0",
     "pinia": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:"

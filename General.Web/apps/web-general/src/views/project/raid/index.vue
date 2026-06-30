@@ -1,36 +1,74 @@
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from 'vue';
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
+
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Empty, Input, Select, Switch, Table, Tag } from 'ant-design-vue';
+import {
+  Button,
+  Card,
+  Empty,
+  Input,
+  Select,
+  Switch,
+  Tag,
+} from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getProjectRaidListApi, type ProjectApi } from '#/api/core';
+import {
+  createDictOptionsFallback,
+  useDictOptions,
+} from '#/composables/platform/use-dict-options';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'ProjectRaidPage' });
 
 const loading = ref(false);
 const items = ref<ProjectApi.RaidItem[]>([]);
+const pagination = useLocalVxePagination(items, { defaultPageSize: 10 });
 const filters = reactive<ProjectApi.RaidListInput>({
   keyword: '',
   onlyOpen: true,
   type: undefined,
 });
+const raidDicts = useDictOptions(
+  ['raid_type', 'task_priority'],
+  createDictOptionsFallback({
+    raid_type: ['风险', '问题', '依赖', '假设'],
+    task_priority: ['P0', 'P1', 'P2', 'P3'],
+  }),
+);
 
 const columns = [
-  { dataIndex: 'type', key: 'type', title: '类型', width: 110 },
-  { dataIndex: 'title', key: 'title', title: '事项标题', width: 240 },
-  { dataIndex: 'projectName', key: 'projectName', title: '所属项目', width: 180 },
-  { dataIndex: 'ownerName', key: 'ownerName', title: '责任人', width: 120 },
-  { dataIndex: 'level', key: 'level', title: '等级', width: 100 },
-  { dataIndex: 'status', key: 'status', title: '状态', width: 120 },
-  { dataIndex: 'plannedResolveDate', key: 'plannedResolveDate', title: '计划处理', width: 160 },
-];
+  { field: 'type', slots: { default: 'type' }, title: '类型', width: 110 },
+  { align: 'left', field: 'title', title: '事项标题', width: 240 },
+  { field: 'projectName', title: '所属项目', width: 180 },
+  { field: 'ownerName', title: '责任人', width: 120 },
+  { field: 'level', slots: { default: 'level' }, title: '等级', width: 100 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 120 },
+  { field: 'plannedResolveDate', slots: { default: 'plannedResolveDate' }, title: '计划处理', width: 160 },
+] satisfies VxeGridProps<ProjectApi.RaidItem>['columns'];
 
-const typeOptions = ['风险', '问题', '依赖', '假设'].map((value) => ({
-  label: value,
-  value,
+const typeOptions = raidDicts.getOptions('raid_type');
+
+const gridOptions = computed<VxeGridProps<ProjectApi.RaidItem>>(() => ({
+  columns,
+  data: pagination.pagedRows.value,
+  loading: loading.value,
+  pagerConfig: pagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
 }));
+
+const gridEvents: NativeVxeGridEvents<ProjectApi.RaidItem> = {
+  'page-change': pagination.handlePageChange,
+};
+
+const [Grid] = useVbenVxeGrid<ProjectApi.RaidItem>({
+  gridEvents,
+  gridOptions: {},
+});
 
 async function loadRaidItems() {
   loading.value = true;
@@ -49,12 +87,17 @@ function formatDate(value?: null | string) {
   return value ? new Date(value).toLocaleDateString() : '-';
 }
 
-onMounted(loadRaidItems);
+onMounted(async () => {
+  await Promise.all([raidDicts.load(), loadRaidItems()]);
+});
 </script>
 
 <template>
-  <Page description="RAID 视图统一汇总风险、问题、依赖、假设，并优先暴露高风险和超期事项。" title="RAID 视图">
-    <Card :bordered="false" title="治理事项">
+  <Page
+    description="RAID 视图统一汇总风险、问题、依赖、假设，并优先暴露高风险和超期事项。"
+    title="RAID 视图"
+  >
+    <Card class="rounded-2xl" :bordered="false" title="治理事项">
       <template #extra>
         <div class="project-raid__toolbar">
           <Input
@@ -81,43 +124,39 @@ onMounted(loadRaidItems);
       <div v-if="!loading && items.length === 0" class="project-raid__empty">
         <Empty description="暂无 RAID 数据" />
       </div>
-      <Table
+      <Grid
         v-else
-        :columns="columns"
-        :data-source="items"
-        :loading="loading"
-        :pagination="{ pageSize: 10 }"
-        row-key="id"
+        :grid-events="gridEvents"
+        :grid-options="gridOptions"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'type'">
-            <Tag :color="(record as ProjectApi.RaidItem).type === '风险' ? 'error' : 'blue'">
-              {{ (record as ProjectApi.RaidItem).type }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'level'">
-            <Tag :color="(record as ProjectApi.RaidItem).level === '高' ? 'error' : 'warning'">
-              {{ (record as ProjectApi.RaidItem).level }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <Tag :color="(record as ProjectApi.RaidItem).isOverdue ? 'error' : 'processing'">
-              {{ (record as ProjectApi.RaidItem).status }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'plannedResolveDate'">
-            {{ formatDate((record as ProjectApi.RaidItem).plannedResolveDate) }}
-          </template>
+        <template #type="{ row }">
+          <Tag :color="raidDicts.getColor('raid_type', row.type, 'blue')">
+            {{ row.type }}
+          </Tag>
         </template>
-      </Table>
+        <template #level="{ row }">
+          <Tag :color="raidDicts.getColor('task_priority', row.level, 'warning')">
+            {{ row.level }}
+          </Tag>
+        </template>
+        <template #status="{ row }">
+          <Tag :color="row.isOverdue ? 'error' : 'processing'">
+            {{ row.status }}
+          </Tag>
+        </template>
+        <template #plannedResolveDate="{ row }">
+          {{ formatDate(row.plannedResolveDate) }}
+        </template>
+      </Grid>
     </Card>
   </Page>
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .project-raid__toolbar {
   display: flex;
-  gap: 12px;
+  @apply gap-3;
   align-items: center;
 }
 
@@ -127,7 +166,7 @@ onMounted(loadRaidItems);
 
 .project-raid__switch {
   display: inline-flex;
-  gap: 8px;
+  @apply gap-2;
   align-items: center;
   color: var(--ant-color-text-secondary);
 }

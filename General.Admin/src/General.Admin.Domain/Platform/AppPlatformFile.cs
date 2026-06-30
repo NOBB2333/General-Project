@@ -24,6 +24,12 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
 
     public bool IsPublic { get; private set; }
 
+    public bool IsCurrentVersion { get; private set; }
+
+    public Guid? PreviousVersionFileId { get; private set; }
+
+    public Guid? ReplacedByFileId { get; private set; }
+
     public string StorageLocation { get; private set; }
 
     public string StorageProvider { get; private set; }
@@ -31,6 +37,8 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
     public Guid? StorageSourceId { get; private set; }
 
     public Guid? UploadedByUserId { get; private set; }
+
+    public int VersionNo { get; private set; }
 
     protected AppPlatformFile()
     {
@@ -60,7 +68,7 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         string? businessId = null) : base(id)
     {
         FileKey = Check.NotNullOrWhiteSpace(fileKey, nameof(fileKey), 256);
-        FileName = Check.NotNullOrWhiteSpace(fileName, nameof(fileName), 256);
+        FileName = PlatformFilePathPolicy.NormalizeFileName(fileName);
         ContentType = Check.NotNullOrWhiteSpace(contentType, nameof(contentType), 256);
         Size = size;
         Category = PlatformFilePathPolicy.NormalizeCategory(category);
@@ -71,8 +79,10 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
         StorageSourceId = storageSourceId;
         BucketName = Normalize(bucketName, 128);
         IsPublic = isPublic;
+        IsCurrentVersion = true;
         BusinessType = Normalize(businessType, 64);
         BusinessId = Normalize(businessId, 128);
+        VersionNo = 1;
     }
 
     public void UpdateCategory(string category, string? parentPath)
@@ -83,10 +93,30 @@ public class AppPlatformFile : FullAuditedAggregateRoot<Guid>
 
     public void UpdateMetadata(string fileName, bool isPublic, string? businessType, string? businessId)
     {
-        FileName = Check.NotNullOrWhiteSpace(fileName, nameof(fileName), 256);
+        FileName = PlatformFilePathPolicy.NormalizeFileName(fileName);
         IsPublic = isPublic;
         BusinessType = Normalize(businessType, 64);
         BusinessId = Normalize(businessId, 128);
+    }
+
+    public void MarkAsVersion(int versionNo, Guid? previousVersionFileId)
+    {
+        VersionNo = Math.Max(1, versionNo);
+        PreviousVersionFileId = previousVersionFileId;
+        ReplacedByFileId = null;
+        IsCurrentVersion = true;
+    }
+
+    public void MarkReplacedBy(Guid replacedByFileId)
+    {
+        ReplacedByFileId = replacedByFileId;
+        IsCurrentVersion = false;
+    }
+
+    public void RestoreAsCurrentVersion()
+    {
+        ReplacedByFileId = null;
+        IsCurrentVersion = true;
     }
 
     private static string? Normalize(string? value, int maxLength)

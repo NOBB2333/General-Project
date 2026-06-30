@@ -29,7 +29,7 @@ public class ProjectSaveInput
 
     [Required]
     [MaxLength(32)]
-    public string Priority { get; set; } = "中";
+    public string Priority { get; set; } = ProjectPriorities.P1;
 
     [Required]
     [MaxLength(64)]

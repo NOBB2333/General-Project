@@ -6,3 +6,5 @@ global using Volo.Abp;
 global using General.Admin.Platform;
 global using General.Admin.Project;
 global using General.Admin.Business;
+global using General.Admin.Ai;
+global using General.Admin.Integration;

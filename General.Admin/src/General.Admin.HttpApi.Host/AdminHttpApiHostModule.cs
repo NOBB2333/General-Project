@@ -252,6 +252,8 @@ public class AdminHttpApiHostModule : AbpModule
                 options.SwaggerDoc(ApiDocGroups.Platform, new OpenApiInfo { Title = "平台 API", Version = "v1" });
                 options.SwaggerDoc(ApiDocGroups.Project, new OpenApiInfo { Title = "项目 API", Version = "v1" });
                 options.SwaggerDoc(ApiDocGroups.Business, new OpenApiInfo { Title = "业务 API", Version = "v1" });
+                options.SwaggerDoc(ApiDocGroups.Ai, new OpenApiInfo { Title = "AI API", Version = "v1" });
+                options.SwaggerDoc(ApiDocGroups.Integration, new OpenApiInfo { Title = "集成 API", Version = "v1" });
                 options.DocInclusionPredicate((docName, description) =>
                 {
                     var groupName = description.GroupName;
@@ -436,6 +438,8 @@ public class AdminHttpApiHostModule : AbpModule
                 c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Platform}/swagger.json", "平台 API");
                 c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Project}/swagger.json", "项目 API");
                 c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Business}/swagger.json", "业务 API");
+                c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Ai}/swagger.json", "AI API");
+                c.SwaggerEndpoint($"/swagger/{ApiDocGroups.Integration}/swagger.json", "集成 API");
                 c.OAuthClientId(configuration["AuthServer:SwaggerClientId"]);
                 c.OAuthScopes("Admin");
             });

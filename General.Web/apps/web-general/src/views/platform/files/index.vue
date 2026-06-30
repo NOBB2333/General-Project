@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { UploadProps, TreeProps } from 'ant-design-vue';
 import type { Dayjs } from 'dayjs';
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 
 import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
@@ -10,6 +11,7 @@ import { Page } from '@vben/common-ui';
 import {
   Button,
   Card,
+  Col,
   DatePicker,
   Drawer,
   Empty,
@@ -17,16 +19,17 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Switch,
-  Table,
   Tag,
   Tree,
   Upload,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   batchDeleteFileApi,
   createFileStorageSourceApi,
@@ -47,6 +50,7 @@ import {
 import PlatformStatusTag from '#/components/platform/platform-status-tag.vue';
 import { useActionLoading } from '#/composables/platform/use-action-loading';
 import { useDateFormatter } from '#/composables/platform/use-date-formatter';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'PlatformFilePage' });
 
@@ -90,26 +94,12 @@ type StorageSourceFormState = Omit<
   secretKey: string;
 };
 
-const columns = [
-  { dataIndex: 'fileName', key: 'fileName', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => left.fileName.localeCompare(right.fileName, 'zh-CN'), title: '文件名' },
-  { dataIndex: 'storageSourceName', key: 'storageSourceName', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => (left.storageSourceName || left.storageProvider).localeCompare(right.storageSourceName || right.storageProvider, 'zh-CN'), title: '存储源', width: 150 },
-  { dataIndex: 'category', key: 'category', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => left.category.localeCompare(right.category, 'zh-CN'), title: '分类', width: 120 },
-  { dataIndex: 'contentType', key: 'contentType', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => left.contentType.localeCompare(right.contentType, 'zh-CN'), title: '类型', width: 220 },
-  { dataIndex: 'isPublic', key: 'isPublic', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => Number(left.isPublic) - Number(right.isPublic), title: '公开性', width: 90 },
-  { dataIndex: 'size', key: 'size', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => left.size - right.size, title: '大小', width: 120 },
-  { dataIndex: 'uploadedBy', key: 'uploadedBy', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => (left.uploadedBy || '').localeCompare(right.uploadedBy || '', 'zh-CN'), title: '上传人', width: 140 },
-  { key: 'business', title: '业务关联', width: 180 },
-  { dataIndex: 'relativePath', key: 'relativePath', title: '存储位置' },
-  { dataIndex: 'uploadedAt', key: 'uploadedAt', sorter: (left: FileApi.FileItem, right: FileApi.FileItem) => new Date(left.uploadedAt).getTime() - new Date(right.uploadedAt).getTime(), title: '上传时间', width: 220 },
-  { key: 'actions', title: '操作', width: 210 },
-];
-
 const items = ref<FileApi.FileItem[]>([]);
 const treeItems = ref<FileApi.TreeItem[]>([]);
 const sources = ref<FileApi.StorageSourceItem[]>([]);
 const loading = ref(false);
 const pageIndex = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(10);
 const totalCount = ref(0);
 const sourceLoading = ref(false);
 const sourceDrawerOpen = ref(false);
@@ -130,6 +120,11 @@ const storageSourceFilter = ref<string>();
 const uploadStorageSourceId = ref<string>();
 const uploadedBy = ref('');
 const uploadedRange = ref<[Dayjs, Dayjs] | undefined>(undefined);
+const searchExpanded = ref(false);
+const sourcePagination = useLocalVxePagination(sources, {
+  defaultPageSize: 10,
+  pageSizes: [10, 20, 50, 100],
+});
 const { formatDateTime } = useDateFormatter();
 const { actionLoadingKey, runAction } = useActionLoading();
 
@@ -164,37 +159,29 @@ const metadataForm = reactive<FileMetadataFormState>({
   isPublic: false,
 });
 
+const baseFileColumns = [
+  { align: 'left', field: 'fileName', sortable: true, title: '文件名', width: 220 },
+  { field: 'storageSourceName', slots: { default: 'storageSourceName' }, sortable: true, title: '存储源', width: 150 },
+  { field: 'category', sortable: true, title: '分类', width: 120 },
+  { align: 'left', field: 'contentType', sortable: true, title: '类型', width: 220 },
+  { field: 'isPublic', slots: { default: 'isPublic' }, sortable: true, title: '公开性', width: 90 },
+  { field: 'size', slots: { default: 'size' }, sortable: true, title: '大小', width: 120 },
+  { field: 'uploadedBy', slots: { default: 'uploadedBy' }, sortable: true, title: '上传人', width: 140 },
+  { field: 'business', slots: { default: 'business' }, title: '业务关联', width: 180 },
+  { align: 'left', field: 'relativePath', slots: { default: 'relativePath' }, title: '存储位置', width: 260 },
+  { field: 'uploadedAt', slots: { default: 'uploadedAt' }, sortable: true, title: '上传时间', width: 180 },
+  { fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 210 },
+] satisfies VxeGridProps<FileApi.FileItem>['columns'];
+
 const sourceColumns = [
-  { dataIndex: 'name', key: 'name', title: '名称', width: 160 },
-  { dataIndex: 'providerName', key: 'providerName', title: '类型', width: 110 },
-  { dataIndex: 'bucketName', key: 'bucketName', title: 'Bucket', width: 150 },
-  { dataIndex: 'endpoint', key: 'endpoint', title: 'Endpoint', ellipsis: true, width: 220 },
-  { dataIndex: 'isDefault', key: 'isDefault', title: '默认', width: 80 },
-  { dataIndex: 'isEnabled', key: 'isEnabled', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 260 },
-];
-
-const categoryOptions = computed(() =>
-  [...new Set(treeItems.value.map((item) => normalizeCategory(item.category)))]
-    .sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    .map((item) => ({ label: item, value: item })),
-);
-
-const enabledSourceOptions = computed(() =>
-  sources.value
-    .filter((source) => source.isEnabled)
-    .map((source) => ({
-      label: `${source.name}${source.isDefault ? '（默认）' : ''}`,
-      value: source.id,
-    })),
-);
-
-const sourceFilterOptions = computed(() =>
-  sources.value.map((source) => ({
-    label: `${source.name}${source.isEnabled ? '' : '（停用）'}`,
-    value: source.id,
-  })),
-);
+  { align: 'left', field: 'name', title: '名称', width: 160 },
+  { field: 'providerName', slots: { default: 'providerName' }, title: '类型', width: 110 },
+  { align: 'left', field: 'bucketName', title: 'Bucket', width: 150 },
+  { align: 'left', field: 'endpoint', title: 'Endpoint', width: 220 },
+  { field: 'isDefault', slots: { default: 'isDefault' }, title: '默认', width: 80 },
+  { field: 'isEnabled', slots: { default: 'isEnabled' }, title: '状态', width: 100 },
+  { fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 260 },
+] satisfies VxeGridProps<FileApi.StorageSourceItem>['columns'];
 
 const directoryTree = computed<FileTreeNode[]>(() => {
   const categoryMap = new Map<string, Set<string>>();
@@ -227,23 +214,75 @@ const directoryTree = computed<FileTreeNode[]>(() => {
   return categoryNodes;
 });
 
-const filteredItems = computed(() => {
-  return items.value;
-});
-
 const selectedFileCount = computed(() => selectedFileKeys.value.length);
 
-const rowSelection = computed(() => {
+const fileColumns = computed<VxeGridProps<FileApi.FileItem>['columns']>(() => {
   if (!canManageFiles.value) {
-    return undefined;
+    return baseFileColumns;
   }
 
-  return {
-    selectedRowKeys: selectedFileKeys.value,
-    onChange: (keys: (number | string)[]) => {
-      selectedFileKeys.value = keys.map((key) => `${key}`);
-    },
-  };
+  return [
+    { align: 'center', type: 'checkbox', width: 48 },
+    ...baseFileColumns,
+  ] as VxeGridProps<FileApi.FileItem>['columns'];
+});
+
+const fileGridOptions = computed<VxeGridProps<FileApi.FileItem>>(() => ({
+  checkboxConfig: canManageFiles.value
+    ? {
+        highlight: true,
+      }
+    : undefined,
+  columns: fileColumns.value,
+  data: items.value,
+  emptyText: '暂无数据',
+  loading: loading.value,
+  pagerConfig: {
+    currentPage: pageIndex.value,
+    pageSize: pageSize.value,
+    pageSizes: [10, 20, 50, 100],
+    total: totalCount.value,
+  },
+  rowConfig: { keyField: 'fileKey' },
+  scrollX: { enabled: true },
+}));
+
+const sourceGridOptions = computed<VxeGridProps<FileApi.StorageSourceItem>>(() => ({
+  columns: sourceColumns,
+  data: sourcePagination.pagedRows.value,
+  emptyText: '暂无存储源',
+  loading: sourceLoading.value,
+  pagerConfig: sourcePagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+
+const fileGridEvents: NativeVxeGridEvents<FileApi.FileItem> = {
+  'checkbox-all': ({ records }: { records: FileApi.FileItem[] }) => {
+    selectedFileKeys.value = records.map((record) => record.fileKey);
+  },
+  'checkbox-change': ({ records }: { records: FileApi.FileItem[] }) => {
+    selectedFileKeys.value = records.map((record) => record.fileKey);
+  },
+  'page-change': ({ currentPage, pageSize: nextPageSize }) => {
+    const normalizedPageSize = nextPageSize || pageSize.value;
+    pageIndex.value = normalizedPageSize === pageSize.value ? currentPage || 1 : 1;
+    pageSize.value = normalizedPageSize;
+    void loadFiles();
+  },
+};
+
+const sourceGridEvents: NativeVxeGridEvents<FileApi.StorageSourceItem> = {
+  'page-change': sourcePagination.handlePageChange,
+};
+
+const [FileGrid] = useVbenVxeGrid<FileApi.FileItem>({
+  gridEvents: fileGridEvents,
+  gridOptions: {},
+});
+const [SourceGrid] = useVbenVxeGrid<FileApi.StorageSourceItem>({
+  gridEvents: sourceGridEvents,
+  gridOptions: {},
 });
 
 async function loadFiles() {
@@ -348,21 +387,6 @@ async function handleBatchDelete() {
     await loadTree();
     await loadFiles();
   });
-}
-
-function handleTableChange(
-  pagination: { current?: number; pageSize?: number },
-  _filters?: unknown,
-  _sorter?: unknown,
-  extra?: { action?: string },
-) {
-  if (extra?.action === 'sort') {
-    return;
-  }
-
-  pageIndex.value = pagination.current || 1;
-  pageSize.value = pagination.pageSize || pageSize.value;
-  void loadFiles();
 }
 
 async function handleSearch() {
@@ -715,7 +739,7 @@ onBeforeUnmount(revokePreviewUrl);
 <template>
   <Page description="文件管理用于维护平台制度、模板、交付材料等共享文件。" title="文件管理">
     <section class="platform-file">
-      <Card :bordered="false" class="platform-file__tree" title="目录树">
+      <Card :bordered="false" class="platform-file__tree rounded-2xl" title="目录树">
         <template #extra>
           <Tag color="blue">{{ totalCount }} 份文件</Tag>
         </template>
@@ -733,144 +757,153 @@ onBeforeUnmount(revokePreviewUrl);
         />
       </Card>
 
-      <Card :bordered="false" class="platform-file__table" title="文件清单">
-        <template #extra>
-          <Space>
-            <Input
-              v-model:value="keyword"
-              allow-clear
-              placeholder="按文件名/类型/路径筛选"
-              @pressEnter="handleSearch"
-            />
-            <Select
-              v-model:value="categoryFilter"
-              allow-clear
-              placeholder="按分类筛选"
-              style="width: 160px"
-              :options="categoryOptions"
-            />
-            <Select
-              v-if="canManageFiles"
-              v-model:value="storageSourceFilter"
-              allow-clear
-              placeholder="按存储源筛选"
-              style="width: 180px"
-              :options="sourceFilterOptions"
-            />
-            <Input
-              v-model:value="uploadedBy"
-              allow-clear
-              placeholder="按上传人筛选"
-              @pressEnter="handleSearch"
-            />
-            <DatePicker.RangePicker v-model:value="uploadedRange" />
-            <Button type="primary" @click="handleSearch">查询</Button>
-            <Button @click="resetFilters">重置</Button>
-            <Select
-              v-if="canManageFiles"
-              v-model:value="uploadStorageSourceId"
-              allow-clear
-              placeholder="上传源"
-              style="width: 180px"
-              :options="enabledSourceOptions"
-            />
-            <Upload v-if="canManageFiles" :custom-request="customRequest" :show-upload-list="false">
-              <Button type="primary">上传文件</Button>
-            </Upload>
-            <Popconfirm
-              v-if="canManageFiles"
-              :disabled="selectedFileCount === 0"
-              :title="`确认删除选中的 ${selectedFileCount} 个文件？`"
-              @confirm="handleBatchDelete"
-            >
-              <Button
-                danger
-                :disabled="selectedFileCount === 0"
-                :loading="actionLoadingKey === 'batch-delete-files'"
-              >
-                批量删除
-              </Button>
-            </Popconfirm>
-            <Button v-if="canManageFiles" @click="sourceDrawerOpen = true">存储源</Button>
-          </Space>
-        </template>
+      <div class="platform-file__content">
+        <Card :bordered="false" class="platform-file__filter rounded-2xl" title="筛选条件">
+          <template #extra>
+            <Button type="link" @click="searchExpanded = !searchExpanded">
+              {{ searchExpanded ? '收起' : '展开' }}
+            </Button>
+          </template>
+          <Form layout="vertical">
+            <Row :gutter="[16, 8]">
+              <Col :lg="8" :md="12" :span="24">
+                <Form.Item label="文件关键字">
+                  <Input
+                    v-model:value="keyword"
+                    allow-clear
+                    placeholder="按文件名、类型或路径筛选"
+                    @pressEnter="handleSearch"
+                  />
+                </Form.Item>
+              </Col>
+              <Col :lg="8" :md="12" :span="24">
+                <Form.Item label="存储源">
+                  <Select
+                    v-model:value="storageSourceFilter"
+                    allow-clear
+                    placeholder="按存储源筛选"
+                    :options="sources.map((item) => ({ label: item.name, value: item.id }))"
+                  />
+                </Form.Item>
+              </Col>
+              <Col :lg="8" :md="12" :span="24">
+                <Form.Item label="上传日期">
+                  <DatePicker.RangePicker v-model:value="uploadedRange" style="width: 100%" />
+                </Form.Item>
+              </Col>
+              <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                <Form.Item label="文件分类">
+                  <Input
+                    v-model:value="categoryFilter"
+                    allow-clear
+                    placeholder="按分类筛选"
+                    @pressEnter="handleSearch"
+                  />
+                </Form.Item>
+              </Col>
+              <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                <Form.Item label="上传人">
+                  <Input
+                    v-model:value="uploadedBy"
+                    allow-clear
+                    placeholder="按上传人筛选"
+                    @pressEnter="handleSearch"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+            <div class="platform-file__filter-actions">
+              <Button @click="resetFilters">重置</Button>
+              <Button type="primary" @click="handleSearch">查询</Button>
+            </div>
+          </Form>
+        </Card>
 
-        <div v-if="!loading && filteredItems.length === 0" class="platform-empty">
-          <Empty description="当前目录暂无文件" />
-        </div>
-        <Table
-          v-else
-          :columns="columns"
-          :data-source="filteredItems"
-          :loading="loading"
-          :pagination="{
-            current: pageIndex,
-            pageSize,
-            showSizeChanger: true,
-            showTotal: (total: number) => `共 ${total} 条`,
-            total: totalCount,
-          }"
-          :row-selection="rowSelection"
-          row-key="fileKey"
-          :scroll="{ x: 1420 }"
-          @change="handleTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'size'">
-              {{ formatSize(record.size) }}
+        <Card :bordered="false" class="platform-file__table rounded-2xl" title="文件清单">
+          <template #extra>
+            <div class="platform-file__table-actions">
+              <Upload v-if="canManageFiles" :custom-request="customRequest" :show-upload-list="false">
+                <Button type="primary">上传文件</Button>
+              </Upload>
+              <Popconfirm
+                v-if="canManageFiles"
+                :disabled="selectedFileCount === 0"
+                :title="`确认删除选中的 ${selectedFileCount} 个文件？`"
+                @confirm="handleBatchDelete"
+              >
+                <Button
+                  danger
+                  :disabled="selectedFileCount === 0"
+                  :loading="actionLoadingKey === 'batch-delete-files'"
+                >
+                  批量删除
+                </Button>
+              </Popconfirm>
+              <Button v-if="canManageFiles" @click="sourceDrawerOpen = true">存储源</Button>
+            </div>
+          </template>
+
+          <FileGrid
+            class="app-vxe-card-grid"
+            grid-class="platform-file__file-grid"
+            :grid-events="fileGridEvents"
+            :grid-options="fileGridOptions"
+          >
+            <template #size="{ row }">
+              {{ formatSize(row.size) }}
             </template>
-            <template v-else-if="column.key === 'storageSourceName'">
-              <Tag>{{ record.storageSourceName || record.storageProvider || '默认配置' }}</Tag>
+            <template #storageSourceName="{ row }">
+              <Tag>{{ row.storageSourceName || row.storageProvider || '默认配置' }}</Tag>
             </template>
-            <template v-else-if="column.key === 'isPublic'">
-              <PlatformStatusTag :value="record.isPublic" true-label="公开" false-label="私有" />
+            <template #isPublic="{ row }">
+              <PlatformStatusTag :value="row.isPublic" true-label="公开" false-label="私有" />
             </template>
-            <template v-else-if="column.key === 'uploadedBy'">
-              {{ record.uploadedBy || '-' }}
+            <template #uploadedBy="{ row }">
+              {{ row.uploadedBy || '-' }}
             </template>
-            <template v-else-if="column.key === 'business'">
-              <span v-if="record.businessType || record.businessId">
-                {{ [record.businessType, record.businessId].filter(Boolean).join(' / ') }}
+            <template #business="{ row }">
+              <span v-if="row.businessType || row.businessId">
+                {{ [row.businessType, row.businessId].filter(Boolean).join(' / ') }}
               </span>
               <span v-else>-</span>
             </template>
-            <template v-else-if="column.key === 'relativePath'">
-              <span class="platform-file__path" :title="record.storageLocation">
-                {{ resolveDisplayPath(record as FileApi.FileItem) }}
+            <template #relativePath="{ row }">
+              <span class="platform-file__path" :title="row.storageLocation">
+                {{ resolveDisplayPath(row) }}
               </span>
             </template>
-            <template v-else-if="column.key === 'uploadedAt'">
-              {{ formatDateTime(record.uploadedAt) }}
+            <template #uploadedAt="{ row }">
+              {{ formatDateTime(row.uploadedAt) }}
             </template>
-            <template v-else-if="column.key === 'actions'">
+            <template #actions="{ row }">
               <Space>
                 <Button
-                  :disabled="!canPreview(record as FileApi.FileItem)"
+                  :disabled="!canPreview(row)"
                   size="small"
                   type="link"
-                  @click="handlePreview(record as FileApi.FileItem)"
+                  @click="handlePreview(row)"
                 >
                   预览
                 </Button>
-                <Button size="small" type="link" @click="handleDownload(record as FileApi.FileItem)">
+                <Button size="small" type="link" @click="handleDownload(row)">
                   下载
                 </Button>
                 <Button
                   v-if="canManageFiles"
                   size="small"
                   type="link"
-                  @click="openMetadataEdit(record as FileApi.FileItem)"
+                  @click="openMetadataEdit(row)"
                 >
                   编辑
                 </Button>
                 <Popconfirm
                   v-if="canManageFiles"
                   title="确认删除该文件？"
-                  @confirm="handleDelete(record.fileKey)"
+                  @confirm="handleDelete(row.fileKey)"
                 >
                   <Button
                     danger
-                    :loading="actionLoadingKey === `delete-file:${(record as FileApi.FileItem).fileKey}`"
+                    :loading="actionLoadingKey === `delete-file:${row.fileKey}`"
                     size="small"
                     type="link"
                   >
@@ -879,9 +912,9 @@ onBeforeUnmount(revokePreviewUrl);
                 </Popconfirm>
               </Space>
             </template>
-          </template>
-        </Table>
-      </Card>
+          </FileGrid>
+        </Card>
+      </div>
     </section>
 
     <Drawer v-model:open="sourceDrawerOpen" title="文件存储源" width="1040">
@@ -892,64 +925,54 @@ onBeforeUnmount(revokePreviewUrl);
         </Space>
       </template>
 
-      <Table
-        :columns="sourceColumns"
-        :data-source="sources"
-        :loading="sourceLoading"
-        :pagination="{ pageSize: 8, showSizeChanger: false }"
-        row-key="id"
-        :scroll="{ x: 1080 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'providerName'">
-            <Tag>{{ (record as FileApi.StorageSourceItem).providerName }}</Tag>
-          </template>
-          <template v-else-if="column.key === 'isDefault'">
-            <Tag v-if="(record as FileApi.StorageSourceItem).isDefault" color="blue">默认</Tag>
-            <span v-else>-</span>
-          </template>
-          <template v-else-if="column.key === 'isEnabled'">
-            <PlatformStatusTag :value="(record as FileApi.StorageSourceItem).isEnabled" />
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <Space>
-              <Button
-                size="small"
-                :disabled="(record as FileApi.StorageSourceItem).isDefault || !(record as FileApi.StorageSourceItem).isEnabled"
-                :loading="actionLoadingKey === `default-source:${(record as FileApi.StorageSourceItem).id}`"
-                @click="setDefaultSource(record as FileApi.StorageSourceItem)"
-              >
-                设为默认
-              </Button>
-              <Switch
-                :checked="(record as FileApi.StorageSourceItem).isEnabled"
-                :disabled="(record as FileApi.StorageSourceItem).isDefault"
-                :loading="actionLoadingKey === `toggle-source:${(record as FileApi.StorageSourceItem).id}`"
-                @change="(checked) => toggleSource(record as FileApi.StorageSourceItem, Boolean(checked))"
-              />
-              <Button size="small" @click="openSourceEdit(record as FileApi.StorageSourceItem)">编辑</Button>
-              <Popconfirm title="确认删除该存储源？已被文件使用的存储源不能删除。" @confirm="deleteSource(record as FileApi.StorageSourceItem)">
-                <Button
-                  danger
-                  :disabled="(record as FileApi.StorageSourceItem).isDefault"
-                  :loading="actionLoadingKey === `delete-source:${(record as FileApi.StorageSourceItem).id}`"
-                  size="small"
-                >
-                  删除
-                </Button>
-              </Popconfirm>
-            </Space>
-          </template>
+      <SourceGrid class="app-vxe-card-grid" :grid-events="sourceGridEvents" :grid-options="sourceGridOptions">
+        <template #providerName="{ row }">
+          <Tag>{{ row.providerName }}</Tag>
         </template>
-      </Table>
+        <template #isDefault="{ row }">
+          <Tag v-if="row.isDefault" color="blue">默认</Tag>
+          <span v-else>-</span>
+        </template>
+        <template #isEnabled="{ row }">
+          <PlatformStatusTag :value="row.isEnabled" />
+        </template>
+        <template #actions="{ row }">
+          <Space>
+            <Button
+              size="small"
+              :disabled="row.isDefault || !row.isEnabled"
+              :loading="actionLoadingKey === `default-source:${row.id}`"
+              @click="setDefaultSource(row)"
+            >
+              设为默认
+            </Button>
+            <Switch
+              :checked="row.isEnabled"
+              :disabled="row.isDefault"
+              :loading="actionLoadingKey === `toggle-source:${row.id}`"
+              @change="(checked) => toggleSource(row, Boolean(checked))"
+            />
+            <Button size="small" @click="openSourceEdit(row)">编辑</Button>
+            <Popconfirm title="确认删除该存储源？已被文件使用的存储源不能删除。" @confirm="deleteSource(row)">
+              <Button
+                danger
+                :disabled="row.isDefault"
+                :loading="actionLoadingKey === `delete-source:${row.id}`"
+                size="small"
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        </template>
+      </SourceGrid>
     </Drawer>
 
-    <Modal
+    <Drawer
       v-model:open="metadataModalOpen"
-      :confirm-loading="metadataSaving"
+      destroy-on-close
       title="编辑文件元数据"
       width="560px"
-      @ok="submitMetadata"
     >
       <Form layout="vertical">
         <Form.Item label="文件别名" required>
@@ -965,7 +988,13 @@ onBeforeUnmount(revokePreviewUrl);
           <Input v-model:value="metadataForm.businessId" :maxlength="128" />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="metadataModalOpen = false">取消</Button>
+          <Button :loading="metadataSaving" type="primary" @click="submitMetadata">保存</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <Modal
       v-model:open="previewModalOpen"
@@ -990,12 +1019,11 @@ onBeforeUnmount(revokePreviewUrl);
       <Empty v-else description="无法加载预览" />
     </Modal>
 
-    <Modal
+    <Drawer
       v-model:open="sourceModalOpen"
-      :confirm-loading="sourceLoading"
+      destroy-on-close
       :title="editingSourceId ? '编辑存储源' : '新增存储源'"
       width="720px"
-      @ok="submitSource"
     >
       <Form layout="vertical">
         <Form.Item label="名称" required>
@@ -1046,20 +1074,53 @@ onBeforeUnmount(revokePreviewUrl);
           <Input.TextArea v-model:value="sourceForm.remark" :auto-size="{ minRows: 2, maxRows: 4 }" />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="sourceModalOpen = false">取消</Button>
+          <Button :loading="sourceLoading" type="primary" @click="submitSource">保存</Button>
+        </div>
+      </template>
+    </Drawer>
   </Page>
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-file {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-file__tree,
-.platform-file__table {
+.platform-file__content {
   min-height: 640px;
+}
+
+.platform-file__content {
+  display: flex;
+  flex-direction: column;
+  @apply gap-4;
+  min-width: 0;
+}
+
+.platform-file__filter,
+.platform-file__table,
+.platform-file__tree {
+  @apply rounded-xl;
+}
+
+.platform-file__filter-actions,
+.platform-file__table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  @apply gap-2;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.platform-file__filter-actions {
+  @apply pt-1;
 }
 
 .platform-file__path {
@@ -1081,7 +1142,7 @@ onBeforeUnmount(revokePreviewUrl);
   display: block;
   max-width: 100%;
   max-height: 70vh;
-  margin: 0 auto;
+  @apply mx-auto my-0;
   object-fit: contain;
 }
 
@@ -1094,6 +1155,11 @@ onBeforeUnmount(revokePreviewUrl);
 @media (width <= 960px) {
   .platform-file {
     grid-template-columns: 1fr;
+  }
+
+  .platform-file__filter-actions,
+  .platform-file__table-actions {
+    justify-content: flex-start;
   }
 }
 </style>

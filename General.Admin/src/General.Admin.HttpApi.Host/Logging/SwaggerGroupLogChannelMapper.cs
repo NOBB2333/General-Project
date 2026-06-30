@@ -21,6 +21,8 @@ public sealed class SwaggerGroupLogChannelMapper
             ApiDocGroups.Platform => LoggingChannelConstants.Platform,
             ApiDocGroups.Project => LoggingChannelConstants.Project,
             ApiDocGroups.Business => LoggingChannelConstants.Business,
+            ApiDocGroups.Ai => LoggingChannelConstants.Ai,
+            ApiDocGroups.Integration => LoggingChannelConstants.Integration,
             _ => LoggingChannelConstants.Platform
         };
     }

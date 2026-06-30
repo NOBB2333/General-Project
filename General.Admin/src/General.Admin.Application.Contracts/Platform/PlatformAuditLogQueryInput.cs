@@ -10,5 +10,7 @@ public class PlatformAuditLogQueryInput
 
     public int MaxResultCount { get; set; } = 200;
 
+    public int SkipCount { get; set; }
+
     public DateTime? StartTime { get; set; }
 }

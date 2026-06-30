@@ -4,15 +4,7 @@
     // 企业私有化优先用 MinIO；公有云上阿里云 OSS 可直接切换 AliyunOSS。
     "Provider": "Local",
     "MaxFileSizeBytes": 104857600, // 100MB
-    // 生产环境建议保持白名单；如确需放开，设置为空数组。
-    "AllowedContentTypes": [
-      "image/jpeg",
-      "image/png",
-      "application/pdf",
-      "text/plain",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ],
+    // 默认白名单由 PlatformFileContentTypes 维护；如确需覆盖或放开，可在此添加 AllowedContentTypes。
     "Local": {
       "RootPath": "App_Data/upload-files",
       "PathTemplate": ""

@@ -10,6 +10,8 @@ public class ProjectIssueItemDto
 
     public Guid? DeveloperOwnerUserId { get; set; }
 
+    public DateTime CreationTime { get; set; }
+
     public DateTime? DueDate { get; set; }
 
     public Guid Id { get; set; }
@@ -19,6 +21,8 @@ public class ProjectIssueItemDto
     public string Level { get; set; } = string.Empty;
 
     public string OwnerName { get; set; } = string.Empty;
+
+    public Guid OwnerUserId { get; set; }
 
     public string? ProductOwnerName { get; set; }
 

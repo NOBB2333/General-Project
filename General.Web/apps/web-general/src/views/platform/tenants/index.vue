@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { PlatformEndpointApi, TenantApi } from '#/api/core';
 
 import { computed, reactive, ref } from 'vue';
@@ -13,27 +14,25 @@ import {
   Checkbox,
   Collapse,
   Drawer,
-  Empty,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Select,
   Skeleton,
   Space,
-  Table,
   Tag,
   Tree,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createTenantApi,
   deleteTenantApi,
   getMenuPermissionTreeApi,
   getPlatformEndpointOptionsApi,
   getTenantAuthorizationApi,
-  getTenantListApi,
+  getTenantPagedApi,
   getTenantUsersApi,
   saveTenantAuthorizationApi,
   setTenantStatusApi,
@@ -63,26 +62,29 @@ const { hasAccessByCodes } = useAccess();
 const canManageTenants = computed(() => hasAccessByCodes([TENANT_MANAGE_CODE]));
 
 const baseColumns = [
-  { dataIndex: 'name', key: 'name', title: '租户名称', width: 180 },
-  { dataIndex: 'adminUserName', key: 'adminUserName', title: '管理员账号', width: 140 },
-  { dataIndex: 'adminEmail', key: 'adminEmail', title: '管理员邮箱', width: 220 },
-  { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 90 },
-  { dataIndex: 'defaultConnectionStringDisplay', key: 'defaultConnectionStringDisplay', title: '连接配置', width: 220 },
-  { dataIndex: 'remark', key: 'remark', title: '备注', width: 220 },
-  { dataIndex: 'creationTime', key: 'creationTime', title: '创建时间', width: 180 },
-  { key: 'actions', title: '操作', width: 420 },
-];
+  { align: 'left', field: 'name', title: '租户名称', width: 180 },
+  { field: 'adminUserName', slots: { default: 'adminUserName' }, title: '管理员账号', width: 140 },
+  { align: 'left', field: 'adminEmail', slots: { default: 'adminEmail' }, title: '管理员邮箱', width: 220 },
+  { field: 'isActive', slots: { default: 'isActive' }, title: '状态', width: 90 },
+  { align: 'left', field: 'defaultConnectionStringDisplay', slots: { default: 'defaultConnectionStringDisplay' }, title: '连接配置', width: 220 },
+  { align: 'left', field: 'remark', slots: { default: 'remark' }, title: '备注', width: 220 },
+  { field: 'creationTime', slots: { default: 'creationTime' }, title: '创建时间', width: 180 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 560 },
+] satisfies VxeGridProps<TenantApi.TenantItem>['columns'];
 
-const columns = computed(() =>
+const columns = computed<VxeGridProps<TenantApi.TenantItem>['columns']>(() =>
   canManageTenants.value
     ? baseColumns
-    : baseColumns.map((item) => item.key === 'actions' ? { ...item, width: 120 } : item),
+    : baseColumns.map((item) => item.field === 'actions' ? { ...item, width: 120 } : item),
 );
 
 const loading = ref(false);
+const pageIndex = ref(1);
+const pageSize = ref(10);
+const totalCount = ref(0);
 const saving = ref(false);
 const items = ref<TenantApi.TenantItem[]>([]);
-const modalVisible = ref(false);
+const createDrawerVisible = ref(false);
 const drawerVisible = ref(false);
 const drawerLoading = ref(false);
 const drawerType = ref<DrawerType>('menu');
@@ -96,11 +98,11 @@ const authStore = useAuthStore();
 const router = useRouter();
 
 const tenantUserColumns = [
-  { dataIndex: 'username', key: 'username', title: '账号', width: 160 },
-  { dataIndex: 'displayName', key: 'displayName', title: '姓名', width: 140 },
-  { dataIndex: 'email', key: 'email', title: '邮箱' },
-  { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 90 },
-];
+  { field: 'username', title: '账号', width: 160 },
+  { field: 'displayName', title: '姓名', width: 140 },
+  { align: 'left', field: 'email', title: '邮箱', minWidth: 220 },
+  { field: 'isActive', slots: { default: 'isActive' }, title: '状态', width: 90 },
+] satisfies VxeGridProps<TenantApi.TenantUserItem>['columns'];
 
 const formState = reactive({
   adminEmail: '',
@@ -121,13 +123,47 @@ const authorizationState = reactive<TenantAuthorizationFormState>({
 });
 
 const metrics = computed(() => [
-  { label: '租户数量', value: items.value.length },
+  { label: '租户数量', value: totalCount.value },
   { label: '启用租户', value: items.value.filter((item) => item.isActive).length },
   {
     label: '使用接口黑名单租户',
     value: items.value.filter((item) => item.apiBlacklist.length > 0).length,
   },
 ]);
+const tenantGridOptions = computed<VxeGridProps<TenantApi.TenantItem>>(() => ({
+  columns: columns.value,
+  data: items.value,
+  emptyText: '暂无租户',
+  loading: loading.value,
+  pagerConfig: {
+    currentPage: pageIndex.value,
+    pageSize: pageSize.value,
+    pageSizes: [10, 20, 50, 100],
+    total: totalCount.value,
+  },
+  rowConfig: { height: 48, keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+const tenantUserGridOptions = computed<VxeGridProps<TenantApi.TenantUserItem>>(() => ({
+  columns: tenantUserColumns,
+  data: tenantUsers.value,
+  emptyText: '暂无租户账号',
+  pagerConfig: { enabled: false },
+  rowConfig: { keyField: 'id' },
+  size: 'small',
+}));
+
+const gridEvents: NativeVxeGridEvents<TenantApi.TenantItem> = {
+  'page-change': ({ currentPage, pageSize: nextPageSize }) => {
+    const normalizedPageSize = nextPageSize || pageSize.value;
+    pageIndex.value = normalizedPageSize === pageSize.value ? currentPage || 1 : 1;
+    pageSize.value = normalizedPageSize;
+    void loadTenants();
+  },
+};
+
+const [TenantGrid] = useVbenVxeGrid<TenantApi.TenantItem>({ gridEvents, gridOptions: {} });
+const [TenantUserGrid] = useVbenVxeGrid<TenantApi.TenantUserItem>({ gridOptions: {} });
 
 function normalizeMenuTree(items: MenuApiNamespace.PermissionTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTree(items, (item) => `[${item.appCode}] ${item.title}`);
@@ -142,18 +178,27 @@ async function loadTenants() {
   loading.value = true;
   try {
     if (!canManageTenants.value) {
-      items.value = await getTenantListApi();
+      const result = await getTenantPagedApi({
+        maxResultCount: pageSize.value,
+        skipCount: (pageIndex.value - 1) * pageSize.value,
+      });
+      items.value = result.items;
+      totalCount.value = result.totalCount;
       treeData.value = [];
       endpointGroups.value = [];
       return;
     }
 
     const [tenantResult, menuResult, endpointResult] = await Promise.allSettled([
-      getTenantListApi(),
-      getMenuPermissionTreeApi('platform,project,business'),
+      getTenantPagedApi({
+        maxResultCount: pageSize.value,
+        skipCount: (pageIndex.value - 1) * pageSize.value,
+      }),
+      getMenuPermissionTreeApi('platform,project,business,ai'),
       getPlatformEndpointOptionsApi(),
     ]);
-    items.value = tenantResult.status === 'fulfilled' ? tenantResult.value : [];
+    items.value = tenantResult.status === 'fulfilled' ? tenantResult.value.items : [];
+    totalCount.value = tenantResult.status === 'fulfilled' ? tenantResult.value.totalCount : 0;
     treeData.value = menuResult.status === 'fulfilled' ? normalizeMenuTree(menuResult.value) : [];
     endpointGroups.value = endpointResult.status === 'fulfilled' ? endpointResult.value : [];
 
@@ -177,7 +222,7 @@ function openCreate() {
   formState.name = '';
   formState.defaultConnectionString = '';
   formState.remark = '';
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function fillEditForm(tenant: TenantApi.TenantItem) {
@@ -216,7 +261,7 @@ async function handleSubmit() {
       remark: formState.remark || null,
     });
     message.success('租户已创建');
-    modalVisible.value = false;
+    createDrawerVisible.value = false;
     await loadTenants();
   } finally {
     saving.value = false;
@@ -340,116 +385,104 @@ loadTenants();
         </article>
       </div>
 
-      <Card class="platform-page__card" title="租户台账">
+      <Card :bordered="false" class="platform-page__card rounded-2xl" title="租户台账">
         <template #extra>
           <Button v-if="canManageTenants" type="primary" @click="openCreate">新增租户</Button>
         </template>
 
         <Skeleton :loading="loading" active>
-          <div v-if="items.length === 0" class="platform-page__empty">
-            <Empty description="暂无租户" />
-          </div>
-          <Table
-            v-else
-            :columns="columns"
-            :data-source="items"
-            :pagination="{ pageSize: 10 }"
-            row-key="id"
-            :scroll="{ x: 1280 }"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'isActive'">
-                <Tag :color="record.isActive ? 'success' : 'default'">
-                  {{ record.isActive ? '启用' : '停用' }}
-                </Tag>
-              </template>
-              <template v-else-if="column.key === 'creationTime'">
-                {{ new Date(record.creationTime).toLocaleString() }}
-              </template>
-              <template v-else-if="column.key === 'adminUserName'">
-                {{ record.adminUserName || '-' }}
-              </template>
-              <template v-else-if="column.key === 'adminEmail'">
-                {{ record.adminEmail || '-' }}
-              </template>
-              <template v-else-if="column.key === 'remark'">
-                {{ record.remark || '-' }}
-              </template>
-              <template v-else-if="column.key === 'defaultConnectionStringDisplay'">
-                <Space size="small">
-                  <Tag :color="record.hasDefaultConnectionString ? 'success' : 'default'">
-                    {{ record.hasDefaultConnectionString ? '已配置' : '未配置' }}
-                  </Tag>
-                  <span>{{ record.defaultConnectionStringDisplay || '-' }}</span>
-                </Space>
-              </template>
-              <template v-else-if="column.key === 'actions'">
-                <Space wrap>
-                  <Popconfirm
-                    v-if="canManageTenants"
-                    :title="`确认${record.isActive ? '停用' : '启用'}租户【${record.name}】？`"
-                    @confirm="handleToggleStatus(record as TenantApi.TenantItem)"
-                  >
-                    <Button
-                      :loading="actionLoadingKey === `toggle:${(record as TenantApi.TenantItem).id}`"
-                      size="small"
-                    >
-                      {{ record.isActive ? '停用' : '启用' }}
-                    </Button>
-                  </Popconfirm>
-                  <Button
-                    v-if="canManageTenants"
-                    size="small"
-                    @click="openDrawer('edit', record as TenantApi.TenantItem)"
-                  >
-                    编辑信息
-                  </Button>
-                  <Button
-                    v-if="canManageTenants"
-                    :loading="actionLoadingKey === `enter:${(record as TenantApi.TenantItem).id}`"
-                    size="small"
-                    type="primary"
-                    @click="handleEnterTenant(record as TenantApi.TenantItem)"
-                  >
-                    运维
-                  </Button>
-                  <Button size="small" @click="openDrawer('users', record as TenantApi.TenantItem)">查看账号</Button>
-                  <Button
-                    v-if="canManageTenants"
-                    size="small"
-                    @click="openDrawer('menu', record as TenantApi.TenantItem)"
-                  >
-                    菜单授权
-                  </Button>
-                  <Button
-                    v-if="canManageTenants"
-                    size="small"
-                    @click="openDrawer('api', record as TenantApi.TenantItem)"
-                  >
-                    接口黑名单
-                  </Button>
-                  <Button
-                    v-if="canManageTenants"
-                    danger
-                    :loading="actionLoadingKey === `delete:${(record as TenantApi.TenantItem).id}`"
-                    size="small"
-                    type="link"
-                    @click="handleDelete((record as TenantApi.TenantItem).id)"
-                  >
-                    删除
-                  </Button>
-                </Space>
-              </template>
+          <TenantGrid class="app-vxe-card-grid" :grid-events="gridEvents" :grid-options="tenantGridOptions">
+            <template #isActive="{ row }">
+              <Tag :color="row.isActive ? 'success' : 'default'">
+                {{ row.isActive ? '启用' : '停用' }}
+              </Tag>
             </template>
-          </Table>
+            <template #creationTime="{ row }">
+              {{ new Date(row.creationTime).toLocaleString() }}
+            </template>
+            <template #adminUserName="{ row }">
+              {{ row.adminUserName || '-' }}
+            </template>
+            <template #adminEmail="{ row }">
+              {{ row.adminEmail || '-' }}
+            </template>
+            <template #remark="{ row }">
+              {{ row.remark || '-' }}
+            </template>
+            <template #defaultConnectionStringDisplay="{ row }">
+              <Space size="small">
+                <Tag :color="row.hasDefaultConnectionString ? 'success' : 'default'">
+                  {{ row.hasDefaultConnectionString ? '已配置' : '未配置' }}
+                </Tag>
+                <span>{{ row.defaultConnectionStringDisplay || '-' }}</span>
+              </Space>
+            </template>
+            <template #actions="{ row }">
+              <Space class="whitespace-nowrap" size="small">
+                <Popconfirm
+                  v-if="canManageTenants"
+                  :title="`确认${row.isActive ? '停用' : '启用'}租户【${row.name}】？`"
+                  @confirm="handleToggleStatus(row)"
+                >
+                  <Button
+                    :loading="actionLoadingKey === `toggle:${row.id}`"
+                    size="small"
+                  >
+                    {{ row.isActive ? '停用' : '启用' }}
+                  </Button>
+                </Popconfirm>
+                <Button
+                  v-if="canManageTenants"
+                  size="small"
+                  @click="openDrawer('edit', row)"
+                >
+                  编辑信息
+                </Button>
+                <Button
+                  v-if="canManageTenants"
+                  :loading="actionLoadingKey === `enter:${row.id}`"
+                  size="small"
+                  type="primary"
+                  @click="handleEnterTenant(row)"
+                >
+                  运维
+                </Button>
+                <Button size="small" @click="openDrawer('users', row)">查看账号</Button>
+                <Button
+                  v-if="canManageTenants"
+                  size="small"
+                  @click="openDrawer('menu', row)"
+                >
+                  菜单授权
+                </Button>
+                <Button
+                  v-if="canManageTenants"
+                  size="small"
+                  @click="openDrawer('api', row)"
+                >
+                  接口黑名单
+                </Button>
+                <Button
+                  v-if="canManageTenants"
+                  danger
+                  :loading="actionLoadingKey === `delete:${row.id}`"
+                  size="small"
+                  type="link"
+                  @click="handleDelete(row.id)"
+                >
+                  删除
+                </Button>
+              </Space>
+            </template>
+          </TenantGrid>
         </Skeleton>
       </Card>
 
-      <Modal
-        v-model:open="modalVisible"
-        :confirm-loading="saving"
+      <Drawer
+        v-model:open="createDrawerVisible"
+        destroy-on-close
         title="新增租户"
-        @ok="handleSubmit"
+        width="640"
       >
         <Form layout="vertical">
           <Form.Item label="租户名称" required>
@@ -487,7 +520,13 @@ loadTenants();
             <Input.TextArea v-model:value="formState.remark" :maxlength="256" :rows="3" />
           </Form.Item>
         </Form>
-      </Modal>
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <Button @click="createDrawerVisible = false">取消</Button>
+            <Button :loading="saving" type="primary" @click="handleSubmit">保存</Button>
+          </div>
+        </template>
+      </Drawer>
 
       <Drawer
         v-model:open="drawerVisible"
@@ -525,21 +564,13 @@ loadTenants();
             </template>
 
             <template v-else-if="drawerType === 'users'">
-              <Table
-                :columns="tenantUserColumns"
-                :data-source="tenantUsers"
-                :pagination="false"
-                row-key="id"
-                size="small"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'isActive'">
-                    <Tag :color="(record as TenantApi.TenantUserItem).isActive ? 'success' : 'default'">
-                      {{ (record as TenantApi.TenantUserItem).isActive ? '启用' : '停用' }}
-                    </Tag>
-                  </template>
+              <TenantUserGrid class="app-vxe-card-grid" :grid-options="tenantUserGridOptions">
+                <template #isActive="{ row }">
+                  <Tag :color="row.isActive ? 'success' : 'default'">
+                    {{ row.isActive ? '启用' : '停用' }}
+                  </Tag>
                 </template>
-              </Table>
+              </TenantUserGrid>
               <div class="tenant-drawer__footer">
                 <Button @click="drawerVisible = false">关闭</Button>
               </div>
@@ -607,54 +638,55 @@ loadTenants();
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .tenant-drawer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
   min-height: 100%;
 }
 
 .tenant-drawer__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 16px;
+  @apply gap-3;
+  @apply mt-auto;
+  @apply pt-4;
 }
 
 .api-group {
   display: grid;
-  gap: 10px;
+  @apply gap-2.5;
 }
 
 .api-group :deep(.ant-checkbox-group-item) {
   display: flex;
-  margin-inline-end: 0;
+  @apply me-0;
   white-space: normal;
 }
 
 .platform-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-page__metrics {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .platform-page__metric,
 .platform-page__card {
-  border-radius: 20px;
+  @apply rounded-2xl;
 }
 
 .platform-page__metric {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px;
+  @apply gap-2;
+  @apply px-4 py-4;
   border: 1px solid var(--ant-color-border-secondary);
   background: var(--ant-color-bg-container);
 }
@@ -665,7 +697,7 @@ loadTenants();
 }
 
 .platform-page__metric strong {
-  font-size: 30px;
+  font-size: 24px;
 }
 
 .platform-page__empty {

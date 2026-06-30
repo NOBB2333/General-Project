@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { OnlineUserApi, OrganizationApi, RoleApi, UserApi } from '#/api/core';
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
@@ -9,6 +10,7 @@ import { Page } from '@vben/common-ui';
 import {
   Button,
   Card,
+  Col,
   Descriptions,
   Drawer,
   Empty,
@@ -16,14 +18,17 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Row,
   Select,
+  Skeleton,
   Switch,
-  Table,
   Tag,
+  Tree,
   TreeSelect,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createUserApi,
   deleteUserApi,
@@ -36,7 +41,12 @@ import {
   updateUserApi,
 } from '#/api/core';
 import { useActionLoading } from '#/composables/platform/use-action-loading';
-import { normalizePlatformTreeSelect, type PlatformTreeNode } from '#/composables/platform/use-tree-normalization';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
+import {
+  normalizePlatformTree,
+  normalizePlatformTreeSelect,
+  type PlatformTreeNode,
+} from '#/composables/platform/use-tree-normalization';
 
 defineOptions({ name: 'PlatformUserPage' });
 
@@ -46,40 +56,54 @@ const { hasAccessByCodes } = useAccess();
 const canManageUsers = computed(() => hasAccessByCodes([USER_MANAGE_CODE]));
 
 const baseColumns = [
-  { dataIndex: 'displayName', key: 'displayName', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.displayName.localeCompare(right.displayName, 'zh-CN'), title: '姓名', width: 140 },
-  { dataIndex: 'username', key: 'username', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.username.localeCompare(right.username, 'zh-CN'), title: '账号', width: 160 },
-  { dataIndex: 'employeeNo', key: 'employeeNo', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.employeeNo || '').localeCompare(right.employeeNo || '', 'zh-CN'), title: '工号', width: 120 },
-  { dataIndex: 'phoneNumber', key: 'phoneNumber', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.phoneNumber || '').localeCompare(right.phoneNumber || '', 'zh-CN'), title: '手机号', width: 140 },
-  { dataIndex: 'email', key: 'email', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => left.email.localeCompare(right.email, 'zh-CN'), title: '邮箱', width: 220 },
-  { dataIndex: 'tenantName', key: 'tenantName', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.tenantName || '').localeCompare(right.tenantName || '', 'zh-CN'), title: '租户', width: 120 },
-  { dataIndex: 'externalSource', key: 'externalSource', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => (left.externalSource || '').localeCompare(right.externalSource || '', 'zh-CN'), title: '外部来源', width: 120 },
-  { dataIndex: 'roles', key: 'roles', title: '角色', width: 180 },
-  { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门', width: 200 },
-  { dataIndex: 'isOnline', key: 'isOnline', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => Number(left.isOnline) - Number(right.isOnline), title: '在线', width: 90 },
-  { dataIndex: 'isActive', key: 'isActive', sorter: (left: UserApi.UserListItem, right: UserApi.UserListItem) => Number(left.isActive) - Number(right.isActive), title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 210 },
-];
+  { field: 'displayName', sortable: true, title: '姓名', width: 140 },
+  { field: 'username', sortable: true, title: '账号', width: 160 },
+  { field: 'employeeNo', sortable: true, title: '工号', width: 120 },
+  { field: 'phoneNumber', sortable: true, title: '手机号', width: 140 },
+  { field: 'email', sortable: true, title: '邮箱', width: 220 },
+  { field: 'tenantName', slots: { default: 'tenantName' }, sortable: true, title: '租户', width: 120 },
+  { field: 'externalSource', sortable: true, title: '外部来源', width: 120 },
+  { field: 'roles', slots: { default: 'roles' }, title: '角色', width: 180 },
+  { field: 'organizationUnitNames', slots: { default: 'organizationUnitNames' }, title: '部门', width: 200 },
+  { field: 'isOnline', slots: { default: 'isOnline' }, sortable: true, title: '在线', width: 90 },
+  { field: 'isActive', slots: { default: 'isActive' }, sortable: true, title: '状态', width: 100 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 280 },
+] satisfies VxeGridProps<UserApi.UserListItem>['columns'];
 
-const columns = computed(() =>
+const columns = computed<VxeGridProps<UserApi.UserListItem>['columns']>(() =>
   canManageUsers.value
     ? baseColumns
-    : baseColumns.filter((item) => item.key !== 'actions'),
+    : baseColumns.filter((item) => item.field !== 'actions'),
 );
 
 const onlineColumns = [
-  { dataIndex: 'userName', key: 'userName', title: '账号' },
-  { dataIndex: 'tenantName', key: 'tenantName', title: '租户', width: 120 },
-  { dataIndex: 'device', key: 'device', title: '设备', width: 120 },
-  { dataIndex: 'browser', key: 'browser', title: '浏览器' },
-  { dataIndex: 'ipAddress', key: 'ipAddress', title: 'IP', width: 160 },
-  { dataIndex: 'signedInAt', key: 'signedInAt', title: '登录时间', width: 200 },
-  { dataIndex: 'lastAccessedAt', key: 'lastAccessedAt', title: '最近活动', width: 200 },
-  { key: 'actions', title: '操作', width: 120 },
-];
+  { align: 'left', field: 'userName', title: '账号', width: 160 },
+  { field: 'tenantName', slots: { default: 'tenantName' }, title: '租户', width: 120 },
+  { field: 'device', title: '设备', width: 120 },
+  { field: 'browser', title: '浏览器', width: 140 },
+  { field: 'ipAddress', title: 'IP', width: 160 },
+  { field: 'signedInAt', slots: { default: 'signedInAt' }, title: '登录时间', width: 200 },
+  { field: 'lastAccessedAt', slots: { default: 'lastAccessedAt' }, title: '最近活动', width: 200 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 120 },
+] satisfies VxeGridProps<OnlineUserApi.OnlineUserItem>['columns'];
+
+const mappingColumns = [
+  { field: 'externalSource', title: '外部系统', width: 120 },
+  { align: 'left', field: 'externalUserId', title: '外部账号标识', width: 220 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 100 },
+  { field: 'boundAt', slots: { default: 'boundAt' }, title: '绑定时间', width: 180 },
+  { field: 'lastSyncedAt', slots: { default: 'lastSyncedAt' }, title: '最近同步', width: 180 },
+  { align: 'left', field: 'remark', slots: { default: 'remark' }, title: '备注', width: 220 },
+] satisfies VxeGridProps<UserApi.ExternalAccountMapping>['columns'];
 
 const keyword = ref('');
+const userNameFilter = ref('');
+const displayNameFilter = ref('');
+const emailFilter = ref('');
+const employeeNoFilter = ref('');
+const phoneNumberFilter = ref('');
 const loading = ref(false);
-const modalVisible = ref(false);
+const createDrawerVisible = ref(false);
 const resetPasswordSaving = ref(false);
 const resetPasswordValue = ref('');
 const resetPasswordVisible = ref(false);
@@ -87,18 +111,24 @@ const saving = ref(false);
 const editingUserId = ref<null | string>(null);
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const organizationUnitId = ref<string>();
+const organizationTreeKeyword = ref('');
+const loadingTree = ref(true);
 const statusFilter = ref<string>();
 const roleName = ref<string>();
 const roleItems = ref<RoleApi.RoleOption[]>([]);
 const users = ref<UserApi.UserListItem[]>([]);
 const totalCount = ref(0);
 const pageIndex = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(10);
+const searchExpanded = ref(false);
 const onlineUsers = ref<OnlineUserApi.OnlineUserItem[]>([]);
+const onlinePagination = useLocalVxePagination(onlineUsers, { defaultPageSize: 10 });
 const onlineVisible = ref(false);
 const onlineLoading = ref(false);
 const mappingVisible = ref(false);
 const activeMappingUser = ref<null | UserApi.UserListItem>(null);
+const externalAccounts = computed(() => activeMappingUser.value?.externalAccounts || []);
+const mappingPagination = useLocalVxePagination(externalAccounts, { defaultPageSize: 10 });
 const activeResetUser = ref<null | UserApi.UserListItem>(null);
 const phoneNumberPattern = /^1[3-9]\d{9}$/;
 const usernamePattern = /^[A-Za-z][A-Za-z0-9._-]{2,63}$/;
@@ -159,12 +189,102 @@ const metrics = computed(() => [
 const roleOptions = computed(() =>
   roleItems.value.map((item) => ({ label: item.name, value: item.name })),
 );
+const organizationNodes = computed(() =>
+  normalizePlatformTree(filterOrganizationTree(organizationTree.value), buildTreeTitle),
+);
+const selectedOrganizationKeys = computed(() =>
+  organizationUnitId.value ? [organizationUnitId.value] : [],
+);
+const userGridOptions = computed<VxeGridProps<UserApi.UserListItem>>(() => ({
+  columns: columns.value,
+  data: users.value,
+  emptyText: '未找到用户数据',
+  loading: loading.value,
+  pagerConfig: {
+    currentPage: pageIndex.value,
+    pageSize: pageSize.value,
+    total: totalCount.value,
+  },
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+const onlineGridOptions = computed<VxeGridProps<OnlineUserApi.OnlineUserItem>>(() => ({
+  columns: onlineColumns,
+  data: onlinePagination.pagedRows.value,
+  emptyText: '暂无在线用户',
+  loading: onlineLoading.value,
+  pagerConfig: onlinePagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+const mappingGridOptions = computed<VxeGridProps<UserApi.ExternalAccountMapping>>(() => ({
+  columns: mappingColumns,
+  data: mappingPagination.pagedRows.value,
+  emptyText: '暂无映射记录',
+  pagerConfig: mappingPagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+
+const userGridEvents: NativeVxeGridEvents<UserApi.UserListItem> = {
+  'page-change': ({ currentPage, pageSize: nextPageSize }) => {
+    const normalizedPageSize = nextPageSize || pageSize.value;
+    pageIndex.value = normalizedPageSize === pageSize.value ? currentPage || 1 : 1;
+    pageSize.value = normalizedPageSize;
+    void loadUsers();
+  },
+};
+const onlineGridEvents: NativeVxeGridEvents<OnlineUserApi.OnlineUserItem> = {
+  'page-change': onlinePagination.handlePageChange,
+};
+const mappingGridEvents: NativeVxeGridEvents<UserApi.ExternalAccountMapping> = {
+  'page-change': mappingPagination.handlePageChange,
+};
+
+const [UserGrid] = useVbenVxeGrid<UserApi.UserListItem>({
+  gridEvents: userGridEvents,
+  gridOptions: {},
+});
+const [OnlineGrid] = useVbenVxeGrid<OnlineUserApi.OnlineUserItem>({ gridOptions: {} });
+const [MappingGrid] = useVbenVxeGrid<UserApi.ExternalAccountMapping>({ gridOptions: {} });
 
 function normalizeTree(items: OrganizationApi.OrganizationTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTreeSelect(items, (item) => item.displayName);
 }
 
+function buildTreeTitle(item: OrganizationApi.OrganizationTreeItem) {
+  return item.disabled
+    ? `${item.displayName}（仅可见）`
+    : `${item.displayName}（${item.memberCount}）`;
+}
+
+function filterOrganizationTree(
+  items: OrganizationApi.OrganizationTreeItem[],
+): OrganizationApi.OrganizationTreeItem[] {
+  const keyword = organizationTreeKeyword.value.trim().toLowerCase();
+  if (!keyword) {
+    return items;
+  }
+
+  const result: OrganizationApi.OrganizationTreeItem[] = [];
+  for (const item of items) {
+    const children = filterOrganizationTree(item.children || []);
+    const matched =
+      item.displayName.toLowerCase().includes(keyword) ||
+      item.code.toLowerCase().includes(keyword);
+
+    if (matched || children.length > 0) {
+      result.push({
+        ...item,
+        children,
+      });
+    }
+  }
+  return result;
+}
+
 async function loadFilters() {
+  loadingTree.value = true;
   const [treeResult, roleResult] = await Promise.allSettled([
     getOrganizationTreeApi(),
     getRoleOptionsApi(),
@@ -178,12 +298,16 @@ async function loadFilters() {
   if (treeResult.status === 'rejected' || roleResult.status === 'rejected') {
     message.warning('筛选条件部分加载失败，稍后可重试。');
   }
+  loadingTree.value = false;
 }
 
 async function loadUsers() {
   loading.value = true;
   try {
     const result = await getUserListApi({
+      displayName: displayNameFilter.value.trim() || undefined,
+      email: emailFilter.value.trim() || undefined,
+      employeeNo: employeeNoFilter.value.trim() || undefined,
       keyword: keyword.value || undefined,
       isActive:
         statusFilter.value === undefined
@@ -191,8 +315,10 @@ async function loadUsers() {
           : statusFilter.value === 'true',
       maxResultCount: pageSize.value,
       organizationUnitId: organizationUnitId.value || undefined,
+      phoneNumber: phoneNumberFilter.value.trim() || undefined,
       roleName: roleName.value || undefined,
       skipCount: (pageIndex.value - 1) * pageSize.value,
+      userName: userNameFilter.value.trim() || undefined,
     });
     users.value = result.items;
     totalCount.value = result.totalCount;
@@ -267,7 +393,7 @@ function openCreate() {
   formState.phoneNumber = '';
   formState.roleNames = [];
   formState.username = '';
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function openResetPassword(record: UserApi.UserListItem) {
@@ -290,7 +416,7 @@ function openEdit(record: UserApi.UserListItem) {
   formState.phoneNumber = record.phoneNumber || '';
   formState.roleNames = [...record.roles];
   formState.username = record.username;
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function findOrganizationUnitIdByName(displayName: string): null | string {
@@ -346,7 +472,7 @@ async function handleSubmit() {
       message.success('用户已创建');
     }
 
-    modalVisible.value = false;
+    createDrawerVisible.value = false;
     await refreshUserData();
   } finally {
     saving.value = false;
@@ -407,21 +533,6 @@ async function handleToggleStatus(record: UserApi.UserListItem, checked: boolean
   });
 }
 
-function handleTableChange(
-  pagination: { current?: number; pageSize?: number },
-  _filters?: unknown,
-  _sorter?: unknown,
-  extra?: { action?: string },
-) {
-  if (extra?.action === 'sort') {
-    return;
-  }
-
-  pageIndex.value = pagination.current || 1;
-  pageSize.value = pagination.pageSize || pageSize.value;
-  void loadUsers();
-}
-
 function searchUsers() {
   if (keywordSearchTimer) {
     clearTimeout(keywordSearchTimer);
@@ -431,9 +542,27 @@ function searchUsers() {
   void loadUsers();
 }
 
+function handleOrganizationSelect(keys: (number | string)[]) {
+  organizationUnitId.value = keys.length > 0 ? `${keys[0]}` : undefined;
+}
+
+function clearOrganizationFilter() {
+  if (organizationUnitId.value) {
+    organizationUnitId.value = undefined;
+    return;
+  }
+
+  searchUsers();
+}
+
 async function resetFilters() {
   suppressFilterWatch = true;
   keyword.value = '';
+  userNameFilter.value = '';
+  displayNameFilter.value = '';
+  emailFilter.value = '';
+  employeeNoFilter.value = '';
+  phoneNumberFilter.value = '';
   organizationUnitId.value = undefined;
   roleName.value = undefined;
   statusFilter.value = undefined;
@@ -442,14 +571,25 @@ async function resetFilters() {
   await loadUsers();
 }
 
-watch([organizationUnitId, roleName, statusFilter], () => {
+watch([
+  organizationUnitId,
+  roleName,
+  statusFilter,
+], () => {
   if (suppressFilterWatch) {
     return;
   }
   searchUsers();
 });
 
-watch(keyword, () => {
+watch([
+  keyword,
+  userNameFilter,
+  displayNameFilter,
+  emailFilter,
+  employeeNoFilter,
+  phoneNumberFilter,
+], () => {
   if (suppressFilterWatch) {
     return;
   }
@@ -488,142 +628,232 @@ onBeforeUnmount(() => {
         </article>
       </div>
 
-      <Card class="platform-page__card" title="用户列表">
-        <template #extra>
-          <div class="toolbar">
+      <div class="platform-page__workspace">
+        <Card :bordered="false" class="platform-page__org-card rounded-2xl" title="组织部门">
+          <template #extra>
+            <Button type="link" @click="clearOrganizationFilter">全部</Button>
+          </template>
+          <Skeleton :loading="loadingTree" active>
             <Input
-              v-model:value="keyword"
+              v-model:value="organizationTreeKeyword"
               allow-clear
-              placeholder="按账号/姓名/邮箱筛选"
-              @pressEnter="searchUsers"
+              class="platform-page__org-search"
+              placeholder="搜索部门"
             />
-            <TreeSelect
-              v-model:value="organizationUnitId"
-              allow-clear
-              class="toolbar__select"
-              placeholder="按部门筛选"
-              :tree-data="normalizeTree(organizationTree)"
-              tree-default-expand-all
+            <div v-if="organizationNodes.length === 0" class="platform-page__empty">
+              <Empty :description="organizationTreeKeyword ? '未找到匹配部门' : '未找到组织树数据'" />
+            </div>
+            <Tree
+              v-else
+              block-node
+              default-expand-all
+              :selected-keys="selectedOrganizationKeys"
+              :tree-data="organizationNodes"
+              @select="handleOrganizationSelect"
             />
-            <Select
-              v-model:value="roleName"
-              allow-clear
-              class="toolbar__select"
-              placeholder="按角色筛选"
-              :options="roleOptions"
-            />
-            <Select
-              v-model:value="statusFilter"
-              allow-clear
-              class="toolbar__select"
-              placeholder="按状态筛选"
-              :options="[
-                { label: '启用', value: 'true' },
-                { label: '停用', value: 'false' },
-              ]"
-            />
-            <Button type="primary" @click="searchUsers">查询</Button>
-            <Button @click="resetFilters">重置</Button>
-            <Button v-if="canManageUsers" @click="openOnlineDrawer">在线会话</Button>
-            <Button v-if="canManageUsers" type="primary" @click="openCreate">新增用户</Button>
-          </div>
-        </template>
+          </Skeleton>
+        </Card>
 
-        <div v-if="!loading && users.length === 0" class="platform-page__empty">
-          <Empty description="未找到用户数据" />
-        </div>
-        <Table
-          v-else
-          :columns="columns"
-          :data-source="users"
-          :loading="loading"
-          :pagination="{
-            current: pageIndex,
-            pageSize,
-            showSizeChanger: true,
-            showTotal: (total: number) => `共 ${total} 条`,
-            total: totalCount,
-          }"
-          row-key="id"
-          :scroll="{ x: 1480 }"
-          @change="handleTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'roles'">
-              <div class="tag-list">
-                <Tag v-for="role in record.roles" :key="role" color="blue">
-                  {{ role }}
-                </Tag>
+        <div class="platform-page__main">
+          <Card :bordered="false" class="platform-page__filter-card rounded-2xl" title="筛选条件">
+            <template #extra>
+              <Button type="link" @click="searchExpanded = !searchExpanded">
+                {{ searchExpanded ? '收起' : '展开' }}
+              </Button>
+            </template>
+            <Form layout="vertical">
+              <Row :gutter="[12, 4]">
+                <Col :lg="8" :md="12" :span="24">
+                  <Form.Item label="综合关键字">
+                    <Input
+                      v-model:value="keyword"
+                      allow-clear
+                      placeholder="按账号、姓名、邮箱模糊筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col :lg="8" :md="12" :span="24">
+                  <Form.Item label="账号">
+                    <Input
+                      v-model:value="userNameFilter"
+                      allow-clear
+                      placeholder="按账号筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col :lg="8" :md="12" :span="24">
+                  <Form.Item label="姓名">
+                    <Input
+                      v-model:value="displayNameFilter"
+                      allow-clear
+                      placeholder="按姓名筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="工号">
+                    <Input
+                      v-model:value="employeeNoFilter"
+                      allow-clear
+                      placeholder="按工号筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="邮箱">
+                    <Input
+                      v-model:value="emailFilter"
+                      allow-clear
+                      placeholder="按邮箱筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="手机号">
+                    <Input
+                      v-model:value="phoneNumberFilter"
+                      allow-clear
+                      placeholder="按手机号筛选"
+                      @pressEnter="searchUsers"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="部门">
+                    <TreeSelect
+                      v-model:value="organizationUnitId"
+                      allow-clear
+                      placeholder="按部门筛选"
+                      :tree-data="normalizeTree(organizationTree)"
+                      tree-default-expand-all
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="状态">
+                    <Select
+                      v-model:value="statusFilter"
+                      allow-clear
+                      placeholder="按状态筛选"
+                      :options="[
+                        { label: '启用', value: 'true' },
+                        { label: '停用', value: 'false' },
+                      ]"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col v-show="searchExpanded" :lg="8" :md="12" :span="24">
+                  <Form.Item label="角色">
+                    <Select
+                      v-model:value="roleName"
+                      allow-clear
+                      placeholder="按角色筛选"
+                      :options="roleOptions"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <div class="platform-page__filter-actions">
+                <Button @click="resetFilters">重置</Button>
+              </div>
+            </Form>
+          </Card>
+
+          <Card :bordered="false" class="platform-page__card rounded-2xl" title="用户列表">
+            <template #extra>
+              <div class="platform-page__table-actions">
+                <Button v-if="canManageUsers" @click="openOnlineDrawer">在线会话</Button>
+                <Button v-if="canManageUsers" type="primary" @click="openCreate">新增用户</Button>
               </div>
             </template>
-            <template v-else-if="column.key === 'organizationUnitNames'">
-              <div class="tag-list">
-                <Tag
-                  v-for="organizationUnitName in record.organizationUnitNames"
-                  :key="organizationUnitName"
-                >
-                  {{ organizationUnitName }}
+
+            <UserGrid
+              class="app-vxe-card-grid platform-page__user-grid-shell"
+              grid-class="platform-page__user-grid"
+              :grid-events="userGridEvents"
+              :grid-options="userGridOptions"
+            >
+              <template #roles="{ row }">
+                <div class="tag-list">
+                  <Tag v-for="role in row.roles" :key="role" color="blue">
+                    {{ role }}
+                  </Tag>
+                </div>
+              </template>
+              <template #organizationUnitNames="{ row }">
+                <div class="tag-list">
+                  <Tag
+                    v-for="organizationUnitName in row.organizationUnitNames"
+                    :key="organizationUnitName"
+                  >
+                    {{ organizationUnitName }}
+                  </Tag>
+                </div>
+              </template>
+              <template #tenantName="{ row }">
+                <Tag v-if="row.tenantName" color="blue">
+                  {{ row.tenantName }}
                 </Tag>
-              </div>
-            </template>
-            <template v-else-if="column.key === 'tenantName'">
-              <Tag v-if="(record as UserApi.UserListItem).tenantName" color="blue">
-                {{ (record as UserApi.UserListItem).tenantName }}
-              </Tag>
-              <span v-else>—</span>
-            </template>
-            <template v-else-if="column.key === 'isActive'">
-              <Switch
-                v-if="canManageUsers"
-                :checked="record.isActive"
-                checked-children="启用"
-                :loading="actionLoadingKey === `toggle:${(record as UserApi.UserListItem).id}`"
-                un-checked-children="停用"
-                @change="(checked) => handleToggleStatus(record as UserApi.UserListItem, checked === true)"
-              />
-              <Tag v-else :color="record.isActive ? 'success' : 'default'">
-                {{ record.isActive ? '启用' : '停用' }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'isOnline'">
-              <Tag :color="record.isOnline ? 'success' : 'default'">
-                {{ record.isOnline ? '在线' : '离线' }}
-              </Tag>
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <div class="action-list">
-                <Button size="small" type="link" @click="openEdit(record as UserApi.UserListItem)">
-                  编辑
-                </Button>
-                <Button
-                  size="small"
-                  type="link"
-                  @click="openMappingDrawer(record as UserApi.UserListItem)"
-                >
-                  映射记录
-                </Button>
-                <Button
-                  size="small"
-                  type="link"
-                  @click="openResetPassword(record as UserApi.UserListItem)"
-                >
-                  重置密码
-                </Button>
-                <Popconfirm title="确认删除该用户？" @confirm="handleDelete(record.id)">
+                <span v-else>—</span>
+              </template>
+              <template #isActive="{ row }">
+                <Switch
+                  v-if="canManageUsers"
+                  :checked="row.isActive"
+                  checked-children="启用"
+                  :loading="actionLoadingKey === `toggle:${row.id}`"
+                  un-checked-children="停用"
+                  @change="(checked) => handleToggleStatus(row, checked === true)"
+                />
+                <Tag v-else :color="row.isActive ? 'success' : 'default'">
+                  {{ row.isActive ? '启用' : '停用' }}
+                </Tag>
+              </template>
+              <template #isOnline="{ row }">
+                <Tag :color="row.isOnline ? 'success' : 'default'">
+                  {{ row.isOnline ? '在线' : '离线' }}
+                </Tag>
+              </template>
+              <template #actions="{ row }">
+                <div class="action-list">
+                  <Button size="small" type="link" @click="openEdit(row)">
+                    编辑
+                  </Button>
                   <Button
-                    danger
-                    :loading="actionLoadingKey === `delete:${(record as UserApi.UserListItem).id}`"
                     size="small"
                     type="link"
+                    @click="openMappingDrawer(row)"
                   >
-                    删除
+                    映射记录
                   </Button>
-                </Popconfirm>
-              </div>
-            </template>
-          </template>
-        </Table>
-      </Card>
+                  <Button
+                    size="small"
+                    type="link"
+                    @click="openResetPassword(row)"
+                  >
+                    重置密码
+                  </Button>
+                  <Popconfirm title="确认删除该用户？" @confirm="handleDelete(row.id)">
+                    <Button
+                      danger
+                      :loading="actionLoadingKey === `delete:${row.id}`"
+                      size="small"
+                      type="link"
+                    >
+                      删除
+                    </Button>
+                  </Popconfirm>
+                </div>
+              </template>
+            </UserGrid>
+          </Card>
+        </div>
+      </div>
     </section>
 
     <Drawer
@@ -633,46 +863,34 @@ onBeforeUnmount(() => {
       title="在线会话"
       width="720"
     >
-      <div v-if="!onlineLoading && onlineUsers.length === 0" class="platform-page__empty">
-        <Empty description="暂无在线用户" />
-      </div>
-      <Table
-        v-else
-        :columns="onlineColumns"
-        :data-source="onlineUsers"
-        :loading="onlineLoading"
-        :pagination="{ pageSize: 8 }"
-        row-key="id"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'tenantName'">
-            <Tag v-if="record.tenantName" color="blue">{{ record.tenantName }}</Tag>
-            <span v-else>—</span>
-          </template>
-          <template v-else-if="column.key === 'lastAccessedAt'">
-            {{ record.lastAccessedAt ? new Date(record.lastAccessedAt).toLocaleString() : '-' }}
-          </template>
-          <template v-else-if="column.key === 'signedInAt'">
-            {{ record.signedInAt ? new Date(record.signedInAt).toLocaleString() : '-' }}
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <Popconfirm
-              title="确认强制下线该用户？"
-              @confirm="handleForceLogout(record as OnlineUserApi.OnlineUserItem)"
-            >
-              <Button
-                :disabled="!(record as OnlineUserApi.OnlineUserItem).canForceLogout"
-                danger
-                :loading="actionLoadingKey === `force-logout:${(record as OnlineUserApi.OnlineUserItem).userId}`"
-                size="small"
-                type="link"
-              >
-                强制下线
-              </Button>
-            </Popconfirm>
-          </template>
+      <OnlineGrid class="app-vxe-card-grid" :grid-events="onlineGridEvents" :grid-options="onlineGridOptions">
+        <template #tenantName="{ row }">
+          <Tag v-if="row.tenantName" color="blue">{{ row.tenantName }}</Tag>
+          <span v-else>—</span>
         </template>
-      </Table>
+        <template #lastAccessedAt="{ row }">
+          {{ row.lastAccessedAt ? new Date(row.lastAccessedAt).toLocaleString() : '-' }}
+        </template>
+        <template #signedInAt="{ row }">
+          {{ row.signedInAt ? new Date(row.signedInAt).toLocaleString() : '-' }}
+        </template>
+        <template #actions="{ row }">
+          <Popconfirm
+            title="确认强制下线该用户？"
+            @confirm="handleForceLogout(row)"
+          >
+            <Button
+              :disabled="!row.canForceLogout"
+              danger
+              :loading="actionLoadingKey === `force-logout:${row.userId}`"
+              size="small"
+              type="link"
+            >
+              强制下线
+            </Button>
+          </Popconfirm>
+        </template>
+      </OnlineGrid>
     </Drawer>
 
     <Drawer
@@ -693,52 +911,29 @@ onBeforeUnmount(() => {
         </Descriptions.Item>
       </Descriptions>
 
-      <div
-        v-if="!activeMappingUser || activeMappingUser.externalAccounts.length === 0"
-        class="platform-page__empty"
-      >
-        <Empty description="暂无映射记录" />
-      </div>
-      <Table
-        v-else
-        :columns="[
-          { dataIndex: 'externalSource', key: 'externalSource', title: '外部系统', width: 120 },
-          { dataIndex: 'externalUserId', key: 'externalUserId', title: '外部账号标识', width: 220 },
-          { dataIndex: 'status', key: 'status', title: '状态', width: 100 },
-          { dataIndex: 'boundAt', key: 'boundAt', title: '绑定时间', width: 180 },
-          { dataIndex: 'lastSyncedAt', key: 'lastSyncedAt', title: '最近同步', width: 180 },
-          { dataIndex: 'remark', key: 'remark', title: '备注', width: 220 },
-        ]"
-        :data-source="activeMappingUser?.externalAccounts || []"
-        :pagination="{ pageSize: 8 }"
-        row-key="id"
-        :scroll="{ x: 980 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <Tag :color="record.status === 'active' ? 'success' : 'default'">
-              {{ record.status === 'active' ? '有效' : record.status }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'boundAt'">
-            {{ record.boundAt ? new Date(record.boundAt).toLocaleString() : '-' }}
-          </template>
-          <template v-else-if="column.key === 'lastSyncedAt'">
-            {{ record.lastSyncedAt ? new Date(record.lastSyncedAt).toLocaleString() : '-' }}
-          </template>
-          <template v-else-if="column.key === 'remark'">
-            {{ record.remark || '-' }}
-          </template>
+      <MappingGrid class="app-vxe-card-grid" :grid-events="mappingGridEvents" :grid-options="mappingGridOptions">
+        <template #status="{ row }">
+          <Tag :color="row.status === 'active' ? 'success' : 'default'">
+            {{ row.status === 'active' ? '有效' : row.status }}
+          </Tag>
         </template>
-      </Table>
+        <template #boundAt="{ row }">
+          {{ row.boundAt ? new Date(row.boundAt).toLocaleString() : '-' }}
+        </template>
+        <template #lastSyncedAt="{ row }">
+          {{ row.lastSyncedAt ? new Date(row.lastSyncedAt).toLocaleString() : '-' }}
+        </template>
+        <template #remark="{ row }">
+          {{ row.remark || '-' }}
+        </template>
+      </MappingGrid>
     </Drawer>
 
-    <Modal
-      v-model:open="modalVisible"
-      :confirm-loading="saving"
+    <Drawer
+      v-model:open="createDrawerVisible"
       :title="editingUserId ? '编辑用户' : '新增用户'"
+      destroy-on-close
       width="720px"
-      @ok="handleSubmit"
     >
       <Form layout="vertical">
         <div class="form-grid">
@@ -800,7 +995,13 @@ onBeforeUnmount(() => {
           </Form.Item>
         </div>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="createDrawerVisible = false">取消</Button>
+          <Button :loading="saving" type="primary" @click="handleSubmit">保存</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <Modal
       v-model:open="resetPasswordVisible"
@@ -825,6 +1026,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-page {
   --platform-surface: var(--ant-color-bg-container, hsl(var(--card)));
   --platform-border: var(--ant-color-border-secondary, hsl(var(--border)));
@@ -837,20 +1039,22 @@ onBeforeUnmount(() => {
 
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
   color: var(--platform-text);
 }
 
 .platform-page__metrics {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .platform-page__metric,
-.platform-page__card {
+.platform-page__card,
+.platform-page__filter-card,
+.platform-page__org-card {
   border: 1px solid var(--platform-border);
-  border-radius: 20px;
+  @apply rounded-2xl;
   background: var(--platform-surface);
   box-shadow: var(--platform-shadow);
   color: inherit;
@@ -859,8 +1063,8 @@ onBeforeUnmount(() => {
 .platform-page__metric {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px;
+  @apply gap-2;
+  @apply px-4 py-4;
 }
 
 .platform-page__metric span {
@@ -870,17 +1074,32 @@ onBeforeUnmount(() => {
 
 .platform-page__metric strong {
   color: var(--platform-text);
-  font-size: 30px;
+  font-size: 24px;
 }
 
-.platform-page__card :deep(.ant-card-head),
-.platform-page__card :deep(.ant-card-body) {
-  background: transparent;
-  color: inherit;
+.platform-page__workspace {
+  display: grid;
+  @apply gap-4;
+  grid-template-columns: 340px minmax(0, 1fr);
+  align-items: stretch;
 }
 
-.platform-page__card :deep(.ant-card-head) {
-  border-bottom-color: var(--platform-border);
+.platform-page__org-card {
+  position: sticky;
+  top: 16px;
+  min-height: 100%;
+}
+
+.platform-page__main {
+  display: flex;
+  flex-direction: column;
+  @apply gap-4;
+  min-width: 0;
+  min-height: 640px;
+}
+
+.platform-page__card {
+  flex: 1;
 }
 
 .platform-page__empty {
@@ -889,38 +1108,51 @@ onBeforeUnmount(() => {
   place-items: center;
 }
 
-.toolbar {
+.platform-page__org-search {
+  @apply mb-3;
+}
+
+.platform-page__filter-actions,
+.platform-page__table-actions {
   display: flex;
+  @apply gap-2.5;
+  align-items: center;
+}
+
+.platform-page__filter-actions {
+  justify-content: flex-end;
+  @apply pt-1;
+}
+
+.platform-page__table-actions {
   flex-wrap: wrap;
-  gap: 10px;
+  justify-content: flex-end;
 }
 
-.toolbar :deep(.ant-input),
-.toolbar__select {
-  min-width: 220px;
-}
-
-.tag-list,
 .action-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-}
-
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.form-grid__full {
-  grid-column: 1 / -1;
+  @apply gap-x-1 gap-y-0.5;
+  justify-content: center;
 }
 
 @media (max-width: 1080px) {
   .platform-page__metrics,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .platform-page__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-page__org-card {
+    position: static;
+  }
+
+  .platform-page__filter-actions,
+  .platform-page__table-actions {
+    justify-content: flex-start;
   }
 }
 </style>

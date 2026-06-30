@@ -1,4 +1,7 @@
-import type { VxeTableGridOptions } from '@vben/plugins/vxe-table';
+import type {
+  VxeGridListeners,
+  VxeTableGridOptions,
+} from '@vben/plugins/vxe-table';
 
 import type { ComponentPropsMap, ComponentType } from './component';
 
@@ -22,7 +25,13 @@ setupVbenVxeTable({
         columnConfig: {
           resizable: true,
         },
-        minHeight: 180,
+        minHeight: 0,
+        scrollbarConfig: {
+          height: 8,
+          width: 8,
+          x: {},
+          y: {},
+        },
         formConfig: {
           // 全局禁用vxe-table的表单配置，使用formOptions
           enabled: false,
@@ -73,5 +82,8 @@ setupVbenVxeTable({
 export const useVbenVxeGrid = <T extends Record<string, any>>(
   ...rest: Parameters<typeof useGrid<T, ComponentType, ComponentPropsMap>>
 ) => useGrid<T, ComponentType, ComponentPropsMap>(...rest);
+
+export type NativeVxeGridEvents<T extends Record<string, any> = any> =
+  VxeGridListeners<T> & Record<string, (...args: any[]) => void>;
 
 export type * from '@vben/plugins/vxe-table';

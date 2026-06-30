@@ -12,7 +12,7 @@ public class ProjectOverviewItemDto
 
     public string Name { get; set; } = string.Empty;
 
-    public string NextCycleName { get; set; } = string.Empty;
+    public string NextSprintName { get; set; } = string.Empty;
 
     public string ProjectCode { get; set; } = string.Empty;
 

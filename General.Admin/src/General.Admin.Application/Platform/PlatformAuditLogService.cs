@@ -59,7 +59,11 @@ public class PlatformAuditLogService : ITransientDependency
                 .ToList();
         }
 
-        var logs = await QueryAuditLogsAsync(input, maxResultCount);
+        var queryable = await BuildAuditLogQueryAsync(input);
+        var logs = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .OrderByDescending(x => x.ExecutionTime)
+                .Take(maxResultCount));
         return logs.Select(MapItem).ToList();
     }
 
@@ -118,7 +122,12 @@ public class PlatformAuditLogService : ITransientDependency
             };
         }
 
-        var ordered = await QueryAuditLogsAsync(input, maxResultCount);
+        var queryable = await BuildAuditLogQueryAsync(input);
+        var ordered = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .OrderByDescending(x =>
+ x.ExecutionTime)
+                .Take(maxResultCount));
         var dtoMap = ordered.ToDictionary(x => x.Id, MapItem);
 
         return new PlatformLogDashboardDto
@@ -168,7 +177,37 @@ public class PlatformAuditLogService : ITransientDependency
         };
     }
 
-    private async Task<List<AuditLog>> QueryAuditLogsAsync(PlatformAuditLogQueryInput input, int maxResultCount)
+    public async Task<PlatformPagedResultDto<PlatformAuditLogItemDto>> GetPagedAsync(PlatformAuditLogQueryInput input)
+    {
+        var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 500);
+        var skipCount = Math.Max(input.SkipCount, 0);
+
+        var requestLogs = await _requestAuditStore.QueryPagedAsync(input);
+        if (requestLogs.TotalCount > 0)
+        {
+            return new PlatformPagedResultDto<PlatformAuditLogItemDto>
+            {
+                Items = requestLogs.Items.Select(MapRequestLogItem).ToList(),
+                TotalCount = requestLogs.TotalCount
+            };
+        }
+
+        var queryable = await BuildAuditLogQueryAsync(input);
+        var totalCount = await _asyncQueryableExecuter.CountAsync(queryable);
+        var logs = await _asyncQueryableExecuter.ToListAsync(
+            queryable
+                .OrderByDescending(x => x.ExecutionTime)
+                .Skip(skipCount)
+                .Take(maxResultCount));
+
+        return new PlatformPagedResultDto<PlatformAuditLogItemDto>
+        {
+            Items = logs.Select(MapItem).ToList(),
+            TotalCount = totalCount
+        };
+    }
+
+    private async Task<IQueryable<AuditLog>> BuildAuditLogQueryAsync(PlatformAuditLogQueryInput input)
     {
         var keyword = input.Keyword?.Trim();
         var category = input.Category?.Trim().ToLowerInvariant();
@@ -196,11 +235,7 @@ public class PlatformAuditLogService : ITransientDependency
                     (action.MethodName != null && action.MethodName.Contains(keyword))));
         }
 
-        queryable = ApplyAuditCategoryFilter(queryable, category)
-            .OrderByDescending(x => x.ExecutionTime)
-            .Take(maxResultCount);
-
-        return await _asyncQueryableExecuter.ToListAsync(queryable);
+        return ApplyAuditCategoryFilter(queryable, category);
     }
 
     private static IQueryable<AuditLog> ApplyAuditCategoryFilter(IQueryable<AuditLog> queryable, string? category)
@@ -276,33 +311,38 @@ public class PlatformAuditLogService : ITransientDependency
     private async Task<List<PlatformAuditLogItemDto>> GetRequestLogsAsync(PlatformAuditLogQueryInput input)
     {
         var logs = (await _requestAuditStore.QueryAsync(input))
-            .Select(item => new PlatformAuditLogItemDto
-            {
-                ActionSummary = item.ActionSummary,
-                BrowserInfo = item.BrowserInfo,
-                Category = item.Category ?? "api",
-                ClientIpAddress = item.ClientIpAddress,
-                ExecutionDuration = item.ExecutionDuration,
-                ExecutionTime = item.ExecutionTime,
-                ExceptionMessage = item.ExceptionMessage,
-                HasException = item.HasException,
-                HttpMethod = item.HttpMethod,
-                HttpStatusCode = item.HttpStatusCode,
-                HostOperatorUserId = item.HostOperatorUserId,
-                HostOperatorUserName = item.HostOperatorUserName,
-                Id = item.Id,
-                ImpersonatedUserId = item.ImpersonatedUserId,
-                ImpersonatedUserName = item.ImpersonatedUserName,
-                IsHostTenantOperation = item.IsHostTenantOperation,
-                MenuTitle = item.MenuTitle,
-                OperationSessionId = item.OperationSessionId,
-                OperationTenantId = item.OperationTenantId,
-                TenantName = item.TenantName,
-                Url = item.Url,
-                UserName = item.UserName
-            })
+            .Select(MapRequestLogItem)
             .ToList();
 
         return logs;
+    }
+
+    private static PlatformAuditLogItemDto MapRequestLogItem(PlatformRequestAuditEntry item)
+    {
+        return new PlatformAuditLogItemDto
+        {
+            ActionSummary = item.ActionSummary,
+            BrowserInfo = item.BrowserInfo,
+            Category = item.Category ?? "api",
+            ClientIpAddress = item.ClientIpAddress,
+            ExecutionDuration = item.ExecutionDuration,
+            ExecutionTime = item.ExecutionTime,
+            ExceptionMessage = item.ExceptionMessage,
+            HasException = item.HasException,
+            HttpMethod = item.HttpMethod,
+            HttpStatusCode = item.HttpStatusCode,
+            HostOperatorUserId = item.HostOperatorUserId,
+            HostOperatorUserName = item.HostOperatorUserName,
+            Id = item.Id,
+            ImpersonatedUserId = item.ImpersonatedUserId,
+            ImpersonatedUserName = item.ImpersonatedUserName,
+            IsHostTenantOperation = item.IsHostTenantOperation,
+            MenuTitle = item.MenuTitle,
+            OperationSessionId = item.OperationSessionId,
+            OperationTenantId = item.OperationTenantId,
+            TenantName = item.TenantName,
+            Url = item.Url,
+            UserName = item.UserName
+        };
     }
 }

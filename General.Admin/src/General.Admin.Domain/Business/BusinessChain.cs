@@ -60,4 +60,26 @@ public class BusinessChain : FullAuditedAggregateRoot<Guid>
         LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
         SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
     }
+
+    public void Update(
+        string chainCode,
+        string stage,
+        string type,
+        string title,
+        string status,
+        Guid ownerUserId,
+        string? summary = null,
+        string? linkedContractCode = null,
+        string? sourceChangeCode = null)
+    {
+        ChainCode = Check.NotNullOrWhiteSpace(chainCode, nameof(chainCode), 64);
+        Stage = Check.NotNullOrWhiteSpace(stage, nameof(stage), 32);
+        Type = Check.NotNullOrWhiteSpace(type, nameof(type), 32);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        OwnerUserId = ownerUserId;
+        Summary = summary?.Trim() ?? string.Empty;
+        LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
+        SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
+    }
 }

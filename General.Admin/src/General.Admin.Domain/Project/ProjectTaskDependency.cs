@@ -3,7 +3,7 @@ using Volo.Abp.Domain.Entities.Auditing;
 namespace General.Admin.Project;
 
 /// <summary>
-/// 任务依赖关系：定义前置任务与后续任务之间的依赖类型（FS/FF/SS/SF），用于排期和关键路径计算。
+/// 任务依赖关系：定义前置任务与后续任务之间的依赖类型（FS/FF/SS/SF），用于 Sprint 和关键路径计算。
 /// </summary>
 public class ProjectTaskDependency : FullAuditedAggregateRoot<Guid>
 {

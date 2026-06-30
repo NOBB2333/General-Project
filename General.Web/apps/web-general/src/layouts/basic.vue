@@ -157,8 +157,12 @@ async function refreshUnreadCount() {
     return;
   }
 
-  const unread = await getNotificationUnreadCountApi();
-  unreadCount.value = unread.count;
+  try {
+    const unread = await getNotificationUnreadCountApi();
+    unreadCount.value = unread.count;
+  } catch {
+    // 后端或开发代理临时不可用时，未读数轮询不应打断当前页面。
+  }
 }
 
 onMounted(() => {
@@ -242,14 +246,15 @@ watch(
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .tenant-operation-bar {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  @apply gap-2;
   max-width: 240px;
-  padding: 2px 10px;
+  @apply px-2.5 py-0.5;
   border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  @apply rounded-md;
   color: hsl(var(--foreground));
   background: hsl(var(--muted));
   font-size: 13px;
@@ -265,7 +270,7 @@ watch(
 @media (max-width: 640px) {
   .tenant-operation-bar {
     max-width: 132px;
-    gap: 4px;
+    @apply gap-1;
     padding-inline: 6px;
   }
 }

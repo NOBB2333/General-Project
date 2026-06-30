@@ -4,7 +4,17 @@ public class PlatformFileListInput
 {
     public string? Category { get; set; }
 
+    public string? CategoryPrefix { get; set; }
+
     public string? BusinessType { get; set; }
+
+    public string? BusinessId { get; set; }
+
+    public string? BusinessKeyword { get; set; }
+
+    public Guid? BusinessProjectId { get; set; }
+
+    public string? BusinessScope { get; set; }
 
     public string? Keyword { get; set; }
 

@@ -59,11 +59,11 @@ public class PlatformSchedulerController : ControllerBase
     }
 
     [HttpGet("{jobKey}/records")]
-    public async Task<ActionResult<ApiResponse<List<PlatformScheduledJobRecordDto>>>> GetRecordsAsync(
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformScheduledJobRecordDto>>>> GetRecordsAsync(
         string jobKey,
         [FromQuery] PlatformScheduledJobRecordQueryInput input)
     {
-        return ApiResponse<List<PlatformScheduledJobRecordDto>>.Ok(
+        return ApiResponse<PlatformPagedResultDto<PlatformScheduledJobRecordDto>>.Ok(
             await _schedulerService.GetRecordsAsync(jobKey, input));
     }
 

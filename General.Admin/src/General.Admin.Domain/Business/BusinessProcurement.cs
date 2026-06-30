@@ -59,4 +59,26 @@ public class BusinessProcurement : FullAuditedAggregateRoot<Guid>
         LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
         SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
     }
+
+    public void Update(
+        string procurementCode,
+        string title,
+        string supplierName,
+        decimal amount,
+        DateTime signDate,
+        string stage,
+        string status,
+        string? linkedContractCode = null,
+        string? sourceChangeCode = null)
+    {
+        ProcurementCode = Check.NotNullOrWhiteSpace(procurementCode, nameof(procurementCode), 64);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
+        SupplierName = Check.NotNullOrWhiteSpace(supplierName, nameof(supplierName), 128);
+        Amount = amount;
+        SignDate = signDate;
+        Stage = Check.NotNullOrWhiteSpace(stage, nameof(stage), 32);
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        LinkedContractCode = linkedContractCode?.Trim() ?? string.Empty;
+        SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
+    }
 }

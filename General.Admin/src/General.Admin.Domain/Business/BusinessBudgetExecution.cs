@@ -42,4 +42,20 @@ public class BusinessBudgetExecution : FullAuditedAggregateRoot<Guid>
         VarianceAmount = varianceAmount;
         SortOrder = sortOrder;
     }
+
+    public void Update(
+        string budgetCode,
+        string category,
+        decimal adjustedAmount,
+        decimal executedAmount,
+        decimal? varianceAmount,
+        int sortOrder)
+    {
+        BudgetCode = Check.NotNullOrWhiteSpace(budgetCode, nameof(budgetCode), 64);
+        Category = Check.NotNullOrWhiteSpace(category, nameof(category), 64);
+        AdjustedAmount = adjustedAmount;
+        ExecutedAmount = executedAmount;
+        VarianceAmount = varianceAmount ?? adjustedAmount - executedAmount;
+        SortOrder = sortOrder;
+    }
 }

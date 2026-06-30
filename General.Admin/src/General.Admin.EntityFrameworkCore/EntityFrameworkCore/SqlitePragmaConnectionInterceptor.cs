@@ -30,6 +30,11 @@ public sealed class SqlitePragmaConnectionInterceptor : DbConnectionInterceptor
             return;
         }
 
+        if (IsReadOnlyConnection(sqliteConnection))
+        {
+            return;
+        }
+
         using var command = sqliteConnection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=30000;";
         command.ExecuteNonQuery();
@@ -42,8 +47,26 @@ public sealed class SqlitePragmaConnectionInterceptor : DbConnectionInterceptor
             return;
         }
 
+        if (IsReadOnlyConnection(sqliteConnection))
+        {
+            return;
+        }
+
         await using var command = sqliteConnection.CreateCommand();
         command.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=30000;";
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static bool IsReadOnlyConnection(SqliteConnection connection)
+    {
+        try
+        {
+            var builder = new SqliteConnectionStringBuilder(connection.ConnectionString);
+            return builder.Mode == SqliteOpenMode.ReadOnly;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

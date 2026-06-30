@@ -25,7 +25,7 @@ import { normalizePlatformTree } from '#/composables/platform/use-tree-normaliza
 
 defineOptions({ name: 'PlatformMenuPage' });
 
-const ALL_APP_CODES = 'platform,project,business';
+const ALL_APP_CODES = 'platform,project,business,ai';
 const APP_OPTIONS = [
   { label: '平台', value: 'platform' },
   { label: '项目', value: 'project' },
@@ -225,7 +225,7 @@ loadMenus();
 <template>
   <Page description="菜单管理重构为左侧树、右侧详情，只在点击编辑后进入保存模式。" title="菜单管理">
     <div class="platform-menu">
-      <Card :bordered="false" class="platform-menu__tree" title="菜单树">
+      <Card :bordered="false" class="platform-menu__tree rounded-2xl" title="菜单树">
         <template #extra>
           <Space>
             <Button type="primary" @click="openCreate()">新增根菜单</Button>
@@ -247,7 +247,7 @@ loadMenus();
         <Empty v-else description="暂无菜单" />
       </Card>
 
-      <Card :bordered="false" title="菜单详情">
+      <Card class="rounded-2xl" :bordered="false" title="菜单详情">
         <template #extra>
           <Space>
             <Switch
@@ -331,9 +331,10 @@ loadMenus();
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-menu {
   display: grid;
-  gap: 16px;
+  @apply gap-4;
   grid-template-columns: 360px minmax(0, 1fr);
 }
 
@@ -345,7 +346,7 @@ loadMenus();
 
 .platform-menu__form-grid {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 

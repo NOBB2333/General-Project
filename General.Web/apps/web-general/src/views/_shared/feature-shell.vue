@@ -53,6 +53,7 @@ const props = defineProps<{
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .feature-shell {
   --feature-surface: var(--ant-color-bg-container, hsl(var(--card)));
   --feature-surface-alt: var(--ant-color-bg-elevated, var(--feature-surface));
@@ -75,7 +76,7 @@ const props = defineProps<{
   --feature-shadow: var(--ant-box-shadow-secondary, 0 24px 60px rgb(15 23 42 / 8%));
 
   min-height: 100%;
-  padding: 28px;
+  @apply p-7;
   background:
     radial-gradient(circle at top left, hsl(var(--primary) / 0.16), transparent 34%),
     radial-gradient(circle at top right, hsl(var(--accent) / 0.88), transparent 30%),
@@ -88,7 +89,7 @@ const props = defineProps<{
 
 .feature-shell__hero {
   display: grid;
-  gap: 20px;
+  @apply gap-5;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
   align-items: stretch;
 }
@@ -97,7 +98,7 @@ const props = defineProps<{
 .feature-shell__metric,
 .feature-shell__card {
   border: 1px solid var(--feature-border);
-  border-radius: 26px;
+  @apply rounded-3xl;
   backdrop-filter: blur(10px);
   box-shadow: var(--feature-shadow);
   transition:
@@ -109,12 +110,12 @@ const props = defineProps<{
 }
 
 .feature-shell__copy {
-  padding: 28px;
+  @apply p-7;
   background: var(--feature-surface);
 }
 
 .feature-shell__eyebrow {
-  margin: 0 0 10px;
+  @apply mb-2.5;
   color: var(--ant-color-primary);
   font-size: 13px;
   font-weight: 700;
@@ -123,7 +124,7 @@ const props = defineProps<{
 }
 
 .feature-shell__title {
-  margin: 0;
+  @apply m-0;
   color: var(--feature-text);
   font-size: clamp(32px, 4vw, 48px);
   line-height: 1.05;
@@ -131,7 +132,7 @@ const props = defineProps<{
 
 .feature-shell__summary {
   max-width: 58ch;
-  margin: 16px 0 0;
+  @apply mt-4;
   color: var(--feature-text-secondary);
   font-size: 15px;
   line-height: 1.75;
@@ -139,37 +140,37 @@ const props = defineProps<{
 
 .feature-shell__grid {
   display: grid;
-  gap: 14px;
+  @apply gap-3.5;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .feature-shell__metric {
-  padding: 18px;
+  @apply p-4;
   background: var(--feature-surface-alt);
 }
 
 .feature-shell__metric-label {
   display: block;
-  margin-bottom: 12px;
+  @apply mb-3;
   color: var(--feature-text-secondary);
   font-size: 13px;
 }
 
 .feature-shell__metric-value {
   color: var(--feature-text);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
 }
 
 .feature-shell__content {
   display: grid;
-  gap: 18px;
+  @apply gap-4;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 18px;
+  @apply mt-4;
 }
 
 .feature-shell__card {
-  padding: 24px;
+  @apply p-6;
   background: var(--feature-surface);
 }
 
@@ -180,19 +181,19 @@ const props = defineProps<{
 }
 
 .feature-shell__card h2 {
-  margin: 0 0 14px;
+  @apply mb-3.5;
   font-size: 18px;
 }
 
 .feature-shell__card ul {
-  padding-left: 18px;
-  margin: 0;
+  @apply pl-4;
+  @apply m-0;
   color: var(--feature-text-secondary);
   line-height: 1.8;
 }
 
 .feature-shell__card--accent p {
-  margin: 0;
+  @apply m-0;
   color: var(--feature-text-secondary);
   line-height: 1.8;
 }
@@ -203,7 +204,7 @@ const props = defineProps<{
 
 @media (max-width: 960px) {
   .feature-shell {
-    padding: 18px;
+    @apply p-4;
   }
 
   .feature-shell__hero,

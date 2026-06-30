@@ -75,16 +75,29 @@ function createRequestClient(
     if (typeof error === 'string') {
       return error;
     }
-    if (error?.message) {
-      return error.message;
+    const errorMessage = typeof error?.message === 'string' ? error.message : '';
+    const errorCode = typeof error?.code === 'string' ? error.code : '';
+    if (errorMessage && !isGenericBusinessExceptionMessage(errorMessage)) {
+      return errorMessage;
     }
     if (Array.isArray(error?.details) && error.details.length > 0) {
       return error.details.map((item: any) => item?.message || item).join('；');
     }
+    if (errorCode && containsCjkText(errorCode)) {
+      return errorCode;
+    }
     if (typeof responseData?.message === 'string') {
       return responseData.message;
     }
-    return '';
+    return errorMessage;
+  }
+
+  function isGenericBusinessExceptionMessage(messageText: string) {
+    return messageText.includes('Volo.Abp.BusinessException');
+  }
+
+  function containsCjkText(value: string) {
+    return /[\u3400-\u9fff]/u.test(value);
   }
 
   // 请求头处理

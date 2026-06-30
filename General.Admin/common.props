@@ -16,4 +16,10 @@
     <Content Remove="$(UserProfile)\.nuget\packages\*\*\contentFiles\any\*\*.abppkg*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 钉住存在漏洞的传递依赖，等待上游 ABP / EF Core 依赖链升级后再移除。 -->
+    <PackageReference Include="Scriban" Version="7.2.5" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+  </ItemGroup>
+
 </Project>

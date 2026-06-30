@@ -27,7 +27,13 @@ export namespace AuditLogApi {
     endTime?: string;
     keyword?: string;
     maxResultCount?: number;
+    skipCount?: number;
     startTime?: string;
+  }
+
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
   }
 
   export interface LogStatItem {
@@ -55,6 +61,12 @@ export namespace AuditLogApi {
 
 export async function getAuditLogListApi(params?: AuditLogApi.AuditLogQuery) {
   return requestClient.get<AuditLogApi.AuditLogItem[]>('/app/audit-log/list', {
+    params,
+  });
+}
+
+export async function getAuditLogPagedApi(params?: AuditLogApi.AuditLogQuery) {
+  return requestClient.get<AuditLogApi.PagedResult<AuditLogApi.AuditLogItem>>('/app/audit-log/paged', {
     params,
   });
 }

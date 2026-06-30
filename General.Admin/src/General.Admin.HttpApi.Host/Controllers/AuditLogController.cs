@@ -27,6 +27,13 @@ public class AuditLogController : ControllerBase
         return ApiResponse<List<PlatformAuditLogItemDto>>.Ok(await _auditLogService.GetListAsync(input));
     }
 
+    [HttpGet("paged")]
+    [Authorize(AdminPermissions.Platform.AuditLogView)]
+    public async Task<ActionResult<ApiResponse<PlatformPagedResultDto<PlatformAuditLogItemDto>>>> GetPagedAsync([FromQuery] PlatformAuditLogQueryInput input)
+    {
+        return ApiResponse<PlatformPagedResultDto<PlatformAuditLogItemDto>>.Ok(await _auditLogService.GetPagedAsync(input));
+    }
+
     [HttpGet("dashboard")]
     [Authorize(AdminPermissions.Platform.AuditLogView)]
     public async Task<ActionResult<ApiResponse<PlatformLogDashboardDto>>> GetDashboardAsync([FromQuery] PlatformAuditLogQueryInput input)

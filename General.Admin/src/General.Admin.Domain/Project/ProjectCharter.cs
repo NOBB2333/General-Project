@@ -46,12 +46,12 @@ public class ProjectCharter : FullAuditedAggregateRoot<Guid>
         string approvalStatus) : base(id)
     {
         ProjectId = projectId;
-        BusinessCase = Check.NotNullOrWhiteSpace(businessCase, nameof(businessCase), 2048);
-        Objectives = Check.NotNullOrWhiteSpace(objectives, nameof(objectives), 2048);
-        ScopeBoundary = Check.NotNullOrWhiteSpace(scopeBoundary, nameof(scopeBoundary), 2048);
-        Assumptions = assumptions.Trim();
-        Constraints = constraints.Trim();
-        SuccessCriteria = Check.NotNullOrWhiteSpace(successCriteria, nameof(successCriteria), 2048);
+        BusinessCase = NormalizeSummary(businessCase, nameof(businessCase));
+        Objectives = NormalizeSummary(objectives, nameof(objectives));
+        ScopeBoundary = NormalizeSummary(scopeBoundary, nameof(scopeBoundary));
+        Assumptions = NormalizeSummary(assumptions, nameof(assumptions));
+        Constraints = NormalizeSummary(constraints, nameof(constraints));
+        SuccessCriteria = NormalizeSummary(successCriteria, nameof(successCriteria));
         ApprovalStatus = Check.NotNullOrWhiteSpace(approvalStatus, nameof(approvalStatus), 32);
     }
 
@@ -64,12 +64,23 @@ public class ProjectCharter : FullAuditedAggregateRoot<Guid>
         string successCriteria,
         string approvalStatus)
     {
-        BusinessCase = Check.NotNullOrWhiteSpace(businessCase, nameof(businessCase), 2048);
-        Objectives = Check.NotNullOrWhiteSpace(objectives, nameof(objectives), 2048);
-        ScopeBoundary = Check.NotNullOrWhiteSpace(scopeBoundary, nameof(scopeBoundary), 2048);
-        Assumptions = assumptions.Trim();
-        Constraints = constraints.Trim();
-        SuccessCriteria = Check.NotNullOrWhiteSpace(successCriteria, nameof(successCriteria), 2048);
+        BusinessCase = NormalizeSummary(businessCase, nameof(businessCase));
+        Objectives = NormalizeSummary(objectives, nameof(objectives));
+        ScopeBoundary = NormalizeSummary(scopeBoundary, nameof(scopeBoundary));
+        Assumptions = NormalizeSummary(assumptions, nameof(assumptions));
+        Constraints = NormalizeSummary(constraints, nameof(constraints));
+        SuccessCriteria = NormalizeSummary(successCriteria, nameof(successCriteria));
         ApprovalStatus = Check.NotNullOrWhiteSpace(approvalStatus, nameof(approvalStatus), 32);
+    }
+
+    public void UpdateApprovalStatus(string approvalStatus)
+    {
+        ApprovalStatus = Check.NotNullOrWhiteSpace(approvalStatus, nameof(approvalStatus), 32);
+    }
+
+    private static string NormalizeSummary(string? value, string parameterName)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        return Check.Length(normalized, parameterName, maxLength: 2048) ?? string.Empty;
     }
 }

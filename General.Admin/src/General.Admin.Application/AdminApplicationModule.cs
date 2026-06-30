@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Elsa.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.Account;
 using Volo.Abp.DistributedLocking;
 using Volo.Abp.Mapperly;
@@ -32,8 +33,13 @@ public class AdminApplicationModule : AbpModule
     public override void ConfigureServices(ServiceConfigurationContext context)
     {
         context.Services.AddMapperlyObjectMapper<AdminApplicationModule>();
+        context.Services.AddElsa();
+        context.Services.AddHttpClient();
         context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformLogCleanupJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, ProjectPerformanceSnapshotJobHandler>();
         context.Services.AddTransient<IPlatformScheduledJobHandler, ProjectWeeklyReportReminderJobHandler>();
         context.Services.AddTransient<IPlatformScheduledJobHandler, PlatformTenantHealthCheckJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, AiAutomationJobHandler>();
+        context.Services.AddTransient<IPlatformScheduledJobHandler, IntegrationSyncScheduledJobHandler>();
     }
 }

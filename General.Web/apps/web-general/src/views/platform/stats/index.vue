@@ -1,10 +1,13 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import type { VxeGridProps } from '#/adapter/vxe-table';
+
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Col, DatePicker, Empty, Row, Table } from 'ant-design-vue';
+import { Button, Card, Col, DatePicker, Empty, Row } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getAuditLogDashboardApi, type AuditLogApi } from '#/api/core';
 
 defineOptions({ name: 'PlatformStatsPage' });
@@ -23,9 +26,30 @@ const dashboard = ref<AuditLogApi.LogDashboard>({
 });
 
 const statColumns = [
-  { dataIndex: 'label', key: 'label', title: '对象' },
-  { dataIndex: 'count', key: 'count', title: '次数', width: 100 },
-];
+  { align: 'left', field: 'label', title: '对象' },
+  { field: 'count', title: '次数', width: 100 },
+] satisfies VxeGridProps<AuditLogApi.LogStatItem>['columns'];
+
+function createStatGridOptions(
+  data: AuditLogApi.LogStatItem[],
+): VxeGridProps<AuditLogApi.LogStatItem> {
+  return {
+    columns: statColumns,
+    data,
+    loading: loading.value,
+    pagerConfig: { enabled: false },
+    rowConfig: { keyField: 'key' },
+    size: 'small',
+  };
+}
+
+const apiStatGridOptions = computed(() => createStatGridOptions(dashboard.value.topApis));
+const userStatGridOptions = computed(() => createStatGridOptions(dashboard.value.topUsers));
+const menuStatGridOptions = computed(() => createStatGridOptions(dashboard.value.topMenus));
+
+const [ApiStatGrid] = useVbenVxeGrid<AuditLogApi.LogStatItem>({ gridOptions: {} });
+const [UserStatGrid] = useVbenVxeGrid<AuditLogApi.LogStatItem>({ gridOptions: {} });
+const [MenuStatGrid] = useVbenVxeGrid<AuditLogApi.LogStatItem>({ gridOptions: {} });
 
 async function loadStats() {
   loading.value = true;
@@ -46,7 +70,7 @@ onMounted(loadStats);
 <template>
   <Page description="访问统计按接口、用户、菜单聚合当前平台访问情况。" title="访问统计">
     <section class="platform-stats">
-      <Card :bordered="false" title="查询条件">
+      <Card class="rounded-2xl" :bordered="false" title="查询条件">
         <div class="platform-stats__toolbar">
           <DatePicker.RangePicker
             show-time
@@ -58,44 +82,32 @@ onMounted(loadStats);
 
       <Row :gutter="[16, 16]">
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="接口统计">
+          <Card class="rounded-2xl" :bordered="false" title="接口统计">
             <Empty v-if="dashboard.topApis.length === 0" description="暂无统计数据" />
-            <Table
+            <ApiStatGrid
               v-else
-              :columns="statColumns"
-              :data-source="dashboard.topApis"
-              :loading="loading"
-              :pagination="false"
-              row-key="key"
-              size="small"
+              class="app-vxe-card-grid"
+              :grid-options="apiStatGridOptions"
             />
           </Card>
         </Col>
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="用户统计">
+          <Card class="rounded-2xl" :bordered="false" title="用户统计">
             <Empty v-if="dashboard.topUsers.length === 0" description="暂无统计数据" />
-            <Table
+            <UserStatGrid
               v-else
-              :columns="statColumns"
-              :data-source="dashboard.topUsers"
-              :loading="loading"
-              :pagination="false"
-              row-key="key"
-              size="small"
+              class="app-vxe-card-grid"
+              :grid-options="userStatGridOptions"
             />
           </Card>
         </Col>
         <Col :lg="8" :span="24">
-          <Card :bordered="false" title="菜单动作统计">
+          <Card class="rounded-2xl" :bordered="false" title="菜单动作统计">
             <Empty v-if="dashboard.topMenus.length === 0" description="暂无统计数据" />
-            <Table
+            <MenuStatGrid
               v-else
-              :columns="statColumns"
-              :data-source="dashboard.topMenus"
-              :loading="loading"
-              :pagination="false"
-              row-key="key"
-              size="small"
+              class="app-vxe-card-grid"
+              :grid-options="menuStatGridOptions"
             />
           </Card>
         </Col>
@@ -105,15 +117,16 @@ onMounted(loadStats);
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-stats {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-stats__toolbar {
   display: flex;
-  gap: 12px;
+  @apply gap-3;
 }
 
 @media (max-width: 960px) {

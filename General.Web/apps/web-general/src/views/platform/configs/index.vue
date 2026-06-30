@@ -1,32 +1,36 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { ConfigApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Button, Card, Form, Input, InputNumber, Modal, Radio, Space, Table, Tag, message } from 'ant-design-vue';
+import { Button, Card, Drawer, Form, Input, InputNumber, Radio, Space, Tag, message } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getPlatformConfigListApi, updatePlatformConfigApi } from '#/api/core';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'PlatformConfigsPage' });
 
 const columns = [
-  { dataIndex: 'groupName', key: 'groupName', title: '分组', width: 120 },
-  { dataIndex: 'name', key: 'name', title: '名称', width: 160 },
-  { dataIndex: 'code', key: 'code', title: '配置编码', width: 280 },
-  { dataIndex: 'value', key: 'value', title: '当前值', width: 180 },
-  { dataIndex: 'defaultValue', key: 'defaultValue', title: '默认值', width: 160 },
-  { dataIndex: 'providerName', key: 'providerName', title: '作用域', width: 110 },
-  { dataIndex: 'valueType', key: 'valueType', title: '类型', width: 90 },
-  { dataIndex: 'description', key: 'description', title: '说明' },
-  { key: 'actions', title: '操作', width: 100 },
-];
+  { field: 'groupName', filters: [], slots: { default: 'groupName' }, title: '分组', width: 120 },
+  { align: 'left', field: 'name', title: '名称', width: 160 },
+  { align: 'left', field: 'code', title: '配置编码', width: 280 },
+  { align: 'left', field: 'value', title: '当前值', width: 180 },
+  { align: 'left', field: 'defaultValue', slots: { default: 'defaultValue' }, title: '默认值', width: 160 },
+  { field: 'providerName', slots: { default: 'providerName' }, title: '作用域', width: 110 },
+  { field: 'valueType', slots: { default: 'valueType' }, title: '类型', width: 90 },
+  { align: 'left', field: 'description', title: '说明' },
+  { fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 100 },
+] satisfies VxeGridProps<ConfigApi.ConfigItem>['columns'];
 
 const items = ref<ConfigApi.ConfigItem[]>([]);
 const loading = ref(false);
+const pagination = useLocalVxePagination(items, { defaultPageSize: 10 });
 const saving = ref(false);
-const modalVisible = ref(false);
+const drawerVisible = ref(false);
 const editingItem = ref<ConfigApi.ConfigItem | null>(null);
 const formState = reactive({
   numberValue: 0,
@@ -36,8 +40,33 @@ const formState = reactive({
 
 const groupFilters = computed(() =>
   [...new Map(items.value.map((item) => [item.groupName, item.groupName])).values()]
-    .map((groupName) => ({ text: groupName, value: groupName })),
+    .map((groupName) => ({ label: groupName, value: groupName })),
 );
+
+const gridOptions = computed<VxeGridProps<ConfigApi.ConfigItem>>(() => ({
+  columns: columns.map((column) =>
+    column.field === 'groupName'
+      ? {
+          ...column,
+          filterMethod: ({ option, row }) => row.groupName === option.value,
+          filters: groupFilters.value,
+        }
+      : column,
+  ),
+  data: pagination.pagedRows.value,
+  loading: loading.value,
+  pagerConfig: pagination.pagerConfig.value,
+  rowConfig: { keyField: 'code' },
+}));
+
+const gridEvents: NativeVxeGridEvents<ConfigApi.ConfigItem> = {
+  'page-change': pagination.handlePageChange,
+};
+
+const [Grid] = useVbenVxeGrid<ConfigApi.ConfigItem>({
+  gridEvents,
+  gridOptions: {},
+});
 
 async function loadConfigs() {
   loading.value = true;
@@ -53,7 +82,7 @@ function openEdit(item: ConfigApi.ConfigItem) {
   formState.providerName = item.providerName || 'G';
   formState.value = item.value;
   formState.numberValue = Number.parseInt(item.value, 10) || 0;
-  modalVisible.value = true;
+  drawerVisible.value = true;
 }
 
 async function handleSubmit() {
@@ -75,7 +104,7 @@ async function handleSubmit() {
       value: nextValue,
     });
     message.success('配置已保存');
-    modalVisible.value = false;
+    drawerVisible.value = false;
     await loadConfigs();
   } finally {
     saving.value = false;
@@ -87,45 +116,41 @@ onMounted(loadConfigs);
 
 <template>
   <Page description="配置参数用于维护允许在线调整的安全运行参数，基础设施连接与密钥仍应通过配置文件或环境变量管理。" title="配置参数">
-    <Card :bordered="false" title="参数列表">
-      <Table
-        :columns="columns.map((column) => column.key === 'groupName' ? { ...column, filters: groupFilters, onFilter: (value: boolean | number | string, record: ConfigApi.ConfigItem) => record.groupName === value } : column)"
-        :data-source="items"
-        :loading="loading"
-        :pagination="{ pageSize: 10 }"
-        row-key="code"
+    <Card :bordered="false" class="rounded-2xl" title="参数列表">
+      <Grid
+        class="app-vxe-card-grid"
+        :grid-events="gridEvents"
+        :grid-options="gridOptions"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'groupName'">
-            <Tag>{{ record.groupName }}</Tag>
-          </template>
-          <template v-else-if="column.key === 'providerName'">
-            <Tag :color="record.providerName === 'T' ? 'purple' : 'default'">
-              {{ record.providerName === 'T' ? '租户覆盖' : '全局' }}
-            </Tag>
-          </template>
-          <template v-else-if="column.key === 'defaultValue'">
-            <span>{{ record.defaultValue || '-' }}</span>
-          </template>
-          <template v-else-if="column.key === 'valueType'">
-            <Tag color="blue">{{ record.valueType }}</Tag>
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <Space>
-              <Button :disabled="record.isReadonly" size="small" type="link" @click="openEdit(record as ConfigApi.ConfigItem)">
-                编辑
-              </Button>
-            </Space>
-          </template>
+        <template #groupName="{ row }">
+          <Tag>{{ row.groupName }}</Tag>
         </template>
-      </Table>
+        <template #providerName="{ row }">
+          <Tag :color="row.providerName === 'T' ? 'purple' : 'default'">
+            {{ row.providerName === 'T' ? '租户覆盖' : '全局' }}
+          </Tag>
+        </template>
+        <template #defaultValue="{ row }">
+          <span>{{ row.defaultValue || '-' }}</span>
+        </template>
+        <template #valueType="{ row }">
+          <Tag color="blue">{{ row.valueType }}</Tag>
+        </template>
+        <template #actions="{ row }">
+          <Space>
+            <Button :disabled="row.isReadonly" size="small" type="link" @click="openEdit(row)">
+              编辑
+            </Button>
+          </Space>
+        </template>
+      </Grid>
     </Card>
 
-    <Modal
-      v-model:open="modalVisible"
-      :confirm-loading="saving"
+    <Drawer
+      v-model:open="drawerVisible"
       :title="editingItem ? `编辑配置 · ${editingItem.name}` : '编辑配置'"
-      @ok="handleSubmit"
+      destroy-on-close
+      width="560"
     >
       <Form layout="vertical">
         <Form.Item label="配置编码">
@@ -150,6 +175,12 @@ onMounted(loadConfigs);
           <Input.TextArea :value="editingItem?.description || ''" disabled :rows="3" />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="drawerVisible = false">取消</Button>
+          <Button :loading="saving" type="primary" @click="handleSubmit">保存</Button>
+        </div>
+      </template>
+    </Drawer>
   </Page>
 </template>

@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { MenuApi, OrganizationApi, PlatformEndpointApi, RoleApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -18,12 +19,12 @@ import {
   Radio,
   Skeleton,
   Space,
-  Table,
   Tag,
   Tree,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createRoleApi,
   deleteRoleApi,
@@ -37,6 +38,7 @@ import {
   saveRoleMenusApi,
 } from '#/api/core';
 import { useActionLoading } from '#/composables/platform/use-action-loading';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 import {
   normalizePlatformTree,
   type PlatformTreeNode,
@@ -62,16 +64,17 @@ const ACCOUNT_SCOPE_OPTIONS = [
 ];
 
 const columns = [
-  { dataIndex: 'name', key: 'name', title: '角色名称', width: 180 },
-  { dataIndex: 'description', key: 'description', title: '说明', ellipsis: true, width: 320 },
-  { dataIndex: 'userCount', key: 'userCount', title: '用户数', width: 90 },
-  { dataIndex: 'menuCount', key: 'menuCount', title: '菜单数', width: 90 },
-  { dataIndex: 'status', key: 'status', title: '状态', width: 90 },
-  { key: 'actions', title: '授权动作', width: 420 },
-];
+  { field: 'name', title: '角色名称', width: 180 },
+  { align: 'left', field: 'description', slots: { default: 'description' }, title: '说明', width: 320 },
+  { field: 'userCount', title: '用户数', width: 90 },
+  { field: 'menuCount', title: '菜单数', width: 90 },
+  { field: 'status', slots: { default: 'status' }, title: '状态', width: 90 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '授权动作', width: 420 },
+] satisfies VxeGridProps<RoleApi.RoleItem>['columns'];
 
 const roles = ref<RoleApi.RoleItem[]>([]);
 const roleLoading = ref(true);
+const rolePagination = useLocalVxePagination(roles, { defaultPageSize: 10 });
 const createVisible = ref(false);
 const saving = ref(false);
 const drawerVisible = ref(false);
@@ -156,6 +159,24 @@ const metrics = computed(() => [
     value: roles.value.filter((item) => item.dataScopeMode === 'custom').length,
   },
 ]);
+const roleGridOptions = computed<VxeGridProps<RoleApi.RoleItem>>(() => ({
+  columns,
+  data: rolePagination.pagedRows.value,
+  emptyText: '未找到角色数据',
+  loading: roleLoading.value,
+  pagerConfig: rolePagination.pagerConfig.value,
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+
+const roleGridEvents: NativeVxeGridEvents<RoleApi.RoleItem> = {
+  'page-change': rolePagination.handlePageChange,
+};
+
+const [RoleGrid] = useVbenVxeGrid<RoleApi.RoleItem>({
+  gridEvents: roleGridEvents,
+  gridOptions: {},
+});
 
 function normalizeMenuTree(items: MenuApi.PermissionTreeItem[]): PlatformTreeNode[] {
   return normalizePlatformTree(
@@ -173,7 +194,7 @@ async function loadBaseData() {
   try {
     const [roleResult, menuResult, organizationResult, userResult, endpointResult] = await Promise.allSettled([
       getRoleListApi(),
-      getMenuPermissionTreeApi('platform,project,business'),
+      getMenuPermissionTreeApi('platform,project,business,ai'),
       getOrganizationTreeApi(),
       getUserListApi({ maxResultCount: 1000 }),
       getPlatformEndpointOptionsApi(),
@@ -314,51 +335,43 @@ onMounted(loadBaseData);
         </article>
       </div>
 
-      <Card class="platform-page__card" title="角色列表">
+      <Card :bordered="false" class="platform-page__card rounded-2xl" title="角色列表">
         <template #extra>
           <Button type="primary" @click="createVisible = true">新增角色</Button>
         </template>
 
         <Skeleton :loading="roleLoading" active>
-          <div v-if="roles.length === 0" class="platform-page__empty">
-            <Empty description="未找到角色数据" />
-          </div>
-          <Table
-            v-else
-            :columns="columns"
-            :data-source="roles"
-            :pagination="{ pageSize: 10 }"
-            row-key="id"
-            :scroll="{ x: 1280 }"
+          <RoleGrid
+            class="app-vxe-card-grid"
+            :grid-events="roleGridEvents"
+            :grid-options="roleGridOptions"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'description'">
-                <div class="description-cell">{{ record.description }}</div>
-              </template>
-              <template v-else-if="column.key === 'status'">
-                <Tag :color="record.status ? 'success' : 'default'">
-                  {{ record.status ? '启用' : '停用' }}
-                </Tag>
-              </template>
-              <template v-else-if="column.key === 'actions'">
-                <Space wrap>
-                  <Button size="small" @click="openDrawer('menu', record as RoleApi.RoleItem)">菜单</Button>
-                  <Button size="small" @click="openDrawer('data', record as RoleApi.RoleItem)">数据</Button>
-                  <Button size="small" @click="openDrawer('account', record as RoleApi.RoleItem)">账号</Button>
-                  <Button size="small" @click="openDrawer('api', record as RoleApi.RoleItem)">接口</Button>
-                  <Button
-                    danger
-                    :loading="actionLoadingKey === `delete:${(record as RoleApi.RoleItem).id}`"
-                    size="small"
-                    type="link"
-                    @click="handleDeleteRole((record as RoleApi.RoleItem).id)"
-                  >
-                    删除
-                  </Button>
-                </Space>
-              </template>
+            <template #description="{ row }">
+              <div class="description-cell">{{ row.description }}</div>
             </template>
-          </Table>
+            <template #status="{ row }">
+              <Tag :color="row.status ? 'success' : 'default'">
+                {{ row.status ? '启用' : '停用' }}
+              </Tag>
+            </template>
+            <template #actions="{ row }">
+              <Space wrap>
+                <Button size="small" @click="openDrawer('menu', row)">菜单</Button>
+                <Button size="small" @click="openDrawer('data', row)">数据</Button>
+                <Button size="small" @click="openDrawer('account', row)">账号</Button>
+                <Button size="small" @click="openDrawer('api', row)">接口</Button>
+                <Button
+                  danger
+                  :loading="actionLoadingKey === `delete:${row.id}`"
+                  size="small"
+                  type="link"
+                  @click="handleDeleteRole(row.id)"
+                >
+                  删除
+                </Button>
+              </Space>
+            </template>
+          </RoleGrid>
         </Skeleton>
       </Card>
 
@@ -548,28 +561,29 @@ onMounted(loadBaseData);
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-page__metrics {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .platform-page__metric,
 .platform-page__card {
-  border-radius: 20px;
+  @apply rounded-2xl;
 }
 
 .platform-page__metric {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 18px;
+  @apply gap-2;
+  @apply px-4 py-4;
   border: 1px solid var(--ant-color-border-secondary);
   background: var(--ant-color-bg-container);
 }
@@ -580,7 +594,7 @@ onMounted(loadBaseData);
 }
 
 .platform-page__metric strong {
-  font-size: 30px;
+  font-size: 24px;
 }
 
 .platform-page__empty {
@@ -600,30 +614,30 @@ onMounted(loadBaseData);
 .role-drawer {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
   min-height: 100%;
 }
 
 .role-member-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 16px;
+  @apply gap-2.5;
+  @apply px-4 py-3;
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 8px;
+  @apply rounded-lg;
   background: var(--ant-color-bg-layout);
 }
 
 .role-member-section__header {
   display: flex;
-  gap: 8px;
+  @apply gap-2;
   align-items: center;
 }
 
 .role-member-section__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  @apply gap-1.5;
 }
 
 .role-member-section__empty {
@@ -633,24 +647,24 @@ onMounted(loadBaseData);
 
 .account-scope {
   display: grid;
-  gap: 16px;
+  @apply gap-4;
   grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
 }
 
 .account-scope__panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  @apply gap-3;
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 16px;
-  padding: 16px;
+  @apply rounded-2xl;
+  @apply p-4;
 }
 
 .account-scope__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  @apply gap-3;
 }
 
 .account-scope__header :deep(.ant-input-affix-wrapper) {
@@ -666,7 +680,7 @@ onMounted(loadBaseData);
 .account-scope__list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  @apply gap-2.5;
   max-height: 440px;
   overflow: auto;
 }
@@ -674,10 +688,10 @@ onMounted(loadBaseData);
 .account-scope__item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  @apply gap-3;
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 12px;
-  padding: 12px;
+  @apply rounded-xl;
+  @apply p-3;
   cursor: pointer;
 }
 
@@ -685,7 +699,7 @@ onMounted(loadBaseData);
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  @apply gap-1;
   min-width: 0;
 }
 
@@ -698,7 +712,7 @@ onMounted(loadBaseData);
 .account-scope__selected {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  @apply gap-2;
 }
 
 .account-scope__empty {
@@ -711,19 +725,19 @@ onMounted(loadBaseData);
 .role-drawer__footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: auto;
-  padding-top: 16px;
+  @apply gap-3;
+  @apply mt-auto;
+  @apply pt-4;
 }
 
 .api-group {
   display: grid;
-  gap: 10px;
+  @apply gap-2.5;
 }
 
 .api-group :deep(.ant-checkbox-group-item) {
   display: flex;
-  margin-inline-end: 0;
+  @apply me-0;
   white-space: normal;
 }
 

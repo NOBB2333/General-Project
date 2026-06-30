@@ -1,10 +1,12 @@
-import { inject, type InjectionKey } from 'vue';
+import { inject, type InjectionKey, type Ref } from 'vue';
 
 import type { BusinessApi } from '#/api/core';
 
 import type { useBusinessProjectsPage } from './composables/useBusinessProjectsPage';
 
-export type BusinessProjectsProviderContext = ReturnType<typeof useBusinessProjectsPage> & {
+export type BusinessProjectsProviderContext = ReturnType<
+  typeof useBusinessProjectsPage
+> & {
   budgetColumns: any[];
   businessColumns: any[];
   contractColumns: any[];
@@ -14,8 +16,11 @@ export type BusinessProjectsProviderContext = ReturnType<typeof useBusinessProje
   receivableColumns: any[];
 };
 
-export type BusinessProjectsContext = Omit<BusinessProjectsProviderContext, 'detail'> & {
-  detail: BusinessApi.ProjectDetail;
+export type BusinessProjectsContext = Omit<
+  BusinessProjectsProviderContext,
+  'detail'
+> & {
+  detail: Ref<BusinessApi.ProjectDetail>;
   budgetColumns: any[];
   businessColumns: any[];
   contractColumns: any[];
@@ -25,7 +30,8 @@ export type BusinessProjectsContext = Omit<BusinessProjectsProviderContext, 'det
   receivableColumns: any[];
 };
 
-export const businessProjectsContextKey: InjectionKey<BusinessProjectsProviderContext> = Symbol('BusinessProjectsContext');
+export const businessProjectsContextKey: InjectionKey<BusinessProjectsProviderContext> =
+  Symbol('BusinessProjectsContext');
 
 export function useBusinessProjectsContext() {
   const context = inject(businessProjectsContextKey);

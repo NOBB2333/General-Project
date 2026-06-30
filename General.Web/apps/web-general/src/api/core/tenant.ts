@@ -1,6 +1,16 @@
 import { requestClient } from '#/api/request';
 
 export namespace TenantApi {
+  export interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
+  }
+
+  export interface TenantQuery {
+    skipCount: number;
+    maxResultCount: number;
+  }
+
   export interface TenantAuthorization {
     adminUserId?: null | string;
     apiBlacklist: string[];
@@ -41,6 +51,10 @@ export namespace TenantApi {
     isActive: boolean;
     username: string;
   }
+}
+
+export async function getTenantPagedApi(params: TenantApi.TenantQuery) {
+  return requestClient.get<TenantApi.PagedResult<TenantApi.TenantItem>>('/app/tenant/paged', { params });
 }
 
 export async function getTenantListApi() {

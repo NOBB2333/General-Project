@@ -59,7 +59,7 @@ onMounted(loadProfile);
   <Page description="查看个人信息与账号安全设置。" title="个人中心">
     <Spin :spinning="loading">
       <div class="platform-profile">
-        <Card :bordered="false" class="platform-profile__hero">
+        <Card :bordered="false" class="platform-profile__hero rounded-2xl">
           <div class="platform-profile__hero-inner">
             <Avatar :size="72" class="platform-profile__avatar">
               {{ (userInfo?.realName || userInfo?.username || '?').charAt(0).toUpperCase() }}
@@ -71,7 +71,7 @@ onMounted(loadProfile);
           </div>
         </Card>
 
-        <Card :bordered="false" title="基本信息">
+        <Card class="rounded-2xl" :bordered="false" title="基本信息">
           <Descriptions :column="{ sm: 2, xs: 1 }" bordered size="small">
             <Descriptions.Item label="用户名">{{ userInfo?.username || '-' }}</Descriptions.Item>
             <Descriptions.Item label="姓名">{{ userInfo?.realName || '-' }}</Descriptions.Item>
@@ -82,21 +82,21 @@ onMounted(loadProfile);
           </Descriptions>
         </Card>
 
-        <Card :bordered="false" title="所属角色">
+        <Card class="rounded-2xl" :bordered="false" title="所属角色">
           <div v-if="(userInfo?.roles || []).length > 0" class="platform-profile__tags">
             <Tag v-for="role in userInfo.roles" :key="role" color="blue">{{ role }}</Tag>
           </div>
           <span v-else class="platform-profile__empty">未分配角色</span>
         </Card>
 
-        <Card :bordered="false" title="所属组织">
+        <Card class="rounded-2xl" :bordered="false" title="所属组织">
           <div v-if="(userInfo?.organizationUnitNames || []).length > 0" class="platform-profile__tags">
             <Tag v-for="org in userInfo.organizationUnitNames" :key="org" color="cyan">{{ org }}</Tag>
           </div>
           <span v-else class="platform-profile__empty">未分配组织</span>
         </Card>
 
-        <Card :bordered="false" title="修改密码">
+        <Card class="rounded-2xl" :bordered="false" title="修改密码">
           <Form layout="vertical" style="max-width: 400px">
             <Form.Item label="当前密码">
               <Input.Password v-model:value="passwordForm.currentPassword" placeholder="请输入当前密码" />
@@ -118,10 +118,11 @@ onMounted(loadProfile);
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-profile {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-profile__hero {
@@ -132,7 +133,7 @@ onMounted(loadProfile);
 
 .platform-profile__hero-inner {
   display: flex;
-  gap: 20px;
+  @apply gap-5;
   align-items: center;
 }
 
@@ -143,20 +144,20 @@ onMounted(loadProfile);
 }
 
 .platform-profile__hero h2 {
-  margin: 0 0 4px;
+  @apply mb-1;
   font-size: 20px;
   color: var(--ant-color-text);
 }
 
 .platform-profile__hero p {
-  margin: 0;
+  @apply m-0;
   color: var(--ant-color-text-secondary);
 }
 
 .platform-profile__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  @apply gap-2;
 }
 
 .platform-profile__empty {
@@ -164,4 +165,3 @@ onMounted(loadProfile);
   color: var(--ant-color-text-quaternary);
 }
 </style>
-

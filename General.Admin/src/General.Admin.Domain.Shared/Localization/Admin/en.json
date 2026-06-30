@@ -4,6 +4,26 @@
     "AppName": "Admin",
     "Menu:Home": "Home",
     "Welcome": "Welcome",
-    "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information, visit abp.io."
+    "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information, visit abp.io.",
+    "Permission:Ai.Agent.Manage": "Manage AI agent orchestration",
+    "Permission:Ai.Artifact.Manage": "Manage AI safe artifacts",
+    "Permission:Ai.WebSearch.Manage": "Manage AI web search",
+    "Permission:Integration.Connector.RotateSecret": "Rotate integration connector secret",
+    "Permission:Integration.Delivery.View": "View integration delivery records",
+    "Permission:Integration.Delivery.Manage": "Manage failed integration deliveries",
+    "Permission:Integration.Delivery.Export": "Export integration delivery audit",
+    "Permission:Integration.Binding.View": "View integration account bindings",
+    "Permission:Integration.Binding.Manage": "Manage integration account bindings",
+    "Permission:Integration.Binding.Import": "Import integration external accounts",
+    "Permission:Integration.Template.View": "View integration message templates",
+    "Permission:Integration.Template.Manage": "Manage integration message templates",
+    "Permission:Integration.Template.Test": "Preview integration message templates",
+    "Permission:Integration.Rule.View": "View integration notification rules",
+    "Permission:Integration.Rule.Manage": "Manage integration notification rules",
+    "Permission:Integration.Sync.View": "View integration sync jobs",
+    "Permission:Integration.Sync.Manage": "Manage integration sync jobs",
+    "Permission:Integration.Sync.Run": "Run integration sync jobs",
+    "Permission:Integration.Webhook.View": "View integration webhook events",
+    "Permission:Integration.Webhook.Manage": "Manage integration webhook events"
   }
 }

@@ -1,0 +1,180 @@
+@reference "@vben/tailwind-config/theme";
+
+.app-vxe-card-grid {
+  height: auto !important;
+  min-height: 0;
+  width: 100%;
+  background: transparent;
+}
+
+.app-vxe-card-grid > .vxe-grid {
+  min-height: 0;
+  padding-inline: 0;
+  padding-bottom: 0 !important;
+}
+
+.app-vxe-card-grid .vxe-grid--pager-wrapper {
+  @apply px-0 pt-3;
+}
+
+.vxe-grid--bottom-wrapper:empty,
+.vxe-grid--top-wrapper:empty,
+.vxe-grid--layout-header-wrapper:empty,
+.vxe-grid--layout-footer-wrapper:empty {
+  display: none;
+}
+
+.vxe-grid--layout-header-wrapper:has(> .vxe-grid--form-wrapper:empty),
+.vxe-grid--layout-footer-wrapper:empty {
+  display: none;
+}
+
+.vxe-grid > div:last-child:not([class]):empty,
+.vxe-grid > div:last-child:not([class]):has(> div:empty) {
+  display: none;
+}
+
+.vxe-grid .vxe-grid--layout-body-wrapper > :empty,
+.vxe-grid .vxe-grid--layout-body-content-wrapper > :empty {
+  display: none;
+}
+
+.vxe-grid .vxe-grid--pager-wrapper {
+  @apply pt-3;
+}
+
+.vxe-grid .vxe-pager.mt-2 {
+  @apply mt-0;
+}
+
+/* 设置空白表格里面的占位SVG 高度  */
+.vxe-grid .vxe-table--empty-block {
+  min-height: 80px;
+}
+
+.vxe-grid .vxe-table--empty-content {
+  align-items: flex-start;
+  min-height: 80px;
+  @apply pt-2.5;
+}
+
+.vxe-grid .vxe-table--empty-content svg,
+.vxe-grid .vxe-table--empty-content img {
+  @apply mt-2;
+}
+
+/*  END 设置空白表格里面的占位SVG 高度  */
+
+.vxe-grid .vxe-table--scroll-x-wrapper,
+.vxe-grid .vxe-table--scroll-y-wrapper,
+.vxe-grid .vxe-table--scroll-x-virtual,
+.vxe-grid .vxe-table--scroll-y-virtual,
+.vxe-grid .vxe-table--scroll-x-space,
+.vxe-grid .vxe-table--scroll-y-space,
+.vxe-grid .vxe-table--scroll-x-left-corner,
+.vxe-grid .vxe-table--scroll-x-right-corner,
+.vxe-grid .vxe-table--scroll-y-top-corner,
+.vxe-grid .vxe-table--scroll-y-bottom-corner {
+  outline: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-top: 0 !important;
+  box-shadow: none !important;
+}
+
+.vxe-grid .vxe-table--border-line {
+  pointer-events: none;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* VXE 的外框是一整层 overlay，横向滚动时只避开底部滚动条槽。 */
+.vxe-grid .vxe-table.sx-pos--bottom.is--scroll-x .vxe-table--border-line {
+  height: calc(
+    100% - var(--vxe-ui-table-view-scrollbar-height, 8px)
+  ) !important;
+}
+
+.vxe-grid .vxe-table--body-wrapper,
+.vxe-grid .vxe-table--footer-wrapper,
+.vxe-grid .vxe-table--main-wrapper {
+  outline: 0 !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+.vxe-grid .vxe-table--scroll-x-virtual {
+  min-height: 0 !important;
+}
+
+.vxe-grid .vxe-table--scroll-x-left-corner::before,
+.vxe-grid .vxe-table--scroll-x-right-corner::before,
+.vxe-grid .vxe-table--scroll-y-top-corner::before,
+.vxe-grid .vxe-table--scroll-y-bottom-corner::before {
+  outline: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.vxe-grid .vxe-table--scroll-x-handle,
+.vxe-grid .vxe-table--scroll-y-handle,
+.vxe-grid .vxe-table--scroll-x-handle-appearance,
+.vxe-grid .vxe-table--scroll-y-handle-appearance {
+  outline: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.vxe-grid .vxe-table--scroll-x-handle {
+  scrollbar-color: rgb(148 163 184 / 32%) transparent;
+  opacity: 0.18;
+  transition: opacity 0.18s ease;
+}
+
+.vxe-grid .vxe-table--scroll-y-handle {
+  scrollbar-color: rgb(148 163 184 / 32%) transparent;
+  opacity: 0.18;
+  transition: opacity 0.18s ease;
+}
+
+.vxe-grid:hover .vxe-table--scroll-x-handle,
+.vxe-grid:focus-within .vxe-table--scroll-x-handle,
+.vxe-grid:hover .vxe-table--scroll-y-handle,
+.vxe-grid:focus-within .vxe-table--scroll-y-handle {
+  opacity: 0.75;
+}
+
+.vxe-grid .vxe-table--scroll-x-handle::-webkit-scrollbar {
+  height: 8px;
+}
+
+.vxe-grid .vxe-table--scroll-y-handle::-webkit-scrollbar {
+  width: 8px;
+}
+
+.vxe-grid .vxe-table--scroll-x-handle::-webkit-scrollbar-track,
+.vxe-grid .vxe-table--scroll-y-handle::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vxe-grid .vxe-table--scroll-x-handle::-webkit-scrollbar-thumb,
+.vxe-grid .vxe-table--scroll-y-handle::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 32%);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  @apply rounded-full;
+}
+
+.vxe-grid:hover .vxe-table--scroll-x-handle::-webkit-scrollbar-thumb,
+.vxe-grid:focus-within .vxe-table--scroll-x-handle::-webkit-scrollbar-thumb,
+.vxe-grid:hover .vxe-table--scroll-y-handle::-webkit-scrollbar-thumb,
+.vxe-grid:focus-within .vxe-table--scroll-y-handle::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 60%);
+  background-clip: content-box;
+}

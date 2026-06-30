@@ -9,6 +9,7 @@ export namespace OnlineUserApi {
     id: string;
     ipAddress: string;
     lastAccessedAt?: null | string;
+    signedInAt?: null | string;
     tenantName?: null | string;
     userId: string;
     userName: string;

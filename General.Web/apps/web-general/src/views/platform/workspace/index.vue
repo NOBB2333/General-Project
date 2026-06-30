@@ -115,7 +115,7 @@ onMounted(loadWorkspace);
   >
     <Skeleton :loading="loading" active>
       <div class="platform-workspace">
-        <Card class="platform-workspace__hero" :bordered="false">
+        <Card class="platform-workspace__hero rounded-2xl" :bordered="false">
           <div class="platform-workspace__hero-copy">
             <p class="platform-workspace__eyebrow">Phase 1 Platform</p>
             <h2>组织、用户、角色、租户、菜单、文件统一在平台中心收口。</h2>
@@ -137,7 +137,7 @@ onMounted(loadWorkspace);
 
         <Row :gutter="[16, 16]">
           <Col v-for="item in metricItems" :key="item[0]" :lg="4" :md="8" :span="24">
-            <Card :bordered="false" class="platform-workspace__metric">
+            <Card :bordered="false" class="platform-workspace__metric rounded-2xl">
               <Statistic :title="item[0]" :value="item[1]" />
             </Card>
           </Col>
@@ -145,7 +145,7 @@ onMounted(loadWorkspace);
 
         <Row :gutter="[16, 16]" class="mt-1">
           <Col :lg="14" :span="24">
-            <Card :bordered="false" title="快捷入口">
+            <Card class="rounded-2xl" :bordered="false" title="快捷入口">
               <div v-if="quickEntries.length > 0" class="platform-workspace__grid">
                 <button
                   v-for="entry in quickEntries"
@@ -163,7 +163,7 @@ onMounted(loadWorkspace);
           </Col>
 
           <Col :lg="10" :span="24">
-            <Card :bordered="false" title="治理摘要">
+            <Card class="rounded-2xl" :bordered="false" title="治理摘要">
               <Timeline>
                 <Timeline.Item v-for="item in timelineItems" :key="item">
                   {{ item }}
@@ -199,10 +199,11 @@ onMounted(loadWorkspace);
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-workspace {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-workspace__hero {
@@ -212,9 +213,9 @@ onMounted(loadWorkspace);
 }
 
 .platform-workspace__hero-copy h2 {
-  margin: 0 0 12px;
+  @apply mb-3;
   color: var(--ant-color-text);
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1.25;
 }
 
@@ -225,7 +226,7 @@ onMounted(loadWorkspace);
 }
 
 .platform-workspace__eyebrow {
-  margin: 0 0 10px;
+  @apply mb-2.5;
   color: var(--ant-color-primary);
   font-size: 12px;
   font-weight: 700;
@@ -236,8 +237,8 @@ onMounted(loadWorkspace);
 .platform-workspace__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 18px;
+  @apply gap-2;
+  @apply mt-4;
 }
 
 .platform-workspace__metric,
@@ -251,21 +252,21 @@ onMounted(loadWorkspace);
 
 .platform-workspace__grid {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .platform-workspace__attention {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
+  @apply gap-3;
+  @apply mt-4;
 }
 
 .platform-workspace__attention-item {
-  padding: 12px 14px;
+  @apply px-3.5 py-3;
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 14px;
+  @apply rounded-xl;
   background: var(--ant-color-fill-quaternary);
 }
 
@@ -273,26 +274,26 @@ onMounted(loadWorkspace);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  @apply gap-2;
 }
 
 .platform-workspace__attention-item p {
-  margin: 8px 0 0;
+  @apply mt-2;
   color: var(--ant-color-text-secondary);
   line-height: 1.7;
 }
 
 .platform-workspace__entry {
-  padding: 16px;
+  @apply p-4;
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 16px;
+  @apply rounded-2xl;
   background: var(--ant-color-fill-quaternary);
   text-align: left;
 }
 
 .platform-workspace__entry span {
   display: block;
-  margin-bottom: 6px;
+  @apply mb-1.5;
   color: var(--ant-color-primary);
   font-size: 12px;
 }

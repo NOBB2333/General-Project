@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
 import type { OrganizationApi, UserApi } from '#/api/core';
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
@@ -9,18 +10,19 @@ import { Page } from '@vben/common-ui';
 import {
   Button,
   Card,
+  Drawer,
   Empty,
   Form,
   Input,
   Modal,
   Skeleton,
-  Table,
   Tag,
   Tree,
   TreeSelect,
   message,
 } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   createOrganizationUnitApi,
   deleteOrganizationUnitApi,
@@ -43,24 +45,24 @@ const { hasAccessByCodes } = useAccess();
 const canManageOrganization = computed(() => hasAccessByCodes([ORG_MANAGE_CODE]));
 
 const baseColumns = [
-  { dataIndex: 'displayName', key: 'displayName', title: '姓名' },
-  { dataIndex: 'username', key: 'username', title: '账号' },
-  { dataIndex: 'roles', key: 'roles', title: '角色' },
-  { dataIndex: 'organizationUnitNames', key: 'organizationUnitNames', title: '部门' },
-  { dataIndex: 'isActive', key: 'isActive', title: '状态', width: 100 },
-  { key: 'actions', title: '操作', width: 120 },
-];
+  { field: 'displayName', title: '姓名', width: 140 },
+  { field: 'username', title: '账号', width: 160 },
+  { field: 'roles', slots: { default: 'roles' }, title: '角色', width: 180 },
+  { field: 'organizationUnitNames', slots: { default: 'organizationUnitNames' }, title: '部门', width: 220 },
+  { field: 'isActive', slots: { default: 'isActive' }, title: '状态', width: 100 },
+  { field: 'actions', fixed: 'right', slots: { default: 'actions' }, title: '操作', width: 120 },
+] satisfies VxeGridProps<UserApi.UserListItem>['columns'];
 
-const columns = computed(() =>
+const columns = computed<VxeGridProps<UserApi.UserListItem>['columns']>(() =>
   canManageOrganization.value
     ? baseColumns
-    : baseColumns.filter((item) => item.key !== 'actions'),
+    : baseColumns.filter((item) => item.field !== 'actions'),
 );
 
 const keyword = ref('');
 const loadingMembers = ref(false);
 const loadingTree = ref(true);
-const modalVisible = ref(false);
+const createDrawerVisible = ref(false);
 const modalMode = ref<'create' | 'edit' | 'move'>('create');
 const organizationTree = ref<OrganizationApi.OrganizationTreeItem[]>([]);
 const saving = ref(false);
@@ -70,6 +72,9 @@ const transferTargetOrganizationUnitId = ref<string>();
 const transferUser = ref<null | UserApi.UserListItem>(null);
 const transferVisible = ref(false);
 const users = ref<UserApi.UserListItem[]>([]);
+const memberPageIndex = ref(1);
+const memberPageSize = ref(10);
+const memberTotalCount = ref(0);
 const { actionLoadingKey, runAction } = useActionLoading();
 const formState = reactive({
   displayName: '',
@@ -78,6 +83,31 @@ const formState = reactive({
 
 const selectedNodeKeys = computed(() => (selectedNodeKey.value ? [selectedNodeKey.value] : []));
 const selectedNode = computed(() => findNodeById(organizationTree.value, selectedNodeKey.value));
+const memberGridOptions = computed<VxeGridProps<UserApi.UserListItem>>(() => ({
+  columns: columns.value,
+  data: users.value,
+  emptyText: '未找到成员数据',
+  loading: loadingMembers.value,
+  pagerConfig: {
+    currentPage: memberPageIndex.value,
+    pageSize: memberPageSize.value,
+    pageSizes: [10, 20, 50, 100],
+    total: memberTotalCount.value,
+  },
+  rowConfig: { keyField: 'id' },
+  scrollX: { enabled: true },
+}));
+
+const [MemberGrid] = useVbenVxeGrid<UserApi.UserListItem>({ gridOptions: {} });
+
+const memberGridEvents: NativeVxeGridEvents<UserApi.UserListItem> = {
+  'page-change': ({ currentPage, pageSize }) => {
+    const normalizedPageSize = pageSize || memberPageSize.value;
+    memberPageIndex.value = normalizedPageSize === memberPageSize.value ? currentPage || 1 : 1;
+    memberPageSize.value = normalizedPageSize;
+    void loadMembers();
+  },
+};
 
 function buildTreeTitle(item: OrganizationApi.OrganizationTreeItem) {
   return item.disabled
@@ -125,11 +155,14 @@ async function loadTree() {
 async function loadMembers() {
   loadingMembers.value = true;
   try {
-    users.value = await getUserListApi({
+    const result = await getUserListApi({
       keyword: keyword.value || undefined,
-      maxResultCount: 1000,
+      maxResultCount: memberPageSize.value,
       organizationUnitId: selectedNodeKey.value || undefined,
-    }).then((result) => result.items);
+      skipCount: (memberPageIndex.value - 1) * memberPageSize.value,
+    });
+    users.value = result.items;
+    memberTotalCount.value = result.totalCount;
   } finally {
     loadingMembers.value = false;
   }
@@ -139,14 +172,14 @@ function openCreateRoot() {
   modalMode.value = 'create';
   formState.displayName = '';
   formState.parentId = undefined;
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function openCreateChild() {
   modalMode.value = 'create';
   formState.displayName = '';
   formState.parentId = selectedNode.value?.id || undefined;
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function openEdit() {
@@ -156,7 +189,7 @@ function openEdit() {
   modalMode.value = 'edit';
   formState.displayName = selectedNode.value.displayName;
   formState.parentId = selectedNode.value.parentId || undefined;
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 function openMove() {
@@ -166,7 +199,7 @@ function openMove() {
   modalMode.value = 'move';
   formState.displayName = selectedNode.value.displayName;
   formState.parentId = selectedNode.value.parentId || undefined;
-  modalVisible.value = true;
+  createDrawerVisible.value = true;
 }
 
 async function handleSubmit() {
@@ -197,7 +230,7 @@ async function handleSubmit() {
       message.success('组织节点已移动');
     }
 
-    modalVisible.value = false;
+    createDrawerVisible.value = false;
     await loadTree();
     await loadMembers();
   } finally {
@@ -270,9 +303,9 @@ onMounted(async () => {
   >
     <section class="platform-page">
       <div class="platform-page__grid">
-        <Card class="platform-page__card" title="组织树">
+        <Card :bordered="false" class="platform-page__card rounded-2xl" title="组织树">
           <template #extra>
-            <Button v-if="canManageOrganization" type="primary" @click="openCreateRoot">新增节点</Button>
+            <Button v-if="canManageOrganization" type="primary" @click="openCreateRoot">新增组织</Button>
           </template>
 
           <Skeleton :loading="loadingTree" active>
@@ -291,10 +324,10 @@ onMounted(async () => {
         </Card>
 
         <div class="platform-page__stack">
-          <Card class="platform-page__card" title="节点概览">
+          <Card :bordered="false" class="platform-page__card rounded-2xl" title="节点概览">
             <template #extra>
               <div v-if="canManageOrganization" class="toolbar">
-                <Button type="primary" @click="openCreateChild">新增节点</Button>
+                <Button type="primary" @click="openCreateChild">新增组织</Button>
                 <Button :disabled="!selectedNode" @click="openEdit">编辑</Button>
                 <Button :disabled="!selectedNode" @click="openMove">移动</Button>
                 <Button
@@ -334,64 +367,56 @@ onMounted(async () => {
             </div>
           </Card>
 
-          <Card class="platform-page__card" title="部门成员">
+          <Card :bordered="false" class="platform-page__card rounded-2xl" title="部门成员">
             <template #extra>
-              <div class="toolbar">
+              <div class="toolbar toolbar--search">
                 <Input
                   v-model:value="keyword"
                   allow-clear
                   placeholder="按账号/姓名/邮箱筛选"
+                  style="width: 260px"
                   @pressEnter="loadMembers"
                 />
                 <Button type="primary" @click="loadMembers">查询</Button>
               </div>
             </template>
 
-            <Table
-              :columns="columns"
-              :data-source="users"
-              :loading="loadingMembers"
-              :pagination="{ pageSize: 8 }"
-              row-key="id"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'roles'">
-                  <div class="tag-list">
-                    <Tag v-for="role in record.roles" :key="role" color="blue">
-                      {{ role }}
-                    </Tag>
-                  </div>
-                </template>
-                <template v-else-if="column.key === 'organizationUnitNames'">
-                  <div class="tag-list">
-                    <Tag
-                      v-for="organizationUnitName in record.organizationUnitNames"
-                      :key="organizationUnitName"
-                    >
-                      {{ organizationUnitName }}
-                    </Tag>
-                  </div>
-                </template>
-                <template v-else-if="column.key === 'isActive'">
-                  <Tag :color="record.isActive ? 'green' : 'default'">
-                    {{ record.isActive ? '启用' : '停用' }}
+            <MemberGrid class="app-vxe-card-grid" :grid-events="memberGridEvents" :grid-options="memberGridOptions">
+              <template #roles="{ row }">
+                <div class="tag-list">
+                  <Tag v-for="role in row.roles" :key="role" color="blue">
+                    {{ role }}
                   </Tag>
-                </template>
-                <template v-else-if="column.key === 'actions' && canManageOrganization">
-                  <Button size="small" type="link" @click="openTransfer(record as UserApi.UserListItem)">
-                    转移成员
-                  </Button>
-                </template>
+                </div>
               </template>
-            </Table>
+              <template #organizationUnitNames="{ row }">
+                <div class="tag-list">
+                  <Tag
+                    v-for="organizationUnitName in row.organizationUnitNames"
+                    :key="organizationUnitName"
+                  >
+                    {{ organizationUnitName }}
+                  </Tag>
+                </div>
+              </template>
+              <template #isActive="{ row }">
+                <Tag :color="row.isActive ? 'green' : 'default'">
+                  {{ row.isActive ? '启用' : '停用' }}
+                </Tag>
+              </template>
+              <template #actions="{ row }">
+                <Button v-if="canManageOrganization" size="small" type="link" @click="openTransfer(row)">
+                  转移成员
+                </Button>
+              </template>
+            </MemberGrid>
           </Card>
         </div>
       </div>
     </section>
 
-    <Modal
-      v-model:open="modalVisible"
-      :confirm-loading="saving"
+    <Drawer
+      v-model:open="createDrawerVisible"
       :title="
         modalMode === 'create'
           ? '新增组织节点'
@@ -399,7 +424,8 @@ onMounted(async () => {
             ? '编辑组织节点'
             : '移动组织节点'
       "
-      @ok="handleSubmit"
+      destroy-on-close
+      width="560"
     >
       <Form layout="vertical">
         <Form.Item v-if="modalMode !== 'move'" label="部门名称" required>
@@ -415,7 +441,13 @@ onMounted(async () => {
           />
         </Form.Item>
       </Form>
-    </Modal>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button @click="createDrawerVisible = false">取消</Button>
+          <Button :loading="saving" type="primary" @click="handleSubmit">保存</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <Modal
       v-model:open="transferVisible"
@@ -441,6 +473,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-page {
   --platform-surface: var(--ant-color-bg-container, hsl(var(--card)));
   --platform-surface-alt: var(--ant-color-bg-elevated, var(--platform-surface));
@@ -460,32 +493,22 @@ onMounted(async () => {
 
 .platform-page__grid {
   display: grid;
-  gap: 16px;
+  @apply gap-4;
   grid-template-columns: 340px minmax(0, 1fr);
 }
 
 .platform-page__stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-page__card {
   border: 1px solid var(--platform-border);
-  border-radius: 20px;
+  @apply rounded-2xl;
   background: var(--platform-surface);
   box-shadow: var(--platform-shadow);
   color: inherit;
-}
-
-.platform-page__card :deep(.ant-card-head),
-.platform-page__card :deep(.ant-card-body) {
-  background: transparent;
-  color: inherit;
-}
-
-.platform-page__card :deep(.ant-card-head) {
-  border-bottom-color: var(--platform-border);
 }
 
 .platform-page__empty {
@@ -500,14 +523,14 @@ onMounted(async () => {
 
 .summary-panel {
   display: grid;
-  gap: 14px;
+  @apply gap-3.5;
   grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.6fr);
 }
 
 .summary-panel__main,
 .summary-panel__facts article {
   border: 1px solid var(--platform-border);
-  border-radius: 16px;
+  @apply rounded-2xl;
   background: linear-gradient(
     180deg,
     var(--platform-surface-alt) 0%,
@@ -516,36 +539,36 @@ onMounted(async () => {
 }
 
 .summary-panel__main {
-  padding: 16px;
+  @apply p-4;
 }
 
 .summary-panel__main span,
 .summary-panel__facts span {
   display: block;
-  margin-bottom: 8px;
+  @apply mb-2;
   color: var(--platform-text-secondary);
   font-size: 12px;
 }
 
 .summary-panel__main strong {
   color: var(--platform-text);
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.6;
 }
 
 .summary-panel__main p {
-  margin: 8px 0 0;
+  @apply mt-2;
   color: var(--platform-text-secondary);
 }
 
 .summary-panel__facts {
   display: grid;
-  gap: 10px;
+  @apply gap-2.5;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .summary-panel__facts article {
-  padding: 14px;
+  @apply p-3.5;
 }
 
 .summary-panel__facts strong {
@@ -561,7 +584,12 @@ onMounted(async () => {
 .tag-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  @apply gap-1.5;
+}
+
+.toolbar--search {
+  flex-wrap: nowrap;
+  @apply gap-2;
 }
 
 @media (max-width: 1080px) {
@@ -569,6 +597,10 @@ onMounted(async () => {
   .summary-panel,
   .summary-panel__facts {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar--search {
+    flex-wrap: wrap;
   }
 }
 </style>

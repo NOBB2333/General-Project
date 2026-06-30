@@ -63,4 +63,28 @@ public class BusinessContract : FullAuditedAggregateRoot<Guid>
         ParentContractCode = parentContractCode?.Trim() ?? string.Empty;
         SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
     }
+
+    public void Update(
+        string contractCode,
+        string title,
+        string type,
+        string counterpartyName,
+        decimal amount,
+        DateTime signDate,
+        string status,
+        bool isRevenueContract,
+        string? parentContractCode = null,
+        string? sourceChangeCode = null)
+    {
+        ContractCode = Check.NotNullOrWhiteSpace(contractCode, nameof(contractCode), 64);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 128);
+        Type = Check.NotNullOrWhiteSpace(type, nameof(type), 32);
+        CounterpartyName = Check.NotNullOrWhiteSpace(counterpartyName, nameof(counterpartyName), 128);
+        Amount = amount;
+        SignDate = signDate;
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        IsRevenueContract = isRevenueContract;
+        ParentContractCode = parentContractCode?.Trim() ?? string.Empty;
+        SourceChangeCode = sourceChangeCode?.Trim() ?? string.Empty;
+    }
 }

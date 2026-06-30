@@ -219,7 +219,7 @@ const options = computed(() => {
       {},
       mergedOptions.pagerConfig,
       {
-        pageSize: 20,
+        pageSize: mergedOptions.pagerConfig?.pageSize ?? 20,
         background: true,
         pageSizes: [10, 20, 30, 50, 100, 200],
         className: 'mt-2 w-full',

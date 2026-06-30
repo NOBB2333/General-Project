@@ -35,36 +35,7 @@ public class PlatformRequestAuditStore : ITransientDependency
         try
         {
             var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 500);
-            var category = input.Category?.Trim().ToLowerInvariant();
-            var keyword = input.Keyword?.Trim();
-
-            var queryable = await _requestAuditLogRepository.GetQueryableAsync();
-
-            if (input.StartTime.HasValue)
-            {
-                queryable = queryable.Where(x => x.ExecutionTime >= input.StartTime.Value);
-            }
-
-            if (input.EndTime.HasValue)
-            {
-                queryable = queryable.Where(x => x.ExecutionTime <= input.EndTime.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(keyword))
-            {
-                queryable = queryable.Where(x =>
-                    (x.UserName != null && x.UserName.Contains(keyword)) ||
-                    (x.TenantName != null && x.TenantName.Contains(keyword)) ||
-                    (x.Url != null && x.Url.Contains(keyword)) ||
-                    (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
-                    (x.HostOperatorUserName != null && x.HostOperatorUserName.Contains(keyword)) ||
-                    (x.ImpersonatedUserName != null && x.ImpersonatedUserName.Contains(keyword)) ||
-                    (x.OperationSessionId != null && x.OperationSessionId.Contains(keyword)) ||
-                    (x.ActionSummary != null && x.ActionSummary.Contains(keyword)) ||
-                    (x.MenuTitle != null && x.MenuTitle.Contains(keyword)));
-            }
-
-            queryable = ApplyCategoryFilter(queryable, category)
+            var queryable = (await BuildQueryAsync(input))
                 .OrderByDescending(x => x.ExecutionTime)
                 .Take(maxResultCount);
 
@@ -75,6 +46,69 @@ public class PlatformRequestAuditStore : ITransientDependency
         {
             return [];
         }
+    }
+
+    public async Task<PlatformPagedResultDto<PlatformRequestAuditEntry>> QueryPagedAsync(PlatformAuditLogQueryInput input)
+    {
+        try
+        {
+            var maxResultCount = Math.Clamp(input.MaxResultCount, 1, 500);
+            var skipCount = Math.Max(input.SkipCount, 0);
+            var queryable = await BuildQueryAsync(input);
+            var totalCount = await _asyncQueryableExecuter.CountAsync(queryable);
+            var logs = await _asyncQueryableExecuter.ToListAsync(
+                queryable
+                    .OrderByDescending(x => x.ExecutionTime)
+                    .Skip(skipCount)
+                    .Take(maxResultCount));
+
+            return new PlatformPagedResultDto<PlatformRequestAuditEntry>
+            {
+                Items = logs.Select(MapEntry).ToList(),
+                TotalCount = totalCount
+            };
+        }
+        catch (Exception ex) when (ex.ToString().Contains("no such table: AppRequestAuditLogs", StringComparison.OrdinalIgnoreCase))
+        {
+            return new PlatformPagedResultDto<PlatformRequestAuditEntry>
+            {
+                Items = [],
+                TotalCount = 0
+            };
+        }
+    }
+
+    private async Task<IQueryable<AppRequestAuditLog>> BuildQueryAsync(PlatformAuditLogQueryInput input)
+    {
+        var category = input.Category?.Trim().ToLowerInvariant();
+        var keyword = input.Keyword?.Trim();
+        var queryable = await _requestAuditLogRepository.GetQueryableAsync();
+
+        if (input.StartTime.HasValue)
+        {
+            queryable = queryable.Where(x => x.ExecutionTime >= input.StartTime.Value);
+        }
+
+        if (input.EndTime.HasValue)
+        {
+            queryable = queryable.Where(x => x.ExecutionTime <= input.EndTime.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            queryable = queryable.Where(x =>
+                (x.UserName != null && x.UserName.Contains(keyword)) ||
+                (x.TenantName != null && x.TenantName.Contains(keyword)) ||
+                (x.Url != null && x.Url.Contains(keyword)) ||
+                (x.ClientIpAddress != null && x.ClientIpAddress.Contains(keyword)) ||
+                (x.HostOperatorUserName != null && x.HostOperatorUserName.Contains(keyword)) ||
+                (x.ImpersonatedUserName != null && x.ImpersonatedUserName.Contains(keyword)) ||
+                (x.OperationSessionId != null && x.OperationSessionId.Contains(keyword)) ||
+                (x.ActionSummary != null && x.ActionSummary.Contains(keyword)) ||
+                (x.MenuTitle != null && x.MenuTitle.Contains(keyword)));
+        }
+
+        return ApplyCategoryFilter(queryable, category);
     }
 
     private static IQueryable<AppRequestAuditLog> ApplyCategoryFilter(

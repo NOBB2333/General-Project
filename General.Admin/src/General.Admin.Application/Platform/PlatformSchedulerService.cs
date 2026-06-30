@@ -143,7 +143,7 @@ public class PlatformSchedulerService : ITransientDependency
         return triggers;
     }
 
-    public async Task<List<PlatformScheduledJobRecordDto>> GetRecordsAsync(
+    public async Task<PlatformPagedResultDto<PlatformScheduledJobRecordDto>> GetRecordsAsync(
         string jobKey,
         PlatformScheduledJobRecordQueryInput input)
     {
@@ -174,13 +174,20 @@ public class PlatformSchedulerService : ITransientDependency
             queryable = queryable.Where(x => x.StartTime < startedTo);
         }
 
+        var totalCount = await _asyncQueryableExecuter.CountAsync(queryable);
         var maxResultCount = Math.Clamp(input.MaxResultCount, 1, MaxRecordResultCount);
+        var skipCount = Math.Max(input.SkipCount, 0);
         var records = await _asyncQueryableExecuter.ToListAsync(
             queryable
                 .OrderByDescending(x => x.StartTime)
+                .Skip(skipCount)
                 .Take(maxResultCount));
 
-        return records.Select(MapRecord).ToList();
+        return new PlatformPagedResultDto<PlatformScheduledJobRecordDto>
+        {
+            Items = records.Select(MapRecord).ToList(),
+            TotalCount = totalCount
+        };
     }
 
     public async Task<PlatformScheduledJobDto> CreateAsync(PlatformScheduledJobSaveInput input)

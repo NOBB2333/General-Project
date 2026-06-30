@@ -3,19 +3,33 @@ namespace General.Admin.Platform;
 public static class PlatformFilePathPolicy
 {
     private const int MaxCategoryLength = 64;
+    private const int MaxFileNameLength = 256;
     private const int MaxParentPathLength = 256;
 
     public static string NormalizeCategory(string? category)
     {
-        var value = NormalizeSegment(category, "default", MaxCategoryLength, nameof(category));
-        if (value.Contains('/'))
+        return NormalizeSegment(category, "default", MaxCategoryLength, nameof(category));
+    }
+
+    public static (string Category, string? ParentPath) NormalizeUploadTarget(
+        string? category,
+        string? parentPath,
+        string? businessType,
+        string? businessId)
+    {
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            return (NormalizeCategory(category), NormalizeParentPath(parentPath));
+        }
+
+        if (!string.IsNullOrWhiteSpace(businessType) || !string.IsNullOrWhiteSpace(businessId))
         {
             throw new BusinessException("Platform:InvalidFilePath")
                 .WithData("Path", category ?? string.Empty)
-                .WithData("Reason", "文件分类不能包含路径分隔符。");
+                .WithData("Reason", "业务文件必须提供明确分类。");
         }
 
-        return value;
+        return ("Platform/General", NormalizeParentPath(string.IsNullOrWhiteSpace(parentPath) ? "files" : parentPath));
     }
 
     public static string? NormalizeParentPath(string? parentPath)
@@ -52,8 +66,37 @@ public static class PlatformFilePathPolicy
     {
         return string.Join(
             '/',
-            new[] { NormalizeCategory(category), NormalizeParentPath(parentPath), fileName.Trim() }
+            new[] { NormalizeCategory(category), NormalizeParentPath(parentPath), NormalizeFileName(fileName) }
                 .Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
+
+    public static string NormalizeFileName(string? fileName)
+    {
+        var normalized = fileName?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            throw new BusinessException("Platform:InvalidFilePath")
+                .WithData("Path", fileName ?? string.Empty)
+                .WithData("Reason", "文件名不能为空。");
+        }
+
+        if (normalized.Length > MaxFileNameLength)
+        {
+            throw new BusinessException("Platform:InvalidFilePath")
+                .WithData("Path", normalized)
+                .WithData("Reason", "文件名长度超过限制。");
+        }
+
+        EnsureRelativePath(normalized, MaxFileNameLength, nameof(fileName));
+        EnsureSafeSegment(normalized, fileName);
+        if (normalized.Contains('/') || normalized.Contains('\\'))
+        {
+            throw new BusinessException("Platform:InvalidFilePath")
+                .WithData("Path", fileName ?? string.Empty)
+                .WithData("Reason", "文件名不能包含路径分隔符。");
+        }
+
+        return normalized;
     }
 
     private static string NormalizeSegment(string? value, string? defaultValue, int maxLength, string parameterName)
@@ -74,10 +117,13 @@ public static class PlatformFilePathPolicy
         EnsureRelativePath(normalized, maxLength, parameterName);
         if (normalized.Contains('/'))
         {
-            foreach (var segment in normalized.Split('/'))
+            var segments = normalized.Split('/').Select(segment => segment.Trim()).ToArray();
+            foreach (var segment in segments)
             {
                 EnsureSafeSegment(segment, value);
             }
+
+            return string.Join('/', segments);
         }
         else
         {

@@ -1,10 +1,13 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import type { VxeGridProps } from '#/adapter/vxe-table';
+
+import { computed, onMounted, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
-import { Alert, Button, Card, Col, Descriptions, Empty, Row, Statistic, Table } from 'ant-design-vue';
+import { Alert, Button, Card, Col, Descriptions, Empty, Row, Statistic } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getSystemMonitorApi, type SystemMonitorApi } from '#/api/core';
 
 defineOptions({ name: 'PlatformSystemMonitorPage' });
@@ -13,12 +16,23 @@ const loading = ref(false);
 const monitor = ref<null | SystemMonitorApi.MonitorItem>(null);
 
 const diskColumns = [
-  { dataIndex: 'name', key: 'name', title: '磁盘' },
-  { dataIndex: 'type', key: 'type', title: '类型', width: 120 },
-  { dataIndex: 'driveFormat', key: 'driveFormat', title: '格式', width: 120 },
-  { dataIndex: 'totalSizeBytes', key: 'totalSizeBytes', title: '总容量', width: 140 },
-  { dataIndex: 'freeSpaceBytes', key: 'freeSpaceBytes', title: '可用容量', width: 140 },
-];
+  { align: 'left', field: 'name', title: '磁盘' },
+  { field: 'type', title: '类型', width: 120 },
+  { field: 'driveFormat', title: '格式', width: 120 },
+  { field: 'totalSizeBytes', slots: { default: 'totalSizeBytes' }, title: '总容量', width: 140 },
+  { field: 'freeSpaceBytes', slots: { default: 'freeSpaceBytes' }, title: '可用容量', width: 140 },
+] satisfies VxeGridProps<SystemMonitorApi.DiskItem>['columns'];
+
+const diskGridOptions = computed<VxeGridProps<SystemMonitorApi.DiskItem>>(() => ({
+  columns: diskColumns,
+  data: monitor.value?.disks || [],
+  loading: loading.value,
+  pagerConfig: { enabled: false },
+  rowConfig: { keyField: 'name' },
+  size: 'small',
+}));
+
+const [DiskGrid] = useVbenVxeGrid<SystemMonitorApi.DiskItem>({ gridOptions: {} });
 
 async function loadMonitor() {
   loading.value = true;
@@ -74,17 +88,17 @@ onMounted(loadMonitor);
 
       <Row :gutter="[16, 16]">
         <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
+          <Card class="rounded-2xl" :bordered="false">
             <Statistic title="系统 CPU 使用率" :value="formatPercent(monitor?.systemCpuUsagePercent)" />
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
+          <Card class="rounded-2xl" :bordered="false">
             <Statistic title="进程 CPU 使用率" :value="formatPercent(monitor?.processCpuUsagePercent)" />
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
+          <Card class="rounded-2xl" :bordered="false">
             <Statistic
               title="系统内存使用"
               :value="formatMemoryUsage(monitor?.systemUsedMemoryBytes, monitor?.totalMemoryBytes)"
@@ -92,7 +106,7 @@ onMounted(loadMonitor);
           </Card>
         </Col>
         <Col :lg="6" :md="12" :span="24">
-          <Card :bordered="false">
+          <Card class="rounded-2xl" :bordered="false">
             <Statistic
               title="进程内存使用"
               :value="formatMemoryUsage(monitor?.workingSetBytes, monitor?.processMemoryDisplayDenominatorBytes)"
@@ -103,7 +117,7 @@ onMounted(loadMonitor);
 
       <Row :gutter="[16, 16]">
         <Col :lg="12" :span="24">
-          <Card :bordered="false" title="运行环境">
+          <Card class="rounded-2xl" :bordered="false" title="运行环境">
             <template #extra>
               <Button :loading="loading" type="primary" @click="loadMonitor">刷新</Button>
             </template>
@@ -159,24 +173,15 @@ onMounted(loadMonitor);
         </Col>
 
         <Col :lg="12" :span="24">
-          <Card :bordered="false" title="磁盘资源">
-            <Table
-              :columns="diskColumns"
-              :data-source="monitor?.disks || []"
-              :loading="loading"
-              :pagination="false"
-              row-key="name"
-              size="small"
-            >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'totalSizeBytes'">
-                  {{ formatBytes((record as SystemMonitorApi.DiskItem).totalSizeBytes) }}
-                </template>
-                <template v-else-if="column.key === 'freeSpaceBytes'">
-                  {{ formatBytes((record as SystemMonitorApi.DiskItem).freeSpaceBytes) }}
-                </template>
+          <Card class="rounded-2xl" :bordered="false" title="磁盘资源">
+            <DiskGrid class="app-vxe-card-grid" :grid-options="diskGridOptions">
+              <template #totalSizeBytes="{ row }">
+                {{ formatBytes(row.totalSizeBytes) }}
               </template>
-            </Table>
+              <template #freeSpaceBytes="{ row }">
+                {{ formatBytes(row.freeSpaceBytes) }}
+              </template>
+            </DiskGrid>
           </Card>
         </Col>
       </Row>
@@ -185,10 +190,11 @@ onMounted(loadMonitor);
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
 .platform-monitor {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .platform-monitor__empty {
@@ -198,7 +204,7 @@ onMounted(loadMonitor);
 }
 
 .platform-monitor__note {
-  margin-top: 6px;
+  @apply mt-1.5;
   color: var(--ant-color-text-secondary);
   font-size: 12px;
 }

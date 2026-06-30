@@ -41,7 +41,9 @@ public class PlatformApiDocumentationOptions
             [
                 new(ApiDocGroups.Platform, "平台 API", true),
                 new(ApiDocGroups.Project, "项目 API", false),
-                new(ApiDocGroups.Business, "业务 API", false)
+                new(ApiDocGroups.Business, "业务 API", false),
+                new(ApiDocGroups.Ai, "AI API", false),
+                new(ApiDocGroups.Integration, "集成 API", false)
             ];
     }
 }

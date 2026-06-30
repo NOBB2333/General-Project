@@ -1,12 +1,16 @@
 <script lang="ts" setup>
+import type { NativeVxeGridEvents, VxeGridProps } from '#/adapter/vxe-table';
+
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
 
-import { Alert, Button, Card, Skeleton, Table, Tag } from 'ant-design-vue';
+import { Alert, Button, Card, Skeleton, Tag } from 'ant-design-vue';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getBusinessOverviewApi, type BusinessApi } from '#/api/core';
+import { useLocalVxePagination } from '#/composables/platform/use-local-vxe-pagination';
 
 defineOptions({ name: 'BusinessOverviewPage' });
 
@@ -15,17 +19,68 @@ const loading = ref(false);
 const overview = ref<BusinessApi.Overview | null>(null);
 
 const overviewColumns = [
-  { dataIndex: 'projectCode', key: 'projectCode', title: '项目编号', width: 140 },
-  { dataIndex: 'name', key: 'name', title: '项目名称', width: 260 },
-  { dataIndex: 'customerName', key: 'customerName', title: '客户', width: 180 },
-  { dataIndex: 'managerName', key: 'managerName', title: '项目经理', width: 140 },
-  { dataIndex: 'contractAmount', key: 'contractAmount', title: '合同收入', width: 150 },
-  { dataIndex: 'procurementAmount', key: 'procurementAmount', title: '分包采购', width: 150 },
-  { dataIndex: 'receivedAmount', key: 'receivedAmount', title: '已回款', width: 150 },
-  { dataIndex: 'grossProfitRate', key: 'grossProfitRate', title: '毛利率', width: 110 },
-  { dataIndex: 'businessCloseStatus', key: 'businessCloseStatus', title: '经营状态', width: 150 },
-  { dataIndex: 'action', key: 'action', title: '跳转', width: 110 },
-];
+  { field: 'projectCode', title: '项目编号', width: 140 },
+  { align: 'left', field: 'name', title: '项目名称', width: 260 },
+  { field: 'customerName', title: '客户', width: 180 },
+  { field: 'managerName', title: '项目经理', width: 140 },
+  {
+    field: 'contractAmount',
+    slots: { default: 'contractAmount' },
+    title: '合同收入',
+    width: 150,
+  },
+  {
+    field: 'procurementAmount',
+    slots: { default: 'procurementAmount' },
+    title: '分包采购',
+    width: 150,
+  },
+  {
+    field: 'receivedAmount',
+    slots: { default: 'receivedAmount' },
+    title: '已回款',
+    width: 150,
+  },
+  {
+    field: 'grossProfitRate',
+    slots: { default: 'grossProfitRate' },
+    title: '毛利率',
+    width: 110,
+  },
+  {
+    field: 'businessCloseStatus',
+    slots: { default: 'businessCloseStatus' },
+    title: '经营状态',
+    width: 150,
+  },
+  { fixed: 'right', slots: { default: 'action' }, title: '跳转', width: 110 },
+] satisfies VxeGridProps<BusinessApi.ProjectSummary>['columns'];
+
+const projectRows = computed(() => overview.value?.projects || []);
+const projectPagination = useLocalVxePagination(projectRows, {
+  defaultPageSize: 20,
+});
+
+const overviewGridOptions = computed<VxeGridProps<BusinessApi.ProjectSummary>>(
+  () => ({
+    columns: overviewColumns,
+    data: projectPagination.pagedRows.value,
+    height: 560,
+    pagerConfig: projectPagination.pagerConfig.value,
+    rowConfig: { keyField: 'id' },
+    scrollX: { enabled: true },
+    size: 'medium',
+  }),
+);
+
+const overviewGridEvents: NativeVxeGridEvents<BusinessApi.ProjectSummary> = {
+  'page-change': projectPagination.handlePageChange,
+};
+
+const [OverviewGrid] = useVbenVxeGrid<BusinessApi.ProjectSummary>({
+  gridEvents: overviewGridEvents,
+  gridOptions: {},
+});
 
 const metricItems = computed(() => {
   if (!overview.value) {
@@ -33,15 +88,38 @@ const metricItems = computed(() => {
   }
 
   return [
-    { key: 'contract', label: '合同收入', value: formatMoney(overview.value.contractAmount) },
-    { key: 'cost', label: '经营成本', value: formatMoney(overview.value.costAmount) },
-    { key: 'profit', label: '累计毛利', value: formatMoney(overview.value.grossProfitAmount) },
-    { key: 'received', label: '已回款', value: formatMoney(overview.value.receivedAmount) },
-    { key: 'forecast', label: '年底预计回款', value: formatMoney(overview.value.yearEndReceivableForecast) },
+    {
+      key: 'contract',
+      label: '合同收入',
+      value: formatMoney(overview.value.contractAmount),
+    },
+    {
+      key: 'cost',
+      label: '经营成本',
+      value: formatMoney(overview.value.costAmount),
+    },
+    {
+      key: 'profit',
+      label: '累计毛利',
+      value: formatMoney(overview.value.grossProfitAmount),
+    },
+    {
+      key: 'received',
+      label: '已回款',
+      value: formatMoney(overview.value.receivedAmount),
+    },
+    {
+      key: 'forecast',
+      label: '年底预计回款',
+      value: formatMoney(overview.value.yearEndReceivableForecast),
+    },
     {
       key: 'rate',
       label: '综合毛利率',
-      value: typeof overview.value.grossProfitRate === 'number' ? `${overview.value.grossProfitRate.toFixed(1)}%` : '--',
+      value:
+        typeof overview.value.grossProfitRate === 'number'
+          ? `${overview.value.grossProfitRate.toFixed(1)}%`
+          : '--',
     },
   ];
 });
@@ -84,7 +162,9 @@ const warningDetailItems = computed(() => {
     return [];
   }
 
-  return overview.value.warningItems.slice(0, 4);
+  return overview.value.warningItems
+    .filter((item) => !item.type.includes('绩效风险'))
+    .slice(0, 4);
 });
 
 function formatMoney(value?: null | number) {
@@ -98,6 +178,22 @@ function formatMoney(value?: null | number) {
     style: 'currency',
     currency: 'CNY',
   }).format(value);
+}
+
+function resolvePriorityColor(priority?: null | string) {
+  if (priority === 'P0') {
+    return 'red';
+  }
+
+  if (priority === 'P1') {
+    return 'warning';
+  }
+
+  if (priority === 'P2') {
+    return 'blue';
+  }
+
+  return 'default';
 }
 
 function openProject(projectId: string, tab = 'overview') {
@@ -127,10 +223,13 @@ onMounted(loadOverview);
 </script>
 
 <template>
-  <Page description="管理层先看收入、成本、回款、利润与收尾风险，再进入单项目经营详情。" title="经营总览">
+  <Page
+    description="管理层先看收入、成本、回款、利润与收尾风险，再进入单项目经营详情。"
+    title="经营总览"
+  >
     <Alert
       banner
-      class="mb-4"
+      class="business-overview__notice"
       message="经营管理区二期已收敛为资金与合同视角，不再混入 EV / PV / CV、验收和项目执行健康度。"
       type="info"
     />
@@ -138,7 +237,7 @@ onMounted(loadOverview);
     <Skeleton v-if="loading" active :paragraph="{ rows: 8 }" />
 
     <template v-else-if="overview">
-      <Card :bordered="false" class="business-overview__hero">
+      <Card :bordered="false" class="business-overview__hero rounded-2xl">
         <div class="business-overview__hero-head">
           <div>
             <span class="business-overview__eyebrow">经营驾驶舱</span>
@@ -147,26 +246,39 @@ onMounted(loadOverview);
           <p>聚焦正在执行项目的收入、成本、回款、利润与收尾风险。</p>
         </div>
         <div class="business-overview__metrics">
-          <article v-for="item in metricItems" :key="item.key" class="business-overview__metric-card">
+          <article
+            v-for="item in metricItems"
+            :key="item.key"
+            class="business-overview__metric-card"
+          >
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
           </article>
         </div>
       </Card>
 
-      <Card :bordered="false" class="business-overview__warning-board mt-1" title="经营预警">
+      <Card
+        :bordered="false"
+        class="business-overview__warning-board rounded-2xl"
+        title="经营预警"
+      >
         <div class="business-overview__warning-summary">
           <article
             v-for="item in warningSummaryItems"
             :key="item.key"
-            :class="['business-overview__warning-summary-item', `is-${item.key}`]"
+            :class="[
+              'business-overview__warning-summary-item',
+              `is-${item.key}`,
+            ]"
           >
             <div class="business-overview__warning-summary-main">
               <div>
                 <span>{{ item.label }}</span>
                 <strong>{{ item.value }}</strong>
               </div>
-              <Button size="small" type="link" @click="openReport(item.tab)">{{ item.actionLabel }}</Button>
+              <Button class="shrink-0 px-0" size="small" type="link" @click="openReport(item.tab)">{{
+                item.actionLabel
+              }}</Button>
             </div>
             <p>{{ item.description }}</p>
           </article>
@@ -175,61 +287,109 @@ onMounted(loadOverview);
         <div class="business-overview__warning-detail">
           <div class="business-overview__warning-header">
             <strong>重点异常</strong>
-            <Button size="small" type="link" @click="openReport('warning-center')">查看全部预警</Button>
+            <Button
+              size="small"
+              type="link"
+              @click="openReport('warning-center')"
+              >查看全部预警</Button
+            >
           </div>
           <div class="business-overview__warning-rows">
-            <div v-for="item in warningDetailItems" :key="item.id" class="business-overview__warning-row">
+            <div
+              v-for="item in warningDetailItems"
+              :key="item.id"
+              class="business-overview__warning-row"
+            >
               <div class="business-overview__warning-row-main">
                 <div class="business-overview__warning-row-head">
                   <strong>{{ item.projectName }}</strong>
-                  <Tag :color="item.level === '高' ? 'red' : 'gold'">{{ item.level }}级</Tag>
+                  <Tag :color="resolvePriorityColor(item.level)">{{
+                    item.level
+                  }}</Tag>
                 </div>
                 <p>{{ item.type }}：{{ item.description }}</p>
                 <span class="business-overview__warning-meta">
-                  {{ item.projectCode }} · {{ item.ownerName }} · {{ item.lastUpdatedTime }}
+                  {{ item.projectCode }} · {{ item.ownerName }} ·
+                  {{ item.lastUpdatedTime }}
                 </span>
               </div>
-              <Button size="small" @click="openProject(item.projectId, item.actionTab)">查看</Button>
+              <Button
+                class="shrink-0"
+                size="small"
+                @click="openProject(item.projectId, item.actionTab)"
+                >查看</Button
+              >
             </div>
           </div>
         </div>
       </Card>
 
-      <Card :bordered="false" class="business-overview__table-card mt-1" title="执行中经营项目">
-        <Table
-          class="business-overview__table"
-          :columns="overviewColumns"
-          :data-source="overview.projects"
-          :pagination="false"
-          row-key="id"
-          :scroll="{ x: 'max-content', y: 560 }"
-          size="middle"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'contractAmount'">{{ formatMoney(record.contractAmount) }}</template>
-            <template v-else-if="column.key === 'procurementAmount'">{{ formatMoney(record.procurementAmount) }}</template>
-            <template v-else-if="column.key === 'receivedAmount'">{{ formatMoney(record.receivedAmount) }}</template>
-            <template v-else-if="column.key === 'grossProfitRate'">
-              <Tag :color="typeof record.grossProfitRate === 'number' && record.grossProfitRate < 25 ? 'red' : 'green'">
-                {{ typeof record.grossProfitRate === 'number' ? `${record.grossProfitRate.toFixed(1)}%` : '--' }}
+      <Card
+        :bordered="false"
+        class="business-overview__table-card min-w-0 rounded-2xl"
+        title="执行中经营项目"
+      >
+        <div class="min-w-0">
+          <OverviewGrid
+            class="app-vxe-card-grid business-overview__table"
+            :grid-events="overviewGridEvents"
+            :grid-options="overviewGridOptions"
+          >
+            <template #contractAmount="{ row }">{{
+              formatMoney(row.contractAmount)
+            }}</template>
+            <template #procurementAmount="{ row }">{{
+              formatMoney(row.procurementAmount)
+            }}</template>
+            <template #receivedAmount="{ row }">{{
+              formatMoney(row.receivedAmount)
+            }}</template>
+            <template #grossProfitRate="{ row }">
+              <Tag
+                :color="
+                  typeof row.grossProfitRate === 'number' &&
+                  row.grossProfitRate < 25
+                    ? 'red'
+                    : 'green'
+                "
+              >
+                {{
+                  typeof row.grossProfitRate === 'number'
+                    ? `${row.grossProfitRate.toFixed(1)}%`
+                    : '--'
+                }}
               </Tag>
             </template>
-            <template v-else-if="column.key === 'businessCloseStatus'">
-              <Tag :color="record.businessCloseStatus.includes('收尾') || record.businessCloseStatus.includes('待回款') ? 'gold' : 'blue'">
-                {{ record.businessCloseStatus }}
+            <template #businessCloseStatus="{ row }">
+              <Tag
+                :color="
+                  row.businessCloseStatus.includes('收尾') ||
+                  row.businessCloseStatus.includes('待回款')
+                    ? 'gold'
+                    : 'blue'
+                "
+              >
+                {{ row.businessCloseStatus }}
               </Tag>
             </template>
-            <template v-else-if="column.key === 'action'">
-              <Button size="small" type="link" @click="openProject(record.id)">进入项目</Button>
+            <template #action="{ row }">
+              <Button size="small" type="link" @click="openProject(row.id)"
+                >进入项目</Button
+              >
             </template>
-          </template>
-        </Table>
+          </OverviewGrid>
+        </div>
       </Card>
     </template>
   </Page>
 </template>
 
 <style scoped>
+@reference "@vben/tailwind-config/theme";
+.business-overview__notice {
+  @apply mb-4;
+}
+
 .business-overview__hero {
   background:
     linear-gradient(135deg, rgb(22 119 255 / 0.08), rgb(37 99 235 / 0.03)),
@@ -237,21 +397,26 @@ onMounted(loadOverview);
   border: 1px solid rgb(22 119 255 / 0.08);
 }
 
+.business-overview__warning-board,
+.business-overview__table-card {
+  @apply mt-1;
+}
+
 .business-overview__hero-head {
   align-items: end;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  @apply gap-4;
 }
 
 .business-overview__hero-head h3 {
-  margin: 8px 0 0;
+  @apply mt-2;
   font-size: 24px;
 }
 
 .business-overview__hero-head p {
   color: var(--ant-color-text-secondary);
-  margin: 0;
+  @apply m-0;
   max-width: 420px;
   text-align: right;
 }
@@ -266,9 +431,9 @@ onMounted(loadOverview);
 
 .business-overview__metrics {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin-top: 16px;
+  @apply mt-4;
 }
 
 .business-overview__metric-card,
@@ -279,17 +444,21 @@ onMounted(loadOverview);
     var(--ant-color-bg-container);
   border: 1px solid rgb(22 119 255 / 0.16);
   box-shadow: 0 8px 24px rgb(15 23 42 / 0.08);
-  border-radius: 16px;
+  @apply rounded-2xl;
   display: grid;
-  gap: 8px;
+  @apply gap-2;
   min-width: 0;
-  padding: 14px 16px;
+  @apply px-4 py-3.5;
   position: relative;
 }
 
 .business-overview__metric-card::before {
-  background: linear-gradient(90deg, var(--ant-color-primary), rgb(22 119 255 / 0.18));
-  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--ant-color-primary),
+    rgb(22 119 255 / 0.18)
+  );
+  @apply rounded-full;
   content: '';
   height: 3px;
   left: 16px;
@@ -307,27 +476,27 @@ onMounted(loadOverview);
 .business-overview__metric-card strong,
 .business-overview__warning-metric strong {
   color: var(--ant-color-text);
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .business-overview__warning-summary,
 .business-overview__warning-rows {
   display: grid;
-  gap: 12px;
+  @apply gap-3;
 }
 
 .business-overview__warning-summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 16px;
+  @apply mb-4;
 }
 
 .business-overview__warning-summary-item {
   background: var(--ant-color-bg-container);
   border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 16px;
+  @apply rounded-2xl;
   display: grid;
-  gap: 6px;
-  padding: 14px 16px;
+  @apply gap-1.5;
+  @apply px-4 py-3.5;
 }
 
 .business-overview__warning-summary-item.is-profit-warning {
@@ -345,55 +514,50 @@ onMounted(loadOverview);
 .business-overview__warning-summary-main {
   align-items: baseline;
   display: flex;
-  gap: 12px;
+  @apply gap-3;
   justify-content: space-between;
 }
 
 .business-overview__warning-summary-main > div {
   display: grid;
-  gap: 6px;
+  @apply gap-1.5;
 }
 
 .business-overview__warning-summary-main strong {
   color: var(--ant-color-text);
-  font-size: 22px;
-}
-
-.business-overview__warning-summary-item :deep(.ant-btn-link) {
-  flex-shrink: 0;
-  padding-inline: 0;
+  font-size: 24px;
 }
 
 .business-overview__warning-summary-item p,
 .business-overview__warning-row p {
   color: var(--ant-color-text-secondary);
-  margin: 0;
+  @apply m-0;
 }
 
 .business-overview__warning-detail {
   border-top: 1px solid var(--ant-color-border-secondary);
-  padding-top: 16px;
+  @apply pt-4;
 }
 
 .business-overview__warning-header {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  @apply mb-3;
 }
 
 .business-overview__warning-row {
   align-items: center;
   display: flex;
-  gap: 16px;
+  @apply gap-4;
   justify-content: space-between;
-  padding: 12px 0;
+  @apply py-3;
 }
 
 .business-overview__warning-row-head {
   align-items: center;
   display: flex;
-  gap: 10px;
+  @apply gap-2.5;
 }
 
 .business-overview__warning-row + .business-overview__warning-row {
@@ -411,45 +575,19 @@ onMounted(loadOverview);
 
 .business-overview__warning-row-main,
 .business-overview__warning-row p,
-.business-overview__table-card :deep(.ant-card-body) {
+.business-overview__table {
   min-width: 0;
 }
 
 .business-overview__warning-row p {
-  margin: 4px 0 0;
+  @apply mt-1;
 }
 
 .business-overview__warning-meta {
   color: var(--ant-color-text-tertiary);
   display: inline-block;
   font-size: 12px;
-  margin-top: 6px;
-}
-
-.business-overview__warning-row :deep(.ant-btn) {
-  flex-shrink: 0;
-}
-
-.business-overview__table :deep(.ant-table-wrapper),
-.business-overview__table :deep(.ant-spin-nested-loading),
-.business-overview__table :deep(.ant-spin-container),
-.business-overview__table :deep(.ant-table),
-.business-overview__table :deep(.ant-table-container) {
-  min-width: 0;
-  width: 100%;
-}
-
-.business-overview__table :deep(.ant-table-cell) {
-  white-space: nowrap;
-  word-break: keep-all;
-}
-
-.business-overview__table :deep(.ant-table-content) {
-  overflow-x: auto;
-}
-
-.business-overview__table :deep(table) {
-  min-width: max-content;
+  @apply mt-1.5;
 }
 
 @media (max-width: 1400px) {

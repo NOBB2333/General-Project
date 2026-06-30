@@ -8,15 +8,7 @@ public class PlatformFileStorageOptions
 
     public long MaxFileSizeBytes { get; set; } = 104_857_600;
 
-    public string[] AllowedContentTypes { get; set; } =
-    [
-        "image/jpeg",
-        "image/png",
-        "application/pdf",
-        "text/plain",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    ];
+    public string[] AllowedContentTypes { get; set; } = PlatformFileContentTypes.DefaultAllowedContentTypes.ToArray();
 
     public PlatformLocalFileStorageOptions Local { get; set; } = new();
 

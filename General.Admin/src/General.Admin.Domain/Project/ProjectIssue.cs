@@ -89,4 +89,38 @@ public class ProjectIssue : FullAuditedAggregateRoot<Guid>
         AcceptanceCriteriaId = acceptanceCriteriaId;
         QualityChecklistId = qualityChecklistId;
     }
+
+    public void Update(
+        string type,
+        string title,
+        string level,
+        Guid ownerUserId,
+        string status,
+        DateTime? dueDate = null,
+        string? requirementTitle = null,
+        string? productOwnerName = null,
+        string? developerOwnerName = null,
+        string? testerOwnerName = null,
+        Guid? productOwnerUserId = null,
+        Guid? developerOwnerUserId = null,
+        Guid? testerOwnerUserId = null,
+        Guid? acceptanceCriteriaId = null,
+        Guid? qualityChecklistId = null)
+    {
+        Type = Check.NotNullOrWhiteSpace(type, nameof(type), 32);
+        Title = Check.NotNullOrWhiteSpace(title, nameof(title), 256);
+        Level = Check.NotNullOrWhiteSpace(level, nameof(level), 32);
+        OwnerUserId = ownerUserId;
+        Status = Check.NotNullOrWhiteSpace(status, nameof(status), 32);
+        DueDate = dueDate;
+        RequirementTitle = requirementTitle?.Trim();
+        ProductOwnerName = productOwnerName?.Trim();
+        DeveloperOwnerName = developerOwnerName?.Trim();
+        TesterOwnerName = testerOwnerName?.Trim();
+        ProductOwnerUserId = productOwnerUserId;
+        DeveloperOwnerUserId = developerOwnerUserId;
+        TesterOwnerUserId = testerOwnerUserId;
+        AcceptanceCriteriaId = acceptanceCriteriaId;
+        QualityChecklistId = qualityChecklistId;
+    }
 }

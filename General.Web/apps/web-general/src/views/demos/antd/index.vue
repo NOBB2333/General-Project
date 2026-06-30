@@ -39,7 +39,7 @@ function notify(type: NotificationType) {
     :description="$t('demos.generalDescription')"
     :title="$t('demos.generalPageTitle')"
   >
-    <Card class="mb-5" title="按钮">
+    <Card :bordered="false" class="mb-5 rounded-2xl" title="按钮">
       <Space>
         <Button>Default</Button>
         <Button type="primary"> Primary </Button>
@@ -47,7 +47,7 @@ function notify(type: NotificationType) {
         <Button danger> Error </Button>
       </Space>
     </Card>
-    <Card class="mb-5" title="Message">
+    <Card :bordered="false" class="mb-5 rounded-2xl" title="Message">
       <Space>
         <Button @click="info"> 信息 </Button>
         <Button danger @click="error"> 错误 </Button>
@@ -56,7 +56,7 @@ function notify(type: NotificationType) {
       </Space>
     </Card>
 
-    <Card class="mb-5" title="Notification">
+    <Card :bordered="false" class="mb-5 rounded-2xl" title="Notification">
       <Space>
         <Button @click="notify('info')"> 信息 </Button>
         <Button danger @click="notify('error')"> 错误 </Button>
