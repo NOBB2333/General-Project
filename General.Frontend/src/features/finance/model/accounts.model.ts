@@ -1,0 +1,65 @@
+import type { PageModel } from '@/components/page';
+
+export const financeAccountsModel = {
+  key: '财务管理|应收应付',
+  module: '财务管理',
+  moduleSlug: 'finance',
+  label: '应收应付',
+  path: '/finance/accounts',
+  routeName: 'page.finance.ar-ap',
+  pageSlug: 'ar-ap',
+  demoPath: '/finance/accounts',
+  surface: 'list',
+  description: '统一查看应收应付账款、管理期初建账、跟踪资金双向流动',
+  searchPlaceholder: '搜索应收号/销售单/客户/合同...',
+  tabs: ['应收账款', '应付账款', '期初应收建账', '期初应付建账'],
+  tools: ['列表', '按客户', '按合同', '高级筛选'],
+  filters: [
+    {
+      key: 'source',
+      label: '来源',
+      options: ['全部来源', '销售出库', '收入确认', '预收转应收', '其他应收', '期初应收'],
+    },
+    {
+      key: 'bill',
+      label: '票据关系',
+      options: ['全部票据关系', '退票转入', '票据收款'],
+    },
+  ],
+  columns: [
+    { key: 'code', title: '单号', width: 152 },
+    { key: 'source', title: '来源', width: 120 },
+    { key: 'party', title: '客户/业务员', width: 200 },
+    { key: 'contract', title: '合同/项目', width: 220 },
+    { key: 'amount', title: '应收金额', width: 120 },
+    { key: 'settled', title: '已收', width: 110 },
+    { key: 'open', title: '未收', width: 110 },
+    { key: 'dueDate', title: '到期日', width: 170 },
+    { key: 'status', title: '状态', width: 120 },
+    { key: 'invoice', title: '发票', width: 100 },
+    { key: 'bill', title: '票据', width: 100 },
+    { key: 'action', title: '操作', width: 145 },
+  ],
+  stats: [
+    { key: 'total', label: '应收总额', value: '¥304.1万', tone: 'primary', hint: '共 25 笔未结清' },
+    { key: 'overdue', label: '逾期金额', value: '¥135.2万', tone: 'danger', hint: '占比 44%' },
+    { key: 'count', label: '逾期笔数', value: '11', tone: 'warning', hint: '高风险 ¥70.8万' },
+    { key: 'cycle', label: '平均回款周期', value: '10天', tone: 'neutral', hint: '基于已核销记录' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '登记收款',
+  pageSize: 10,
+  emptyHint: '当前筛选条件下没有账款记录',
+  rowActions: ['view', 'copy'],
+  replication: {
+    status: 'verified',
+    referenceUrl: 'https://demo.risemap.cn/finance/accounts',
+    referenceScreenshot: '.codex-artifacts/replication/finance__accounts/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/finance__accounts/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/finance__accounts.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+
+export type FinanceAccountsModel = typeof financeAccountsModel;

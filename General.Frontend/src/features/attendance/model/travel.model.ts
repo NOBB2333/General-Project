@@ -1,0 +1,48 @@
+import type { PageModel } from '@/components/page';
+
+export const travelModel = {
+  key: '考勤假期|出差申请',
+  module: '考勤假期',
+  moduleSlug: 'attendance',
+  label: '出差申请',
+  path: '/attendance/travel',
+  routeName: 'page.attendance.travel',
+  pageSlug: 'travel',
+  demoPath: '/hr/business-trip',
+  surface: 'list',
+  description: '查看出差记录、申请备用金、提交报销、审批团队成员出差',
+  searchPlaceholder: '搜索单号/目的地/事由...',
+  tabs: ['我的出差', '我的团队', '审批管理'],
+  tools: ['新建出差申请'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '单号', width: 120 },
+    { key: 'destination', title: '目的地', width: 115 },
+    { key: 'transport', title: '交通方式', width: 110 },
+    { key: 'reason', title: '出差事由', width: 330 },
+    { key: 'departureDate', title: '出发日期', width: 120 },
+    { key: 'returnDate', title: '返回日期', width: 120 },
+    { key: 'days', title: '天数', width: 65 },
+    { key: 'budget', title: '预算', width: 95 },
+    { key: 'status', title: '状态', width: 95 },
+  ],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '新建出差申请',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无匹配的出差申请',
+  rowActions: ['view', 'withdraw', 'reimburse'],
+  actions: [{ id: 'create', label: '新建出差申请', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/hr/business-trip',
+    referenceScreenshot: '.codex-artifacts/replication/attendance__travel/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/attendance__travel/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/attendance__travel.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type TravelModel = typeof travelModel;

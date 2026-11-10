@@ -1,0 +1,52 @@
+import type { PageModel } from '@/components/page';
+
+export const leadsModel = {
+  key: 'CRM客户管理|线索管理',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '线索管理',
+  path: '/crm/leads',
+  routeName: 'page.crm.leads',
+  pageSlug: 'leads',
+  demoPath: '/sales/leads',
+  surface: 'list',
+  description: '潜在客户线索捕获、培育与转化为商机',
+  searchPlaceholder: '搜索公司、联系人、线索号...',
+  tabs: ['我的线索 3', '线索公海 3'],
+  tools: ['导出', '新建线索'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '线索号', width: 120 },
+    { key: 'company', title: '公司名称', width: 250 },
+    { key: 'contact', title: '联系人', width: 170 },
+    { key: 'status', title: '状态', width: 120 },
+    { key: 'source', title: '来源', width: 100 },
+    { key: 'score', title: '评分', width: 100 },
+    { key: 'amount', title: '预估金额', width: 140 },
+    { key: 'region', title: '地区/行业', width: 180 },
+    { key: 'updatedAt', title: '更新日期', width: 140 },
+    { key: 'action', title: '操作', width: 90 },
+  ],
+  stats: [
+    { key: 'total', label: '全部线索', value: '5', tone: 'primary' },
+    { key: 'new', label: '新线索', value: '1', tone: 'warning' },
+    { key: 'converted', label: '已转化', value: '1', tone: 'primary' },
+    { key: 'public', label: '公海线索', value: '3', tone: 'danger' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建线索',
+  pageSize: 20,
+  emptyHint: '当前条件下没有线索',
+  actions: [{ id: 'create', label: '新建线索', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/leads',
+    referenceScreenshot: '.codex-artifacts/replication/crm__leads/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__leads/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__leads.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type LeadsModel = typeof leadsModel;

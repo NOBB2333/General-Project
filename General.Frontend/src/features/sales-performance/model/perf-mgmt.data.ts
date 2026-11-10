@@ -1,0 +1,88 @@
+import { defineReferenceFixture } from '@/components/page';
+import type { PerfMgmtRow, PerfMgmtTabDefinition } from './perf-mgmt.types';
+
+export const perfMgmtTabs: readonly PerfMgmtTabDefinition[] = [
+  { id: 'calculate', label: '计算与执行', badge: '本期' },
+  { id: 'review', label: '奖金审核' },
+  { id: 'paid', label: '发放记录' },
+  { id: 'pricing', label: '订单考核价格', badge: '超额分成' },
+  { id: 'params', label: '绩效参数配置', badge: '加权系数·奖金基数' },
+  { id: 'analysis', label: '绩效分析' },
+];
+
+const referenceRows: readonly PerfMgmtRow[] = [
+  {
+    id: 'perf-mgmt-001',
+    owner: '张经理',
+    orderCount: 5,
+    planName: '标准销售提成方案（2026年度）',
+    planCode: 'TC-2026-001',
+    period: '2026-Q1',
+    baseAmount: '¥2,240,000',
+    commission: '¥117,200',
+    reward: '+¥20,400',
+    rewardCount: '4/4',
+    deduction: '-¥15,000',
+    amount: '¥122,600',
+    status: '待审批',
+  },
+  {
+    id: 'perf-mgmt-002',
+    owner: '陈销售',
+    orderCount: 2,
+    planName: '标准销售提成方案（2026年度）',
+    planCode: 'TC-2026-001',
+    period: '2026-Q1',
+    baseAmount: '¥549,099',
+    commission: '¥17,455',
+    reward: '+¥2,000',
+    rewardCount: '1/2',
+    deduction: '',
+    amount: '¥19,455',
+    status: '待审批',
+  },
+  {
+    id: 'perf-mgmt-003',
+    owner: '王磊',
+    orderCount: 3,
+    planName: '大客户经理提成方案',
+    planCode: 'TC-2026-003',
+    period: '2026-Q1',
+    baseAmount: '¥440,000',
+    commission: '¥52,800',
+    reward: '+¥12,000',
+    rewardCount: '2/3',
+    deduction: '',
+    amount: '¥64,800',
+    status: '已发放',
+  },
+  {
+    id: 'perf-mgmt-004',
+    owner: '刘洋',
+    orderCount: 2,
+    planName: '标准销售提成方案（2026年度）',
+    planCode: 'TC-2026-001',
+    period: '2026-Q1',
+    baseAmount: '¥160,000',
+    commission: '¥4,800',
+    reward: '+¥2,000',
+    rewardCount: '1/1',
+    deduction: '',
+    amount: '¥6,800',
+    status: '未审',
+  },
+];
+
+export const perfMgmtReferenceFixture = defineReferenceFixture({
+  sourceUrl: 'https://demo.risemap.cn/sales/commission/admin',
+  capturedAt: '2026-08-16',
+  viewport: { width: 1618, height: 899 },
+  rows: referenceRows,
+  defaults: {
+    activeTab: 'calculate',
+    activePeriod: '2026-Q1',
+    plan: 'all',
+    status: 'all',
+    search: '',
+  },
+});

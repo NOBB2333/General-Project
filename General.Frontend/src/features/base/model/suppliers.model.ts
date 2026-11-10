@@ -1,0 +1,67 @@
+import type { ListPageModel } from '@/components/page';
+
+export const suppliersModel = {
+  key: '基础资料|供应商管理',
+  module: '基础资料',
+  moduleSlug: 'base',
+  label: '供应商管理',
+  path: '/base/suppliers',
+  routeName: 'page.base.suppliers',
+  pageSlug: 'suppliers',
+  demoPath: '/base/suppliers',
+  surface: 'list',
+  description: '供应商档案、资质审核、合作绩效与协同沟通',
+  searchPlaceholder: '搜索供应商名称...',
+  tabs: ['供应商列表', '资质管理'],
+  tools: ['导出', '新增供应商'],
+  filters: [{ key: 'scope', label: '管辖范围', options: ['所有', '我负责的', '下属负责的', '我关注的'] }],
+  columns: [
+    { key: 'name', title: '供应商名称', width: 200 },
+    { key: 'level', title: '级别', width: 60 },
+    { key: 'contact', title: '联系人', width: 100 },
+    { key: 'phone', title: '联系电话', width: 140 },
+    { key: 'owner', title: '负责人', width: 100 },
+    { key: 'payMethod', title: '付款方式', width: 110 },
+    { key: 'totalPurchase', title: '历史采购额', width: 120 },
+    { key: 'payable', title: '应付余额', width: 120 },
+    { key: 'status', title: '状态', width: 80 },
+    { key: 'action', title: '操作', width: 120 },
+  ],
+  stats: [
+    { key: 'total', label: '供应商总数', value: '7', tone: 'primary' },
+    { key: 'purchase', label: '历史采购额', value: '¥735万', tone: 'neutral' },
+    { key: 'payable', label: '应付余额', value: '¥81.6万', tone: 'danger' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新增供应商',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无匹配的供应商',
+  rowActions: ['view', 'edit', 'delete'],
+  actions: [
+    { id: 'export', label: '导出', kind: 'export' },
+    { id: 'create', label: '新增供应商', kind: 'create', tone: 'primary' },
+  ],
+  listScopes: [
+    { id: 'all', label: '所有', count: 7 },
+    { id: 'mine', label: '我负责的', filterKey: 'ownerRole', filterValue: 'self' },
+    { id: 'subordinate', label: '下属负责的', filterKey: 'ownerRole', filterValue: 'subordinate' },
+    { id: 'starred', label: '我关注的', count: 2 },
+  ],
+  listViews: [
+    { id: 'list', label: '供应商列表' },
+    { id: 'qualification', label: '资质管理' },
+  ],
+  listTabs: [{ id: 'all', label: '全部' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/base/suppliers',
+    referenceScreenshot: '.codex-artifacts/replication/base__suppliers/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/base__suppliers/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/base__suppliers.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies ListPageModel;
+
+export type SuppliersModel = typeof suppliersModel;

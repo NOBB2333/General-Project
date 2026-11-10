@@ -1,0 +1,7 @@
+{
+  "$schema": "https://stylelint.io/schema.json",
+  "extends": ["stylelint-config-standard", "stylelint-config-standard-vue"],
+  "rules": {
+    "selector-class-pattern": "^[a-z][a-zA-Z0-9]*$"
+  }
+}

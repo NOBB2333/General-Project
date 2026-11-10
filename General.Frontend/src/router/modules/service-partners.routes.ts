@@ -1,0 +1,108 @@
+import type { RouteRecordRaw } from 'vue-router';
+
+export const service_partners_routes: RouteRecordRaw[] = [
+  {
+    path: 'partners/partner-home',
+    name: 'page.service-partners.partner-home',
+    component: () => import('@/features/service-partners/views/PartnerHomePage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '中心首页',
+      title: '中心首页',
+      module: '服务伙伴中心',
+      pageLabel: '中心首页',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/carriers',
+    name: 'page.service-partners.carriers',
+    component: () => import('@/features/service-partners/views/CarriersPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '物流承运商',
+      title: '物流承运商',
+      module: '服务伙伴中心',
+      pageLabel: '物流承运商',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/third-party',
+    name: 'page.service-partners.third-party',
+    component: () => import('@/features/service-partners/views/ThirdPartyPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '第三方服务商',
+      title: '第三方服务商',
+      module: '服务伙伴中心',
+      pageLabel: '第三方服务商',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/agents',
+    name: 'page.service-partners.agents',
+    component: () => import('@/features/service-partners/views/AgentsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '代理 / 渠道商',
+      title: '代理 / 渠道商',
+      module: '服务伙伴中心',
+      pageLabel: '代理 / 渠道商',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/waybills',
+    name: 'page.service-partners.waybills',
+    component: () => import('@/features/service-partners/views/WaybillsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '运单中心',
+      title: '运单中心',
+      module: '服务伙伴中心',
+      pageLabel: '运单中心',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/service-tickets',
+    name: 'page.service-partners.service-tickets',
+    component: () => import('@/features/service-partners/views/ServiceTicketsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '服务工单',
+      title: '服务工单',
+      module: '服务伙伴中心',
+      pageLabel: '服务工单',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/commissions',
+    name: 'page.service-partners.commissions',
+    component: () => import('@/features/service-partners/views/CommissionsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '佣金记录',
+      title: '佣金记录',
+      module: '服务伙伴中心',
+      pageLabel: '佣金记录',
+      feature: 'service-partners',
+    },
+  },
+  {
+    path: 'partners/partner-recon',
+    name: 'page.service-partners.partner-recon',
+    component: () => import('@/features/service-partners/views/PartnerReconPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '伙伴对账中心',
+      title: '伙伴对账中心',
+      module: '服务伙伴中心',
+      pageLabel: '伙伴对账中心',
+      feature: 'service-partners',
+    },
+  },
+];

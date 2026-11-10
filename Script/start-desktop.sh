@@ -6,8 +6,13 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 PROJECT_FILE="$ROOT_DIR/General.Desktop/General.Desktop.csproj"
 MODE="${1:-dev}"
-START_URL="${GENERAL_DESKTOP_START_URL:-http://localhost:5677/workspace}"
-DIST_DIR="${GENERAL_DESKTOP_DIST_DIR:-$ROOT_DIR/General.Web/apps/web-general/dist}"
+START_URL="${GENERAL_DESKTOP_START_URL:-http://localhost:5011/}"
+if [ "${GENERAL_FRONTEND_LEGACY:-0}" = "1" ]; then
+  DEFAULT_DIST_DIR="$ROOT_DIR/General.Web/apps/web-general/dist"
+else
+  DEFAULT_DIST_DIR="$ROOT_DIR/General.Frontend/dist"
+fi
+DIST_DIR="${GENERAL_DESKTOP_DIST_DIR:-$DEFAULT_DIST_DIR}"
 
 echo "启动 General.Desktop 客户端..."
 

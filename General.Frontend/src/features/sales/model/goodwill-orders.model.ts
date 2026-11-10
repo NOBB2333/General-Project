@@ -1,0 +1,57 @@
+import type { PageModel } from '@/components/page';
+
+export const goodwillOrdersModel = {
+  key: '销售业务|Goodwill订单',
+  module: '销售业务',
+  moduleSlug: 'sales',
+  label: 'Goodwill订单',
+  path: '/sales/goodwill-orders',
+  routeName: 'page.sales.goodwill-orders',
+  pageSlug: 'goodwill-orders',
+  demoPath: '/sales/goodwill',
+  surface: 'list',
+  description: '客情维护、补偿赠送等无偿订单的审批与发货跟踪',
+  searchPlaceholder: '搜索单号、客户、原因、创建人...',
+  tabs: ['全部', '草稿', '待审批', '已审批', '发货中', '已完成', '已驳回'],
+  tools: ['新建 Goodwill 订单', '导出'],
+  filters: [
+    {
+      key: 'type',
+      label: '类型',
+      options: ['全部', '备件赠送', '技术资料', '样品提供', '质量补偿', '客户关怀', '其他'],
+    },
+    { key: 'status', label: '状态', options: ['全部', '草稿', '待审批', '已审批', '发货中', '已完成', '已驳回'] },
+  ],
+  columns: [
+    { key: 'code', title: '单号', width: 110 },
+    { key: 'customer', title: '客户', width: 180 },
+    { key: 'type', title: '类型', width: 120 },
+    { key: 'reason', title: '申请原因', width: 260 },
+    { key: 'items', title: '物品', width: 100 },
+    { key: 'status', title: '状态', width: 100 },
+    { key: 'date', title: '创建日期', width: 110 },
+    { key: 'owner', title: '创建人', width: 90 },
+  ],
+  stats: [
+    { key: 'total', label: '订单总数', value: '9', tone: 'primary' },
+    { key: 'pending', label: '待审批', value: '1', tone: 'warning' },
+    { key: 'active', label: '进行中', value: '2', tone: 'primary' },
+    { key: 'done', label: '已完成', value: '3', tone: 'success' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建',
+  moreTools: ['刷新', '列设置'],
+  pageSize: 10,
+  emptyHint: '当前筛选下没有 Goodwill 订单',
+  rowActions: ['view', 'edit', 'delete'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/goodwill',
+    referenceScreenshot: '.codex-artifacts/replication/sales__goodwill-orders/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/sales__goodwill-orders/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/sales__goodwill-orders.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+export type GoodwillOrdersModel = typeof goodwillOrdersModel;

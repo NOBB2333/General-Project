@@ -1,0 +1,41 @@
+import type { PageModel } from '@/components/page';
+
+export const policiesModel = {
+  key: '人事管理|规章制度',
+  module: '人事管理',
+  moduleSlug: 'hr',
+  label: '规章制度',
+  path: '/hr/policies',
+  routeName: 'page.hr.policies',
+  pageSlug: 'policies',
+  demoPath: '/hr/policies',
+  surface: 'board',
+  description: '共 7 项制度 · 6 个类别',
+  searchPlaceholder: '搜索制度名称、摘要、编号...',
+  tabs: ['总览'],
+  tools: ['类别管理', '导出汇编', '新增制度'],
+  filters: [],
+  columns: [],
+  stats: [
+    { key: 'total', label: '制度总数', value: '7', tone: 'primary' },
+    { key: 'active', label: '生效中', value: '6', tone: 'success' },
+    { key: 'revising', label: '修订中', value: '1', tone: 'warning' },
+    { key: 'categories', label: '制度类别', value: '6', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新增制度',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '当前筛选下没有规章制度',
+  rowActions: ['view', 'edit'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/hr/policies',
+    referenceScreenshot: '.codex-artifacts/replication/hr__policies/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/hr__policies/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/hr__policies.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+export type PoliciesModel = typeof policiesModel;

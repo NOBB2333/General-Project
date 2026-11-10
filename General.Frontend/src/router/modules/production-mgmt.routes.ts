@@ -1,0 +1,95 @@
+import type { RouteRecordRaw } from 'vue-router';
+
+export const production_mgmt_routes: RouteRecordRaw[] = [
+  {
+    path: 'production/assembly-orders',
+    name: 'page.production-mgmt.assembly-orders',
+    component: () => import('@/features/production-mgmt/views/AssemblyOrdersPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '组装单',
+      title: '组装单',
+      module: '生产管理',
+      pageLabel: '组装单',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/shortage-todos',
+    name: 'page.production-mgmt.shortage-todos',
+    component: () => import('@/features/production-mgmt/views/ShortageTodosPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '缺料待办',
+      title: '缺料待办',
+      module: '生产管理',
+      pageLabel: '缺料待办',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/material-requisitions',
+    name: 'page.production-mgmt.material-requisitions',
+    component: () => import('@/features/production-mgmt/views/MaterialRequisitionsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '领料单',
+      title: '领料单',
+      module: '生产管理',
+      pageLabel: '领料单',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/material-supplement',
+    name: 'page.production-mgmt.material-supplement',
+    component: () => import('@/features/production-mgmt/views/MaterialSupplementPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '补料单',
+      title: '补料单',
+      module: '生产管理',
+      pageLabel: '补料单',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/material-returns',
+    name: 'page.production-mgmt.material-returns',
+    component: () => import('@/features/production-mgmt/views/MaterialReturnsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '退料单',
+      title: '退料单',
+      module: '生产管理',
+      pageLabel: '退料单',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/disassembly',
+    name: 'page.production-mgmt.disassembly',
+    component: () => import('@/features/production-mgmt/views/DisassemblyPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '拆解单',
+      title: '拆解单',
+      module: '生产管理',
+      pageLabel: '拆解单',
+      feature: 'production-mgmt',
+    },
+  },
+  {
+    path: 'production/part-swap',
+    name: 'page.production-mgmt.part-swap',
+    component: () => import('@/features/production-mgmt/views/PartSwapPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '换件单',
+      title: '换件单',
+      module: '生产管理',
+      pageLabel: '换件单',
+      feature: 'production-mgmt',
+    },
+  },
+];

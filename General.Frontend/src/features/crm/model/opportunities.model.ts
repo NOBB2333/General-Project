@@ -1,0 +1,51 @@
+import type { PageModel } from '@/components/page';
+
+export const opportunitiesModel = {
+  key: 'CRM客户管理|商机管理',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '商机管理',
+  path: '/crm/opportunities',
+  routeName: 'page.crm.opportunities',
+  pageSlug: 'opportunities',
+  demoPath: '/sales/opportunities',
+  surface: 'list',
+  description: '跟踪和管理所有销售商机，推进成交转化',
+  searchPlaceholder: '搜索商机名称、客户...',
+  tabs: [],
+  tools: ['所有 7', '我负责的 4', '下属负责的 3', '我关注的 2', '新建商机'],
+  filters: [],
+  columns: [
+    { key: 'name', title: '商机名称', width: 270 },
+    { key: 'customer', title: '客户', width: 240 },
+    { key: 'stage', title: '阶段', width: 110 },
+    { key: 'traffic', title: '红绿灯', width: 100 },
+    { key: 'priority', title: '优先级', width: 100 },
+    { key: 'amount', title: '金额', width: 150 },
+    { key: 'probability', title: '概率', width: 140 },
+    { key: 'expectedDate', title: '预计成交', width: 140 },
+    { key: 'owner', title: '负责人', width: 100 },
+  ],
+  stats: [
+    { key: 'active', label: '活跃商机', value: '6', tone: 'primary' },
+    { key: 'pipeline', label: '管道总金额', value: '¥359.0万', tone: 'primary' },
+    { key: 'weighted', label: '加权金额', value: '¥192.3万', tone: 'primary' },
+    { key: 'won', label: '已赢单', value: '¥26.0万', tone: 'success' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建商机',
+  pageSize: 20,
+  emptyHint: '当前条件下没有商机',
+  actions: [{ id: 'create', label: '新建商机', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/opportunities',
+    referenceScreenshot: '.codex-artifacts/replication/crm__opportunities/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__opportunities/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__opportunities.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type OpportunitiesModel = typeof opportunitiesModel;

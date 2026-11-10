@@ -1,0 +1,51 @@
+{
+  "name": "general-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22.18.0",
+    "pnpm": ">=12.8.1"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5011",
+    "build": "vite build",
+    "check:boundaries": "node scripts/check-chao-architecture-boundaries.mjs",
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" \"*.{json,md,ts,mjs,html,yaml,yml}\" \".*.json\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" \"*.{json,md,ts,mjs,html,yaml,yml}\" \".*.json\"",
+    "lint": "pnpm lint:js && pnpm lint:styles",
+    "lint:js": "oxlint --vue-plugin --import-plugin --deny-warnings -D correctness -D suspicious src/config/env.ts src/router/index.ts src/api/client.ts tests/api-client.test.mjs vite.config.ts",
+    "lint:styles": "node scripts/check-vue-style-modules.mjs",
+    "preview": "vite preview --host 0.0.0.0 --port 5011",
+    "test:unit": "node --test tests/*.test.mjs",
+    "typecheck": "vue-tsc -b --pretty false",
+    "typecheck:active": "vue-tsc -p tsconfig.active.json --pretty false"
+  },
+  "dependencies": {
+    "cmdk-vue": "1.0.0",
+    "lucide-vue-next": "^0.468.0",
+    "reka-ui": "^2.10.1",
+    "tailwindcss": "^4.1.11",
+    "vue": "3.5.39",
+    "vue-router": "5.1.0",
+    "vue-sonner": "2.0.9"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "26.1.1",
+    "@vitejs/plugin-vue": "6.0.7",
+    "@vue/tsconfig": "^0.7.0",
+    "oxlint": "1.87.0",
+    "postcss-html": "2.0.0",
+    "prettier": "3.9.10",
+    "stylelint": "17.16.0",
+    "stylelint-config-html": "2.0.0",
+    "stylelint-config-recommended-vue": "2.0.0",
+    "stylelint-config-standard": "40.0.0",
+    "stylelint-config-standard-vue": "2.0.0",
+    "typescript": "5.8.3",
+    "vite": "7.3.6",
+    "vue-tsc": "^3.0.1"
+  }
+}

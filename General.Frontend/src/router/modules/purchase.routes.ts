@@ -1,0 +1,108 @@
+import type { RouteRecordRaw } from 'vue-router';
+
+export const purchase_routes: RouteRecordRaw[] = [
+  {
+    path: 'purchase/requests',
+    name: 'page.purchase.purchase-requests',
+    component: () => import('@/features/purchase/views/PurchaseRequestsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '采购申请',
+      title: '采购申请',
+      module: '采购管理',
+      pageLabel: '采购申请',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/inquiries',
+    name: 'page.purchase.inquiries',
+    component: () => import('@/features/purchase/views/InquiriesPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '询价管理',
+      title: '询价管理',
+      module: '采购管理',
+      pageLabel: '询价管理',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/biz-inquiries',
+    name: 'page.purchase.biz-inquiries',
+    component: () => import('@/features/purchase/views/BizInquiriesPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '业务询价',
+      title: '业务询价',
+      module: '采购管理',
+      pageLabel: '业务询价',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/purchase-contracts',
+    name: 'page.purchase.purchase-contracts',
+    component: () => import('@/features/purchase/views/PurchaseContractsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '采购合同',
+      title: '采购合同',
+      module: '采购管理',
+      pageLabel: '采购合同',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/orders',
+    name: 'page.purchase.purchase-orders',
+    component: () => import('@/features/purchase/views/PurchaseOrdersPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '采购订单',
+      title: '采购订单',
+      module: '采购管理',
+      pageLabel: '采购订单',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/payment-flow',
+    name: 'page.purchase.payment-flow',
+    component: () => import('@/features/purchase/views/PaymentFlowPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '付款流水',
+      title: '付款流水',
+      module: '采购管理',
+      pageLabel: '付款流水',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/returns',
+    name: 'page.purchase.purchase-returns',
+    component: () => import('@/features/purchase/views/PurchaseReturnsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '采购退货',
+      title: '采购退货',
+      module: '采购管理',
+      pageLabel: '采购退货',
+      feature: 'purchase',
+    },
+  },
+  {
+    path: 'purchase/pricebook',
+    name: 'page.purchase.supplier-pricebook',
+    component: () => import('@/features/purchase/views/SupplierPricebookPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '供应商价格本',
+      title: '供应商价格本',
+      module: '采购管理',
+      pageLabel: '供应商价格本',
+      feature: 'purchase',
+    },
+  },
+];

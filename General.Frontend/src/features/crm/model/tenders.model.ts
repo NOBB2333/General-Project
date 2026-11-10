@@ -1,0 +1,53 @@
+import type { PageModel } from '@/components/page';
+
+export const tendersModel = {
+  key: 'CRM客户管理|招投标',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '招投标',
+  path: '/crm/tenders',
+  routeName: 'page.crm.tenders',
+  pageSlug: 'tenders',
+  demoPath: '/sales/bidding',
+  surface: 'list',
+  description: '项目全生命周期管理：投标、保证金、结果记录',
+  searchPlaceholder: '搜索项目名称、编号、招标单位...',
+  tabs: ['招投标', '模板中心', '投标分析', '投标工作台'],
+  tools: ['新建投标项目'],
+  filters: [],
+  columns: [
+    { key: 'name', title: '项目名称 / 编号', width: 230 },
+    { key: 'customer', title: '招标单位 / 客户', width: 210 },
+    { key: 'owner', title: '负责人', width: 90 },
+    { key: 'stage', title: '当前阶段', width: 110 },
+    { key: 'deadline', title: '投标截止', width: 110 },
+    { key: 'openingDate', title: '开标时间', width: 110 },
+    { key: 'deposit', title: '保证金', width: 120 },
+    { key: 'result', title: '结果', width: 90 },
+    { key: 'risk', title: '风险提醒', width: 120 },
+  ],
+  stats: [
+    { key: 'month', label: '本月投标项目', value: '18', tone: 'primary' },
+    { key: 'active', label: '进行中项目', value: '13', tone: 'primary' },
+    { key: 'won', label: '本月中标数', value: '3', tone: 'success' },
+    { key: 'rate', label: '中标率', value: '60%', tone: 'primary' },
+    { key: 'opening', label: '待开标项目', value: '2', tone: 'warning' },
+    { key: 'deposit', label: '待退还保证金', value: '103.00万', tone: 'danger' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建投标项目',
+  pageSize: 20,
+  emptyHint: '当前条件下没有投标项目',
+  actions: [{ id: 'create', label: '新建投标项目', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/bidding',
+    referenceScreenshot: '.codex-artifacts/replication/crm__tenders/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__tenders/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__tenders.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type TendersModel = typeof tendersModel;

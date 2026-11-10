@@ -1,0 +1,70 @@
+import type { PageModel } from '@/components/page';
+
+export const giftsModel = {
+  key: '行政管理|礼品管理',
+  module: '行政管理',
+  moduleSlug: 'admin',
+  label: '礼品管理',
+  path: '/admin/gifts',
+  routeName: 'page.admin.gifts',
+  pageSlug: 'gifts',
+  demoPath: '/gift/apply',
+  surface: 'list',
+  description: '员工礼品申请、审批、库存与发放，覆盖商务赠礼与节日福利',
+  searchPlaceholder: '搜索编号/标题/申请人...',
+  tabs: ['礼品申请', '礼品清单', '礼品库管理', '礼品库流水'],
+  tools: ['导出', '新建申请'],
+  filters: [
+    { key: 'scope', label: '申请范围', options: ['我的申请', '团队申请'] },
+    { key: 'status', label: '申请状态', options: ['全部', '待审核', '审核中', '已通过', '已驳回', '已发放'] },
+  ],
+  columns: [
+    { key: 'code', title: '编号', width: 130 },
+    { key: 'name', title: '申请标题', width: 260 },
+    { key: 'category', title: '类别', width: 110 },
+    { key: 'recipient', title: '赠送对象', width: 230 },
+    { key: 'amount', title: '金额', width: 100 },
+    { key: 'date', title: '申请日期', width: 120 },
+    { key: 'status', title: '状态', width: 100 },
+    { key: 'approval', title: '审批进度', width: 130 },
+    { key: 'action', title: '操作', width: 70 },
+  ],
+  stats: [
+    { key: 'amount', label: '申请总额', value: '¥0.68万', tone: 'primary' },
+    { key: 'pending', label: '待处理审批', value: '2', tone: 'warning' },
+    { key: 'approved', label: '已批准金额', value: '¥0.00万', tone: 'success' },
+    { key: 'delivered', label: '已发放', value: '0', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [
+    {
+      id: 'gift-0018',
+      code: 'GFT-0018',
+      name: '华能项目客户拜访礼品',
+      category: '商务礼品',
+      amount: 2520,
+      status: '待审核',
+    },
+    {
+      id: 'gift-0017',
+      code: 'GFT-0017',
+      name: '中石化春节客户答谢礼品',
+      category: '节日礼品',
+      amount: 4236,
+      status: '审核中',
+    },
+  ],
+  primaryAction: '新建申请',
+  emptyHint: '当前条件下没有礼品申请',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/gift/apply',
+    referenceScreenshot: '.codex-artifacts/replication/admin__gifts/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/admin__gifts/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/admin__gifts.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type GiftsModel = typeof giftsModel;

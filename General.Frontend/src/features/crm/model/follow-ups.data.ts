@@ -1,0 +1,98 @@
+import { defineReferenceFixture } from '@/components/page';
+import type { FollowUpRow, FollowUpType } from './follow-ups.types';
+
+const referenceRows = [
+  {
+    id: 'FU-001',
+    date: '2026-02-26',
+    type: '电话',
+    customer: '大唐发电集团',
+    contact: '马超',
+    owner: '刘伟',
+    content: '协助赵敏跟进大唐发电，与马超沟通高层合作意向。',
+    result: '高层愿意推进试点',
+    nextDate: '2026-03-05',
+    nextPlan: '安排高层互访',
+    ownerScope: 'subordinate',
+    followed: true,
+  },
+  {
+    id: 'FU-002',
+    date: '2026-02-25',
+    type: '电话',
+    customer: '宝钢工程技术',
+    contact: '刘洋',
+    owner: '王芳',
+    content: '跟进宝钢热轧项目进展，刘洋表示已在内部提案审批中。',
+    result: '项目审批中',
+    nextDate: '2026-03-10',
+    nextPlan: '等待审批结果',
+    opportunity: '宝钢热轧自动化改造',
+    ownerScope: 'mine',
+  },
+  {
+    id: 'FU-003',
+    date: '2026-02-25',
+    type: '电话',
+    customer: '南方电网科技',
+    contact: '林小燕',
+    owner: '赵敏',
+    content: '电话跟进资料发送情况，林总监表示正在评估，有配电自动化升级计划。',
+    result: '客户在评估阶段',
+    nextDate: '2026-03-10',
+    nextPlan: '准备配电自动化方案',
+    ownerScope: 'mine',
+    followed: true,
+  },
+  {
+    id: 'FU-004',
+    date: '2026-02-25',
+    type: '微信',
+    customer: '上海宏控自动化',
+    contact: '陈刚',
+    owner: '张明',
+    content: '陈总微信确认10寸HMI的数量为50台，15寸HMI为20台，并询问批量折扣。',
+    result: '数量确认，需申请特价',
+    nextDate: '2026-02-28',
+    nextPlan: '内部申请批量特价后回复客户',
+    opportunity: '宏控自动化HMI批量采购',
+    ownerScope: 'mine',
+  },
+  {
+    id: 'FU-005',
+    date: '2026-02-24',
+    type: '邮件',
+    customer: '深圳地铁集团',
+    contact: '李芳',
+    owner: '李强',
+    content: '发送信号设备采购项目资质材料和近三年同类项目业绩。',
+    result: '材料已签收',
+    ownerScope: 'subordinate',
+  },
+  {
+    id: 'FU-006',
+    date: '2026-02-24',
+    type: '会议',
+    customer: '中石化镇海炼化',
+    contact: '陈明',
+    owner: '张明',
+    content: '组织DCS控制系统技术澄清会，确认冗余和安全等级要求。',
+    result: '形成三项待确认问题',
+    nextDate: '2026-02-28',
+    nextPlan: '回复技术澄清问题',
+    opportunity: '镇海炼化DCS控制系统',
+    ownerScope: 'mine',
+  },
+] satisfies readonly FollowUpRow[];
+
+const fixture = {
+  sourceUrl: 'https://demo.risemap.cn/sales/follow-ups',
+  capturedAt: '2026-09-16',
+  viewport: { width: 1618, height: 899 },
+  rows: referenceRows,
+  defaults: { scope: 'all', type: 'all', owner: 'all', role: 'admin', view: 'list', query: '' },
+} as const;
+
+export const followUpsReferenceFixture = defineReferenceFixture<FollowUpRow, typeof fixture>(fixture);
+export const followUpTypes: readonly FollowUpType[] = ['电话', '拜访', '微信', '邮件', '会议', '其他'];
+export const followUpOwners = ['张明', '李强', '王芳', '赵敏', '刘伟'] as const;

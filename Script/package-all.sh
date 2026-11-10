@@ -3,8 +3,13 @@ set -euo pipefail
 
 # 统一输出到根目录 build，下游产物不进 Git。
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BUILD_DIR="$ROOT_DIR/build"
-WEB_DIST_DIR="$ROOT_DIR/General.Web/apps/web-general/dist"
+BUILD_DIR="${GENERAL_ADMIN_BUILD_DIR:-$ROOT_DIR/build}"
+FRONTEND_DEPLOY_DIR="$BUILD_DIR/frontend-deploy"
+if [[ "${GENERAL_FRONTEND_LEGACY:-0}" == "1" ]]; then
+  WEB_DIST_DIR="$ROOT_DIR/General.Web/apps/web-general/dist"
+else
+  WEB_DIST_DIR="${GENERAL_FRONTEND_OUT_DIR:-$ROOT_DIR/General.Frontend/dist}"
+fi
 BACKEND_PROJECT="$ROOT_DIR/General.Admin/src/General.Admin.HttpApi.Host/General.Admin.HttpApi.Host.csproj"
 DBMIGRATOR_PROJECT="$ROOT_DIR/General.Admin/src/General.Admin.DbMigrator/General.Admin.DbMigrator.csproj"
 DESKTOP_PROJECT="$ROOT_DIR/General.Desktop/General.Desktop.csproj"
@@ -72,6 +77,15 @@ write_linux_backend_scripts() {
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v dotnet >/dev/null 2>&1; then
+  for candidate in "$HOME"/.local/share/mise/installs/dotnet/*/bin; do
+    if [[ -x "$candidate/dotnet" ]]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DBMIGRATOR_DIR="$ROOT_DIR/dbmigrator"
 DATA_DIR="${GENERAL_ADMIN_DATA_DIR:-$ROOT_DIR/data}"
@@ -110,6 +124,15 @@ SCRIPT
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v dotnet >/dev/null 2>&1; then
+  for candidate in "$HOME"/.local/share/mise/installs/dotnet/*/bin; do
+    if [[ -x "$candidate/dotnet" ]]; then
+      export PATH="$candidate:$PATH"
+      break
+    fi
+  done
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$ROOT_DIR/app"
 DATA_DIR="${GENERAL_ADMIN_DATA_DIR:-$ROOT_DIR/data}"
@@ -119,7 +142,7 @@ DB_PROVIDER="${GENERAL_ADMIN_DB_PROVIDER:-Sqlite}"
 
 mkdir -p "$LOG_DIR"
 
-export ASPNETCORE_URLS="${GENERAL_ADMIN_URLS:-http://0.0.0.0:5007}"
+export ASPNETCORE_URLS="${GENERAL_ADMIN_URLS:-http://0.0.0.0:5010}"
 export Database__Provider="$DB_PROVIDER"
 
 case "$DB_PROVIDER" in
@@ -256,7 +279,7 @@ pkill -f General.Admin.HttpApi.Host.dll
 | `GENERAL_ADMIN_CONNECTION_STRING` | 完整连接串，PG 或自定义，不设则用 SQLite | - |
 | `GENERAL_ADMIN_DB_FILE` | SQLite 文件路径（仅 SQLite 模式） | `data/general-admin.db` |
 | `GENERAL_ADMIN_DATA_DIR` | SQLite 数据目录（仅 SQLite 模式） | `backend/data` |
-| `GENERAL_ADMIN_URLS` | 监听地址 | `http://0.0.0.0:5007` |
+| `GENERAL_ADMIN_URLS` | 监听地址 | `http://0.0.0.0:5010` |
 | `GENERAL_ADMIN_SELF_URL` | 后端对外公网地址 | - |
 | `GENERAL_ADMIN_CLIENT_URL` | 前端地址 | - |
 | `GENERAL_ADMIN_CORS_ORIGINS` | 允许跨域来源（逗号分隔） | - |
@@ -266,6 +289,10 @@ SCRIPT
   chmod +x \
     "$BACKEND_BUILD_DIR/migrate-db.sh" \
     "$BACKEND_BUILD_DIR/start-backend.sh"
+
+  cp "$ROOT_DIR/Script/data-management.py" "$BACKEND_BUILD_DIR/data-management.py"
+  cp "$ROOT_DIR/Script/DATA-MANAGEMENT.md" "$BACKEND_BUILD_DIR/DATA-MANAGEMENT.md"
+  chmod +x "$BACKEND_BUILD_DIR/data-management.py"
 }
 
 create_macos_desktop_app() {
@@ -415,17 +442,32 @@ for path in (
     shutil.rmtree(path, ignore_errors=True)
 PY
 
-mkdir -p "$BUILD_DIR/web-general" "$BACKEND_BUILD_DIR" "$DESKTOP_BUILD_DIR"
+mkdir -p "$BUILD_DIR/web-general" "$BACKEND_BUILD_DIR" "$DESKTOP_BUILD_DIR" "$FRONTEND_DEPLOY_DIR"
 
 cleanup_macos_metadata "$BUILD_DIR"
 
-echo "构建 web-general 前端..."
-cd "$ROOT_DIR/General.Web"
-pnpm -F @general/web-general run build
-
-if [[ -d "$WEB_DIST_DIR" ]]; then
-  cp -R "$WEB_DIST_DIR"/. "$BUILD_DIR/web-general/"
+if [[ "${GENERAL_FRONTEND_LEGACY:-0}" == "1" ]]; then
+  echo "构建旧版 General.Web web-general..."
+  cd "$ROOT_DIR/General.Web"
+  pnpm -F @general/web-general run build
+else
+  echo "安装并构建独立 General.Frontend..."
+  cd "$ROOT_DIR/General.Frontend"
+  pnpm install --frozen-lockfile
+  VITE_API_BASE_URL="${VITE_API_BASE_URL:-/api}" pnpm run build --outDir "$WEB_DIST_DIR" --emptyOutDir
 fi
+
+if [[ ! -d "$WEB_DIST_DIR" ]]; then
+  echo "前端构建产物目录不存在：$WEB_DIST_DIR" >&2
+  exit 1
+fi
+
+cp -R "$WEB_DIST_DIR"/. "$BUILD_DIR/web-general/"
+
+if [[ "${GENERAL_FRONTEND_LEGACY:-0}" != "1" ]]; then
+  cp "$ROOT_DIR/General.Frontend/deploy/default.conf.template" "$FRONTEND_DEPLOY_DIR/default.conf.template"
+fi
+
 cleanup_macos_metadata "$BUILD_DIR/web-general"
 
 echo "发布 General.Admin 后端..."

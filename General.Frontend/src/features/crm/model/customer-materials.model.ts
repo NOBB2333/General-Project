@@ -1,0 +1,55 @@
+import type { PageModel } from '@/components/page';
+
+export const customerMaterialsModel = {
+  key: 'CRM客户管理|客户物料对照',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '客户物料对照',
+  path: '/crm/customer-materials',
+  routeName: 'page.crm.customer-materials',
+  pageSlug: 'customer-materials',
+  demoPath: '/base/customer-materials',
+  surface: 'list',
+  description: '统一维护我方物料与客户物料的编码 / 名称对照，支持按客户筛选与模糊搜索',
+  searchPlaceholder: '搜索我方/客户的编码或名称...',
+  tabs: [],
+  tools: ['新增对照', '导入清单', '粘贴导入', '导出'],
+  filters: [{ key: 'customer', label: '按客户筛选', options: ['全部客户'] }],
+  columns: [
+    { key: 'customer', title: '客户名称', width: 190 },
+    { key: 'internalCode', title: '我方物料编码', width: 160 },
+    { key: 'internalName', title: '我方物料名称', width: 220 },
+    { key: 'customerCode', title: '客户物料编码', width: 170 },
+    { key: 'customerName', title: '客户物料名称', width: 190 },
+    { key: 'remark', title: '备注', width: 170 },
+    { key: 'maintainedAt', title: '最近维护', width: 170 },
+    { key: 'action', title: '操作', width: 100 },
+  ],
+  stats: [
+    { key: 'mappings', label: '对照条数', value: '8', tone: 'neutral' },
+    { key: 'customers', label: '涉及客户', value: '5', tone: 'neutral' },
+    { key: 'materials', label: '涉及物料', value: '6', tone: 'neutral' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新增对照',
+  pageSize: 20,
+  emptyHint: '当前条件下没有客户物料对照',
+  rowActions: ['edit', 'delete'],
+  actions: [
+    { id: 'create', label: '新增对照', kind: 'create', tone: 'primary' },
+    { id: 'import-file', label: '导入清单', kind: 'import' },
+    { id: 'import-paste', label: '粘贴导入', kind: 'import' },
+    { id: 'export', label: '导出', kind: 'export' },
+  ],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/base/customer-materials',
+    referenceScreenshot: '.codex-artifacts/replication/crm__customer-materials/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__customer-materials/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__customer-materials.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type CustomerMaterialsModel = typeof customerMaterialsModel;

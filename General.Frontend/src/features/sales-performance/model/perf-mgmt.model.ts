@@ -1,0 +1,52 @@
+import type { PageModel } from '@/components/page';
+
+export const perfMgmtModel = {
+  key: '销售绩效|绩效管理',
+  module: '销售绩效',
+  moduleSlug: 'sales-performance',
+  label: '绩效管理',
+  path: '/sales-perf/perf-mgmt',
+  routeName: 'page.sales-performance.perf-mgmt',
+  pageSlug: 'perf-mgmt',
+  demoPath: '/sales/commission/admin',
+  surface: 'list',
+  description: '全员奖金计算、审批、发放的管理驾驶舱 · 业绩排名与团队分析',
+  searchPlaceholder: '搜索销售/方案',
+  tabs: [
+    '计算与执行 本期',
+    '奖金审核',
+    '发放记录',
+    '订单考核价格 超额分成',
+    '绩效参数配置 加权系数·奖金基数',
+    '绩效分析',
+  ],
+  tools: [
+    '计算与执行 本期',
+    '奖金审核',
+    '发放记录',
+    '订单考核价格 超额分成',
+    '绩效参数配置 加权系数·奖金基数',
+    '绩效分析',
+    '导出明细',
+  ],
+  filters: [],
+  columns: [],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '执行本期计算',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '当前筛选下没有绩效核算记录',
+  rowActions: ['view', 'status'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/commission/admin',
+    referenceScreenshot: '.codex-artifacts/replication/sales-performance__perf-mgmt/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/sales-performance__perf-mgmt/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/sales-performance__commission-management.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+
+export type PerfMgmtModel = typeof perfMgmtModel;

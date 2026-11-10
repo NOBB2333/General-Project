@@ -1,0 +1,46 @@
+import type { PageModel } from '@/components/page';
+
+export const overtimeModel = {
+  key: '考勤假期|加班申请',
+  module: '考勤假期',
+  moduleSlug: 'attendance',
+  label: '加班申请',
+  path: '/attendance/overtime',
+  routeName: 'page.attendance.overtime',
+  pageSlug: 'overtime',
+  demoPath: '/hr/overtime',
+  surface: 'list',
+  description: '提交加班申请、查看加班记录、审批团队成员加班',
+  searchPlaceholder: '搜索单号/事由...',
+  tabs: ['我的加班', '我的团队', '审批管理'],
+  tools: ['新建加班'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '单号', width: 125 },
+    { key: 'date', title: '加班日期', width: 140 },
+    { key: 'period', title: '时段', width: 145 },
+    { key: 'hours', title: '时长', width: 75 },
+    { key: 'reason', title: '事由', width: 520 },
+    { key: 'compensation', title: '补偿方式', width: 145 },
+    { key: 'status', title: '状态', width: 105 },
+  ],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '新建加班',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无匹配的加班申请',
+  rowActions: ['view', 'withdraw'],
+  actions: [{ id: 'create', label: '新建加班', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/hr/overtime',
+    referenceScreenshot: '.codex-artifacts/replication/attendance__overtime/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/attendance__overtime/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/attendance__overtime.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type OvertimeModel = typeof overtimeModel;

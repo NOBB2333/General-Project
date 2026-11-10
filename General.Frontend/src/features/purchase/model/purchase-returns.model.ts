@@ -1,0 +1,62 @@
+import type { ListPageModel } from '@/components/page';
+
+export const purchaseReturnsModel: ListPageModel = {
+  key: '采购管理|采购退货',
+  module: '采购管理',
+  moduleSlug: 'purchase',
+  label: '采购退货',
+  path: '/purchase/returns',
+  routeName: 'page.purchase.purchase-returns',
+  pageSlug: 'purchase-returns',
+  demoPath: '/purchase/returns',
+  surface: 'list',
+  description: '处理质量不符/规格异常的退货流程，跟进供应商退款。',
+  searchPlaceholder: '搜索退货单号、供应商...',
+  tabs: ['全部', '草稿', '待审核', '已审核', '退货中', '已退货', '已退款'],
+  tools: ['时间筛选', '导出', '新建退货'],
+  filters: [
+    { key: 'supplier', label: '供应商', options: ['全部供应商'] },
+    { key: 'time', label: '时间', options: ['全部时间', '今天', '近7天', '本月', '近三个月', '自定义'] },
+  ],
+  columns: [
+    { key: 'id', title: '退货单号', width: 120 },
+    { key: 'poId', title: '关联采购单', width: 130 },
+    { key: 'supplier', title: '供应商', width: 150 },
+    { key: 'reason', title: '退货原因', width: 150 },
+    { key: 'items', title: '退货数量', width: 90 },
+    { key: 'amount', title: '退货金额', width: 110 },
+    { key: 'refunded', title: '退款', width: 80 },
+    { key: 'status', title: '状态', width: 90 },
+    { key: 'date', title: '日期', width: 100 },
+    { key: 'attachments', title: '附件', width: 70 },
+  ],
+  stats: [
+    { key: 'total', label: '退货总次数', value: '8', tone: 'primary' },
+    { key: 'pending', label: '待处理', value: '2', tone: 'warning' },
+    { key: 'processing', label: '退货处理中', value: '2', tone: 'primary' },
+    { key: 'refunded', label: '已退款总额', value: '¥21,000', tone: 'success' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建退货',
+  pageSize: 8,
+  emptyHint: '当前筛选下没有采购退货，可重置条件或新建退货',
+  rowActions: ['view'],
+  actions: [
+    { id: 'create', label: '新建退货', kind: 'create', tone: 'primary' },
+    { id: 'export', label: '导出', kind: 'export' },
+  ],
+  listScopes: [],
+  listViews: [{ id: 'all', label: '全部' }],
+  listTabs: [],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/purchase/returns',
+    referenceScreenshot: '.codex-artifacts/replication/purchase__purchase-returns/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/purchase__purchase-returns/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/purchase__purchase-returns.md',
+    capturedAt: '2026-08-16',
+  },
+};
+
+export type PurchaseReturnsModel = typeof purchaseReturnsModel;

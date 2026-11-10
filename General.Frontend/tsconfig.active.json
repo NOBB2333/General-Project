@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": [
+    "src/**/*.d.ts",
+    "src/api/**/*.ts",
+    "src/config/env.ts",
+    "src/directives/**/*.ts",
+    "src/navigation/**/*.ts",
+    "src/session/**/*.ts",
+    "src/router/route.types.ts",
+    "src/components/layout/**/*.ts",
+    "src/components/layout/**/*.vue",
+    "src/components/page/**/*.ts",
+    "src/components/page/**/*.vue",
+    "src/components/ui/**/*.ts",
+    "src/components/ui/**/*.vue",
+    "src/features/auth/**/*.ts",
+    "src/features/auth/**/*.vue",
+    "src/features/system/**/*.ts",
+    "src/features/system/**/*.vue",
+    "src/features/workspace/**/*.ts",
+    "src/features/workspace/**/*.vue",
+    "src/features/platform/**/*.ts",
+    "src/features/platform/**/*.vue",
+    "src/features/integration/**/*.ts",
+    "src/features/integration/**/*.vue",
+    "src/features/projects-new/**/*.ts",
+    "src/features/projects-new/**/*.vue",
+    "src/features/business/**/*.ts",
+    "src/features/business/**/*.vue",
+    "src/features/ai/**/*.ts",
+    "src/features/ai/**/*.vue"
+  ],
+  "compilerOptions": {
+    "composite": false
+  }
+}

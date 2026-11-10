@@ -1,0 +1,55 @@
+import type { PageModel } from '@/components/page';
+
+export const draftsModel = {
+  key: '财务管理|汇票管理',
+  module: '财务管理',
+  moduleSlug: 'finance',
+  label: '汇票管理',
+  path: '/finance/drafts',
+  routeName: 'page.finance.drafts',
+  pageSlug: 'drafts',
+  demoPath: '/finance/notes',
+  surface: 'list',
+  description: '承兑汇票全生命周期：登记入库 → 背书/贴现/解付 → 归档',
+  searchPlaceholder: '票号/出票人/承兑人/客户...',
+  tabs: ['应收票据池', '到期预警', '应付票据', '历史台账'],
+  tools: ['导出', '批量识别', '开新银承付款', '登记应收票据'],
+  filters: [
+    { key: 'status', label: '票据状态', options: ['全部', '持有中', '已背书', '已贴现'] },
+    { key: 'acceptance', label: '承兑类型', options: ['全部承兑类型', '银行承兑', '商业承兑'] },
+  ],
+  columns: [
+    { key: 'code', title: '编号', width: 130 },
+    { key: 'direction', title: '方向', width: 80 },
+    { key: 'noteNumber', title: '票号', width: 230 },
+    { key: 'acceptanceKind', title: '承兑类型', width: 130 },
+    { key: 'drawer', title: '出票人 / 承兑人', width: 240 },
+    { key: 'amount', title: '票面金额', width: 120 },
+    { key: 'issueDate', title: '出票日', width: 110 },
+    { key: 'dueDate', title: '到期日', width: 120 },
+    { key: 'status', title: '状态', width: 90 },
+    { key: 'action', title: '操作', width: 90 },
+  ],
+  stats: [
+    { key: 'pool', label: '持有票据总额', value: '¥337.0万', tone: 'primary' },
+    { key: 'expiring', label: '7 天内到期', value: '2', tone: 'danger' },
+    { key: 'commercial', label: '商承敞口', value: '¥47.0万', tone: 'warning' },
+    { key: 'returned', label: '历史退票', value: '1', tone: 'neutral' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '登记应收票据',
+  pageSize: 20,
+  emptyHint: '当前筛选下没有票据记录',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/finance/notes',
+    referenceScreenshot: '.codex-artifacts/replication/finance__drafts/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/finance__drafts/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/finance__drafts.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+
+export type DraftsModel = typeof draftsModel;

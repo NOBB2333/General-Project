@@ -1,0 +1,47 @@
+import type { PageModel } from '@/components/page';
+
+export const invoicesModel = {
+  key: '财务管理|发票管理',
+  module: '财务管理',
+  moduleSlug: 'finance',
+  label: '发票管理',
+  path: '/finance/invoices',
+  routeName: 'page.finance.invoices',
+  pageSlug: 'invoices',
+  demoPath: '/finance/invoices',
+  surface: 'list',
+  description: '销项 / 进项发票登记、税务校验、未开票预警',
+  searchPlaceholder: '搜索发票号码/对方单位/关联单据...',
+  tabs: ['总览', '销项发票', '进项发票', '未开票汇总(9)', '开票任务(2)'],
+  tools: ['销项批量识别', '进项批量识别', '导出'],
+  filters: [],
+  columns: [
+    { key: 'number', title: '发票号码', width: 150 },
+    { key: 'direction', title: '方向', width: 80 },
+    { key: 'date', title: '日期', width: 100 },
+    { key: 'party', title: '对方单位', width: 180 },
+    { key: 'type', title: '类型', width: 80 },
+    { key: 'amount', title: '含税金额', width: 110 },
+    { key: 'tax', title: '税额', width: 100 },
+    { key: 'referenceCode', title: '关联单据', width: 130 },
+    { key: 'remark', title: '备注', width: 180 },
+    { key: 'action', title: '操作', width: 90 },
+  ],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '导出',
+  pageSize: 10,
+  emptyHint: '当前条件下没有发票记录',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/finance/invoices',
+    referenceScreenshot: '.codex-artifacts/replication/finance__invoices/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/finance__invoices/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/finance__invoices.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+
+export type InvoicesModel = typeof invoicesModel;

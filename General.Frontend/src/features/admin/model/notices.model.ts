@@ -1,0 +1,67 @@
+import type { PageModel } from '@/components/page';
+
+export const noticesModel = {
+  key: '行政管理|公司通知',
+  module: '行政管理',
+  moduleSlug: 'admin',
+  label: '公司通知',
+  path: '/admin/notices',
+  routeName: 'page.admin.notices',
+  pageSlug: 'notices',
+  demoPath: '/ops/notices',
+  surface: 'list',
+  description: '发布、查询、撤回公司级通知，支持指定范围与附件',
+  searchPlaceholder: '搜索主题/发布人/部门...',
+  tabs: [],
+  tools: ['发布通知'],
+  filters: [
+    {
+      key: 'category',
+      label: '通知类别',
+      options: ['全部类别', '政策制度', '人事变动', '活动通知', '紧急通知', '节假日安排', '规章制度', '其他'],
+    },
+    { key: 'scope', label: '发布范围', options: ['全部范围', '全公司', '指定部门', '指定人员'] },
+    { key: 'status', label: '通知状态', options: ['全部状态', '草稿', '已发布', '已撤回', '已过期'] },
+  ],
+  columns: [
+    { key: 'code', title: '编号', width: 150 },
+    { key: 'name', title: '主题', width: 400 },
+    { key: 'category', title: '类别 / 优先级', width: 115 },
+    { key: 'scope', title: '范围', width: 110 },
+    { key: 'department', title: '发布部门 / 发布人', width: 150 },
+    { key: 'publishedAt', title: '发布时间', width: 145 },
+    { key: 'reading', title: '阅读情况', width: 115 },
+    { key: 'status', title: '状态', width: 85 },
+    { key: 'action', title: '操作', width: 85 },
+  ],
+  stats: [
+    { key: 'total', label: '通知总数', value: '8', tone: 'primary' },
+    { key: 'published', label: '已发布', value: '6', tone: 'success' },
+    { key: 'draft', label: '草稿', value: '0', tone: 'warning' },
+    { key: 'withdrawn', label: '已撤回', value: '1', tone: 'danger' },
+  ],
+  panels: [],
+  rows: [
+    { id: 'notice-008', code: 'NOTC-2026-008', name: '关于2026年五一劳动节放假安排的通知', status: '已发布' },
+    { id: 'notice-007', code: 'NOTC-2026-007', name: '新版《员工差旅费报销管理办法V3.0》正式发布', status: '已发布' },
+    { id: 'notice-006', code: 'NOTC-2026-006', name: '关于工程部组织架构调整的通知', status: '已发布' },
+    { id: 'notice-005', code: 'NOTC-2026-005', name: '公司年度春季团建活动报名通知', status: '已发布' },
+    { id: 'notice-004', code: 'NOTC-2026-004', name: '【紧急】公司服务器周六凌晨维护通知', status: '已发布' },
+    { id: 'notice-003', code: 'NOTC-2026-003', name: '关于Q1销售奖金发放说明', status: '已发布' },
+    { id: 'notice-002', code: 'NOTC-2026-002', name: '员工年度健康体检安排通知', status: '已过期' },
+    { id: 'notice-001', code: 'NOTC-2026-001', name: '关于元宵节当日提前下班的通知', status: '已撤回' },
+  ],
+  primaryAction: '发布通知',
+  emptyHint: '当前筛选下没有公司通知',
+  rowActions: ['view', 'status'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/ops/notices',
+    referenceScreenshot: '.codex-artifacts/replication/admin__notices/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/admin__notices/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/admin__notices.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type NoticesModel = typeof noticesModel;

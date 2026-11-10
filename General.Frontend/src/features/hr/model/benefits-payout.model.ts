@@ -1,0 +1,41 @@
+import type { PageModel } from '@/components/page';
+
+export const benefitsPayoutModel = {
+  key: '人事管理|福利发放',
+  module: '人事管理',
+  moduleSlug: 'hr',
+  label: '福利发放',
+  path: '/hr/benefits-payout',
+  routeName: 'page.hr.benefits-payout',
+  pageSlug: 'benefits-payout',
+  demoPath: '/hr/benefits',
+  surface: 'cards',
+  description: '节日福利、生日礼物、员工关怀礼品发放与领取记录',
+  searchPlaceholder: '',
+  tabs: ['发放记录', '兑换码库 7', '实物库 7'],
+  tools: ['新建发放'],
+  filters: [],
+  columns: [],
+  stats: [
+    { key: 'value', label: '累计发放价值', value: '¥4,579', tone: 'primary' },
+    { key: 'quantity', label: '累计发放数量', value: '53', tone: 'success' },
+    { key: 'codes', label: '兑换码剩余', value: '352', tone: 'primary' },
+    { key: 'stock', label: '实物库存剩余', value: '360', tone: 'warning' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建发放',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无福利发放记录',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/hr/benefits',
+    referenceScreenshot: '.codex-artifacts/replication/hr__benefits-payout/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/hr__benefits-payout/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/hr__benefits-payout.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+export type BenefitsPayoutModel = typeof benefitsPayoutModel;

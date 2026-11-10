@@ -1,0 +1,47 @@
+import type { PageModel } from '@/components/page';
+
+export const leaveModel = {
+  key: '考勤假期|请假管理',
+  module: '考勤假期',
+  moduleSlug: 'attendance',
+  label: '请假管理',
+  path: '/attendance/leave',
+  routeName: 'page.attendance.leave',
+  pageSlug: 'leave',
+  demoPath: '/hr/leave',
+  surface: 'list',
+  description: '管理您的假期余额、提交请假申请、审批团队成员请假',
+  searchPlaceholder: '搜索单号/事由...',
+  tabs: ['我的假期', '审批管理', '调休补假', '假期配置'],
+  tools: ['新建请假'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '单号', width: 125 },
+    { key: 'type', title: '假别', width: 95 },
+    { key: 'startDate', title: '开始日期', width: 118 },
+    { key: 'endDate', title: '结束日期', width: 118 },
+    { key: 'days', title: '天数', width: 70 },
+    { key: 'reason', title: '事由', width: 240 },
+    { key: 'status', title: '状态', width: 100 },
+    { key: 'approver', title: '审批人', width: 90 },
+  ],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '新建请假',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无匹配的请假申请',
+  rowActions: ['view', 'withdraw'],
+  actions: [{ id: 'create', label: '新建请假', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/hr/leave',
+    referenceScreenshot: '.codex-artifacts/replication/attendance__leave/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/attendance__leave/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/attendance__leave.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type LeaveModel = typeof leaveModel;

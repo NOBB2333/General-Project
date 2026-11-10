@@ -1,0 +1,105 @@
+import { defineReferenceFixture } from '@/components/page';
+import type { PublicSeaRow } from './public-sea.types';
+
+const referenceRows = [
+  {
+    id: 'SEA-001',
+    customer: '中核集团华东分公司',
+    industry: '电力能源',
+    level: 'A',
+    contact: '刘主任',
+    city: '上海',
+    source: '主动释放',
+    estimatedValue: 850000,
+    releaseDays: 8,
+  },
+  {
+    id: 'SEA-002',
+    customer: '国电投江苏电力',
+    industry: '电力能源',
+    level: 'B',
+    contact: '陈工',
+    city: '南京',
+    source: '超期回收',
+    estimatedValue: 420000,
+    releaseDays: 10,
+  },
+  {
+    id: 'SEA-003',
+    customer: '中石化镇海炼化',
+    industry: '石油化工',
+    level: 'A',
+    contact: '马工程师',
+    city: '宁波',
+    source: '主动释放',
+    estimatedValue: 1200000,
+    releaseDays: 13,
+  },
+  {
+    id: 'SEA-004',
+    customer: '宝武集团湛江钢铁',
+    industry: '钢铁冶金',
+    level: 'B',
+    contact: '黄经理',
+    city: '湛江',
+    source: '超期回收',
+    estimatedValue: 580000,
+    releaseDays: 16,
+  },
+  {
+    id: 'SEA-005',
+    customer: '南京环保科技集团',
+    industry: '环保水处理',
+    level: 'C',
+    contact: '徐总',
+    city: '南京',
+    source: '合并释放',
+    estimatedValue: 180000,
+    releaseDays: 20,
+  },
+  {
+    id: 'SEA-006',
+    customer: '比亚迪合肥工厂',
+    industry: '装备制造',
+    level: 'A',
+    contact: '吴经理',
+    city: '合肥',
+    source: '新建',
+    estimatedValue: 960000,
+    releaseDays: 3,
+  },
+  {
+    id: 'SEA-007',
+    customer: '徐工集团徐州总部',
+    industry: '装备制造',
+    level: 'B',
+    contact: '孙工',
+    city: '徐州',
+    source: '主动释放',
+    estimatedValue: 350000,
+    releaseDays: 27,
+  },
+  {
+    id: 'SEA-008',
+    customer: '杭州地铁集团',
+    industry: '轨道交通',
+    level: 'A',
+    contact: '郑主管',
+    city: '杭州',
+    source: '超期回收',
+    estimatedValue: 720000,
+    releaseDays: 31,
+  },
+] satisfies readonly PublicSeaRow[];
+
+const fixture = {
+  sourceUrl: 'https://demo.risemap.cn/sales/public-sea',
+  capturedAt: '2026-09-16',
+  viewport: { width: 1618, height: 899 },
+  rows: referenceRows,
+  defaults: { tab: 'all', industry: 'all', source: 'all', query: '' },
+} as const;
+
+export const publicSeaReferenceFixture = defineReferenceFixture<PublicSeaRow, typeof fixture>(fixture);
+export const publicSeaIndustries = [...new Set(referenceRows.map((row) => row.industry))];
+export const publicSeaSources = [...new Set(referenceRows.map((row) => row.source))];

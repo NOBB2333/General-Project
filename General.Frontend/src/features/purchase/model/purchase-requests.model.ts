@@ -1,0 +1,68 @@
+import type { ListPageModel } from '@/components/page';
+
+export const purchaseRequestsModel = {
+  key: '采购管理|采购申请',
+  module: '采购管理',
+  moduleSlug: 'purchase',
+  label: '采购申请',
+  path: '/purchase/requests',
+  routeName: 'page.purchase.purchase-requests',
+  pageSlug: 'purchase-requests',
+  demoPath: '/purchase/requests',
+  surface: 'list',
+  description: '发起采购申请、审批流转、转询价/订单全流程跟踪',
+  searchPlaceholder: '搜索申请编号、标题...',
+  tabs: ['全部', '草稿', '审批中', '询价中', '比价中', '采购中', '已完成', '已驳回'],
+  tools: ['导出', '新建申请'],
+  filters: [
+    {
+      key: 'supplier',
+      label: '供应商',
+      options: ['全部供应商', '威纶通科技', '西门子中国区代理', '三菱电机自动化', '明纬电源直销'],
+    },
+    { key: 'requestor', label: '申请人', options: ['全部申请人', '张经理', '仓管员', '李工', '王工', '行政'] },
+  ],
+  columns: [
+    { key: 'id', title: '申请编号', width: 120 },
+    { key: 'title', title: '申请标题', width: 180 },
+    { key: 'priority', title: '优先级', width: 90 },
+    { key: 'project', title: '关联项目', width: 150 },
+    { key: 'requestor', title: '申请人', width: 100 },
+    { key: 'items', title: '商品数', width: 80 },
+    { key: 'amount', title: '金额', width: 110 },
+    { key: 'status', title: '状态', width: 90 },
+    { key: 'poList', title: '采购订单', width: 130 },
+    { key: 'date', title: '日期', width: 100 },
+  ],
+  stats: [
+    { key: 'approval', label: '审批中', value: '2', tone: 'warning' },
+    { key: 'quote', label: '询价/比价中', value: '2', tone: 'neutral' },
+    { key: 'purchase', label: '采购中', value: '1', tone: 'primary' },
+    { key: 'done', label: '已完成', value: '1', tone: 'success' },
+    { key: 'amount', label: '本月金额', value: '¥80.2万', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建申请',
+  moreTools: [],
+  pageSize: 20,
+  emptyHint: '暂无匹配的采购申请',
+  rowActions: ['view'],
+  actions: [
+    { id: 'export', label: '导出', kind: 'export' },
+    { id: 'create', label: '新建申请', kind: 'create', tone: 'primary' },
+  ],
+  listScopes: [{ id: 'all', label: '全部', count: 8 }],
+  listViews: [{ id: 'list', label: '申请列表' }],
+  listTabs: [{ id: 'all', label: '全部' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/purchase/requests',
+    referenceScreenshot: '.codex-artifacts/replication/purchase__purchase-requests/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/purchase__purchase-requests/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/purchase__purchase-requests.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies ListPageModel;
+
+export type PurchaseRequestsModel = typeof purchaseRequestsModel;

@@ -1,0 +1,100 @@
+import type { SearchPageModel } from '@/components/page';
+
+export const materialSearchModel = {
+  key: '基础资料|综合物料搜索',
+  module: '基础资料',
+  moduleSlug: 'base',
+  label: '综合物料搜索',
+  path: '/base/material-search',
+  routeName: 'page.base.material-search',
+  pageSlug: 'material-search',
+  demoPath: '/base/material-search',
+  surface: 'search',
+  description: '按订货号/型号/名称搜索，快速查看物料完整信息、库存与价格趋势',
+  searchPlaceholder: '按订货号、型号、物料名称搜索',
+  tabs: ['搜索', '最近查看'],
+  tools: ['搜索', '清空记录'],
+  actions: [
+    { id: 'search', label: '搜索', kind: 'custom', tone: 'primary' },
+    { id: 'clear-history', label: '清空记录', kind: 'reset' },
+  ],
+  copy: {
+    heading: '搜索物料查看详细信息',
+    description: '支持按订货号、型号、物料名称搜索',
+    inputLabel: '搜索物料',
+    entityLabel: '物料',
+    recentTitle: '最近查看记录',
+    recentEmptyTitle: '暂无最近查看记录',
+    recentEmptyDescription: '输入订货号开始搜索物料。',
+    notFoundTitle: '没有找到匹配物料',
+    notFoundDescription: '请检查订货号、型号或物料名称后重新搜索。',
+    detailCodeLabel: '订货号/型号',
+    queryRequiredMessage: '请输入订货号、型号或物料名称',
+  },
+  resultFields: {
+    code: 'code',
+    title: 'name',
+    category: 'category',
+    timestamp: 'updatedAt',
+    categoryFallback: '未分类',
+  },
+  suggestions: ['MT8102iP', '6ES7214-1AG40', 'FX5U-32MT/ES'],
+  initialRecentIds: ['material-search-001', 'material-search-002', 'material-search-003'],
+  filters: [
+    {
+      key: 'status',
+      label: '状态',
+      options: ['全部状态', '草稿', '进行中', '已完成'],
+    },
+    {
+      key: 'time',
+      label: '时间',
+      options: ['全部时间', '本周', '本月', '本季', '本年'],
+    },
+  ],
+  columns: [
+    {
+      key: 'code',
+      title: '订货号/型号',
+      width: 160,
+    },
+    {
+      key: 'name',
+      title: '物料名称',
+      width: 200,
+    },
+    {
+      key: 'category',
+      title: '分类',
+      width: 120,
+    },
+    {
+      key: 'updatedAt',
+      title: '查看时间',
+      width: 140,
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 100,
+    },
+  ],
+  stats: [],
+  panels: [],
+  rows: [],
+  primaryAction: '搜索',
+  moreTools: ['导入', '打印', '刷新', '列设置', '批量启用', '批量停用'],
+  pageSize: 10,
+  emptyHint: '当前筛选下没有综合物料搜索，可重置条件或搜索',
+  rowActions: ['view', 'edit', 'copy', 'delete'],
+  replication: {
+    status: 'verified',
+    referenceUrl: 'https://demo.risemap.cn/base/material-search',
+    referenceScreenshot: '.codex-artifacts/replication/base__material-search/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/base__material-search/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/base__material-search.md',
+    capturedAt: '2026-07-15',
+  },
+} as const satisfies SearchPageModel;
+
+export type MaterialSearchModel = typeof materialSearchModel;

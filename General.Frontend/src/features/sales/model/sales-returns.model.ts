@@ -1,0 +1,51 @@
+import type { PageModel } from '@/components/page';
+
+export const salesReturnsModel = {
+  key: '销售业务|销售退货',
+  module: '销售业务',
+  moduleSlug: 'sales',
+  label: '销售退货',
+  path: '/sales/returns',
+  routeName: 'page.sales.sales-returns',
+  pageSlug: 'sales-returns',
+  demoPath: '/sales/returns',
+  surface: 'list',
+  description: '客户退货申请审核、退款处理、责任原因归集',
+  searchPlaceholder: '搜索退货单号...',
+  tabs: ['全部', '待审核', '已审核', '已退货', '已退款'],
+  tools: ['导出', '新建退货'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '退货单号', width: 160 },
+    { key: 'orderCode', title: '销售单号', width: 160 },
+    { key: 'customer', title: '客户', width: 190 },
+    { key: 'reason', title: '退货原因', width: 180 },
+    { key: 'quantity', title: '数量', width: 80 },
+    { key: 'amount', title: '金额', width: 120 },
+    { key: 'status', title: '状态', width: 110 },
+    { key: 'attachments', title: '附件', width: 80 },
+    { key: 'action', title: '操作', width: 80 },
+  ],
+  stats: [
+    { key: 'total', label: '退货总数', value: '4', tone: 'primary' },
+    { key: 'pending', label: '待处理', value: '2', tone: 'warning' },
+    { key: 'amount', label: '退货金额', value: '¥5.8万', tone: 'danger' },
+    { key: 'rate', label: '退货率', value: '1.8%', tone: 'neutral' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建退货',
+  pageSize: 25,
+  emptyHint: '当前筛选下没有销售退货',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/returns',
+    referenceScreenshot: '.codex-artifacts/replication/sales__returns/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/sales__returns/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/sales__returns.md',
+    capturedAt: '2026-08-16',
+  },
+} as const satisfies PageModel;
+
+export type SalesReturnsModel = typeof salesReturnsModel;

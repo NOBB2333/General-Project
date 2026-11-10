@@ -1,0 +1,51 @@
+import type { PageModel } from '@/components/page';
+
+export const beveragesModel = {
+  key: '行政管理|酒水管理',
+  module: '行政管理',
+  moduleSlug: 'admin',
+  label: '酒水管理',
+  path: '/admin/beverages',
+  routeName: 'page.admin.beverages',
+  pageSlug: 'beverages',
+  demoPath: '/gift/beverage',
+  surface: 'list',
+  description: '酒水库存盘点、申请审批、领用记录与采购计划全流程管控',
+  searchPlaceholder: '搜索酒水名称...',
+  tabs: ['库存台账', '申请记录'],
+  tools: ['导出', '申请酒水'],
+  filters: [{ key: 'category', label: '类别', options: ['全部', '白酒', '红酒', '啤酒', '饮料', '茶叶', '其他'] }],
+  columns: [
+    { key: 'code', title: '编号', width: 100 },
+    { key: 'name', title: '名称', width: 180 },
+    { key: 'category', title: '类别', width: 100 },
+    { key: 'specification', title: '规格', width: 150 },
+    { key: 'stock', title: '库存', width: 100 },
+    { key: 'unitPrice', title: '单价', width: 100 },
+    { key: 'stockValue', title: '库存价值', width: 120 },
+    { key: 'location', title: '存放位置', width: 150 },
+    { key: 'status', title: '状态', width: 90 },
+  ],
+  stats: [
+    { key: 'value', label: '库存总值', value: '¥6.55万', tone: 'primary' },
+    { key: 'usage', label: '本月领用', value: '¥0.58万', tone: 'success' },
+    { key: 'pending', label: '待审核', value: '2', tone: 'warning' },
+    { key: 'warning', label: '库存预警', value: '0', tone: 'success' },
+    { key: 'categories', label: '品类数', value: '5', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '申请酒水',
+  emptyHint: '当前条件下没有酒水库存',
+  rowActions: [],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/gift/beverage',
+    referenceScreenshot: '.codex-artifacts/replication/admin__beverages/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/admin__beverages/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/admin__beverages.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+
+export type BeveragesModel = typeof beveragesModel;

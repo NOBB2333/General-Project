@@ -1,0 +1,53 @@
+import type { PageModel } from '@/components/page';
+export const meetingNotesModel = {
+  key: '行政管理|会议纪要',
+  module: '行政管理',
+  moduleSlug: 'admin',
+  label: '会议纪要',
+  path: '/admin/meeting-notes',
+  routeName: 'page.admin.meeting-notes',
+  pageSlug: 'meeting-notes',
+  demoPath: '/ops/meetings',
+  surface: 'list',
+  description: '会议记录归档、决议追踪、待办事项指派与执行情况复盘',
+  searchPlaceholder: '搜索会议...',
+  tabs: [],
+  tools: ['新建会议纪要'],
+  filters: [
+    {
+      key: 'type',
+      label: '会议类型',
+      options: ['全部类型', '项目会议', '经营分析', '技术评审', '部门会议', '全体会议', '专题讨论'],
+    },
+    { key: 'status', label: '状态', options: ['全部状态', '草稿', '已发送', '已归档'] },
+  ],
+  columns: [
+    { key: 'code', title: '编号', width: 160 },
+    { key: 'title', title: '会议主题', width: 320 },
+    { key: 'date', title: '日期/时间', width: 180 },
+    { key: 'host', title: '主持人', width: 150 },
+    { key: 'attendees', title: '参会人', width: 210 },
+    { key: 'todos', title: '待办', width: 120 },
+    { key: 'status', title: '状态', width: 100 },
+  ],
+  stats: [
+    { key: 'month', label: '本月会议', value: '6', tone: 'primary' },
+    { key: 'pending', label: '待跟进待办', value: '9', tone: 'warning' },
+    { key: 'done', label: '已完成待办', value: '3', tone: 'success' },
+    { key: 'attendees', label: '参会人次', value: '32', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建会议纪要',
+  emptyHint: '当前条件下没有会议纪要',
+  rowActions: ['view'],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/ops/meetings',
+    referenceScreenshot: '.codex-artifacts/replication/admin__meeting-notes/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/admin__meeting-notes/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/admin__meeting-notes.md',
+    capturedAt: '2026-09-16',
+  },
+} satisfies PageModel;
+export type MeetingNotesModel = typeof meetingNotesModel;

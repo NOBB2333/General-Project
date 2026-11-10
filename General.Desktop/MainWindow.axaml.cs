@@ -28,7 +28,7 @@ public partial class MainWindow : Window
         var distUrl = ResolveDistUrl(overrideDistDir)
             ?? ResolveDistUrl(Path.Combine(AppContext.BaseDirectory, "wwwroot"));
 
-        return distUrl ?? "http://localhost:5677/workspace";
+        return distUrl ?? "http://localhost:5011/";
     }
 
     private static string? ResolveDistUrl(string? distDirectory)

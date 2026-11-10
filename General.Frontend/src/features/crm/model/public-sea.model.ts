@@ -1,0 +1,51 @@
+import type { PageModel } from '@/components/page';
+
+export const publicSeaModel = {
+  key: 'CRM客户管理|公海客户',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '公海客户',
+  path: '/crm/public-sea',
+  routeName: 'page.crm.public-sea',
+  pageSlug: 'public-sea',
+  demoPath: '/sales/public-sea',
+  surface: 'list',
+  description: '未分配或已释放的客户资源池，销售人员可自行领取',
+  searchPlaceholder: '搜索客户名称...',
+  tabs: ['全部公海', '最近释放', '长期未跟进', '高价值'],
+  tools: ['导出', '新建公海客户'],
+  filters: [],
+  columns: [
+    { key: 'customer', title: '客户名称', width: 250 },
+    { key: 'industry', title: '行业', width: 180 },
+    { key: 'level', title: '级别', width: 90 },
+    { key: 'contact', title: '联系人', width: 140 },
+    { key: 'city', title: '所在城市', width: 140 },
+    { key: 'source', title: '来源', width: 150 },
+    { key: 'estimatedValue', title: '预估价值', width: 160 },
+    { key: 'releaseDays', title: '释放天数', width: 130 },
+    { key: 'action', title: '操作', width: 90 },
+  ],
+  stats: [
+    { key: 'total', label: '公海客户数', value: '8', tone: 'primary' },
+    { key: 'new', label: '本周新增', value: '1', tone: 'primary' },
+    { key: 'valuable', label: '高价值客户', value: '5', tone: 'success' },
+    { key: 'value', label: '预估总价值', value: '¥526万', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建公海客户',
+  pageSize: 20,
+  emptyHint: '当前筛选下没有公海客户',
+  actions: [{ id: 'create', label: '新建公海客户', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/public-sea',
+    referenceScreenshot: '.codex-artifacts/replication/crm__public-sea/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__public-sea/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__public-sea.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type PublicSeaModel = typeof publicSeaModel;

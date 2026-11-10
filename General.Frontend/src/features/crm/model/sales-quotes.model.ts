@@ -1,0 +1,53 @@
+import type { PageModel } from '@/components/page';
+
+export const salesQuotesModel = {
+  key: 'CRM客户管理|销售报价',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '销售报价',
+  path: '/crm/sales-quotes',
+  routeName: 'page.crm.sales-quotes',
+  pageSlug: 'sales-quotes',
+  demoPath: '/sales/quotations',
+  surface: 'list',
+  description: '报价单创建、审批与转订单全流程管理',
+  searchPlaceholder: '搜索报价单号、客户、项目...',
+  tabs: ['全部', '草稿', '待审核', '已发送', '已接受', '已拒绝', '已过期'],
+  tools: ['导出', '新建报价'],
+  filters: [],
+  columns: [
+    { key: 'code', title: '报价单号', width: 150 },
+    { key: 'customer', title: '客户', width: 170 },
+    { key: 'project', title: '关联项目', width: 180 },
+    { key: 'owner', title: '负责人', width: 130 },
+    { key: 'productCount', title: '商品数', width: 90 },
+    { key: 'amount', title: '报价金额', width: 130 },
+    { key: 'discount', title: '折扣', width: 80 },
+    { key: 'status', title: '状态', width: 100 },
+    { key: 'validUntil', title: '有效期至', width: 130 },
+    { key: 'date', title: '日期', width: 120 },
+    { key: 'action', title: '', width: 54 },
+  ],
+  stats: [
+    { key: 'totalAmount', label: '报价总额', value: '¥312.2万', tone: 'primary' },
+    { key: 'wonAmount', label: '已成交金额', value: '¥90.6万', tone: 'success' },
+    { key: 'followUp', label: '待跟进', value: '4', tone: 'warning' },
+    { key: 'winRate', label: '成交率', value: '40%', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新建报价',
+  pageSize: 20,
+  emptyHint: '当前条件下没有报价单',
+  actions: [{ id: 'create', label: '新建报价', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/sales/quotations',
+    referenceScreenshot: '.codex-artifacts/replication/crm__sales-quotes/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__sales-quotes/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__sales-quotes.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type SalesQuotesModel = typeof salesQuotesModel;

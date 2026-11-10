@@ -1,0 +1,108 @@
+import type { RouteRecordRaw } from 'vue-router';
+
+export const drawings_routes: RouteRecordRaw[] = [
+  {
+    path: 'drawings/drawing-overview',
+    name: 'page.drawings.drawing-overview',
+    component: () => import('@/features/drawings/views/DrawingOverviewPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸总览',
+      title: '图纸总览',
+      module: '图纸管理',
+      pageLabel: '图纸总览',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-numbers',
+    name: 'page.drawings.drawing-numbers',
+    component: () => import('@/features/drawings/views/DrawingNumbersPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图号档案',
+      title: '图号档案',
+      module: '图纸管理',
+      pageLabel: '图号档案',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-review',
+    name: 'page.drawings.drawing-review',
+    component: () => import('@/features/drawings/views/DrawingReviewPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸评审',
+      title: '图纸评审',
+      module: '图纸管理',
+      pageLabel: '图纸评审',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-publish',
+    name: 'page.drawings.drawing-publish',
+    component: () => import('@/features/drawings/views/DrawingPublishPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸发布',
+      title: '图纸发布',
+      module: '图纸管理',
+      pageLabel: '图纸发布',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-change',
+    name: 'page.drawings.drawing-change',
+    component: () => import('@/features/drawings/views/DrawingChangePage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸变更',
+      title: '图纸变更',
+      module: '图纸管理',
+      pageLabel: '图纸变更',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-issue-log',
+    name: 'page.drawings.drawing-issue-log',
+    component: () => import('@/features/drawings/views/DrawingIssueLogPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸发放记录',
+      title: '图纸发放记录',
+      module: '图纸管理',
+      pageLabel: '图纸发放记录',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/drawing-links',
+    name: 'page.drawings.drawing-links',
+    component: () => import('@/features/drawings/views/DrawingLinksPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '图纸关联查询',
+      title: '图纸关联查询',
+      module: '图纸管理',
+      pageLabel: '图纸关联查询',
+      feature: 'drawings',
+    },
+  },
+  {
+    path: 'drawings/customer-drawings',
+    name: 'page.drawings.customer-drawings',
+    component: () => import('@/features/drawings/views/CustomerDrawingsPage.vue'),
+    meta: {
+      appView: 'feature',
+      workspace: '客户图纸',
+      title: '客户图纸',
+      module: '图纸管理',
+      pageLabel: '客户图纸',
+      feature: 'drawings',
+    },
+  },
+];

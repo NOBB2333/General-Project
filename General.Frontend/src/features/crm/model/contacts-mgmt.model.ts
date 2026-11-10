@@ -1,0 +1,50 @@
+import type { PageModel } from '@/components/page';
+
+export const contactsMgmtModel = {
+  key: 'CRM客户管理|联系人管理',
+  module: 'CRM客户管理',
+  moduleSlug: 'crm',
+  label: '联系人管理',
+  path: '/crm/contacts-mgmt',
+  routeName: 'page.crm.contacts-mgmt',
+  pageSlug: 'contacts-mgmt',
+  demoPath: '/base/contacts',
+  surface: 'list',
+  description: '以「人」为中心管理所有客户联系人，追踪离职、跳槽等人脉变动',
+  searchPlaceholder: '搜索姓名、公司、电话、邮箱...',
+  tabs: ['全部', '在职', '已跳槽', '已离职', '停用'],
+  tools: ['新增联系人'],
+  filters: [{ key: 'owner', label: '维护人', options: ['全部维护人'] }],
+  columns: [
+    { key: 'name', title: '联系人', width: 180 },
+    { key: 'position', title: '职位 / 部门', width: 180 },
+    { key: 'company', title: '所属公司', width: 260 },
+    { key: 'status', title: '任职状态', width: 110 },
+    { key: 'decision', title: '决策权重', width: 130 },
+    { key: 'contact', title: '联系方式', width: 250 },
+    { key: 'owner', title: '维护人', width: 120 },
+    { key: 'action', title: '操作', width: 90 },
+  ],
+  stats: [
+    { key: 'total', label: '联系人总数', value: '11', tone: 'neutral' },
+    { key: 'active', label: '在职', value: '7', tone: 'success' },
+    { key: 'away', label: '不在原公司', value: '3', tone: 'warning' },
+    { key: 'kp', label: '关键决策人(KP)', value: '4', tone: 'primary' },
+  ],
+  panels: [],
+  rows: [],
+  primaryAction: '新增联系人',
+  pageSize: 20,
+  emptyHint: '当前条件下没有联系人',
+  actions: [{ id: 'create', label: '新增联系人', kind: 'create', tone: 'primary' }],
+  replication: {
+    status: 'implemented',
+    referenceUrl: 'https://demo.risemap.cn/base/contacts',
+    referenceScreenshot: '.codex-artifacts/replication/crm__contacts-mgmt/reference-default.png',
+    localScreenshot: '.codex-artifacts/replication/crm__contacts-mgmt/local-default.png',
+    evidenceDocument: 'outputs/page-evidence/crm__contacts-mgmt.md',
+    capturedAt: '2026-09-16',
+  },
+} as const satisfies PageModel;
+
+export type ContactsMgmtModel = typeof contactsMgmtModel;
